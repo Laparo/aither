@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  lint-and-test:
+    name: Lint & Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Biome lint & format check
+        run: npm run lint
+
+      - name: Run tests
+        run: npm test
+
+  # CodeRabbit runs automatically on PRs via the GitHub App.
+  # Install the app at: https://github.com/apps/coderabbitai
+  # Configuration: .coderabbit.yaml
+
+  # TODO: Qodo AI Review — uncomment when QODO_API_KEY secret is available
+  # qodo:
+  #   name: Qodo AI Review
+  #   runs-on: ubuntu-latest
+  #   if: github.event_name == 'pull_request'
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #       with:
+  #         fetch-depth: 0
+  #     - uses: qodo-ai/qodo-merge-pro@v2
+  #       env:
+  #         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  #         QODO_API_KEY: ${{ secrets.QODO_API_KEY }}
+  #       with:
+  #         args: "--pr_reviewer.extra_instructions='Focus on TypeScript type safety, Zod schema correctness, and test coverage. Project uses strict TDD.'"

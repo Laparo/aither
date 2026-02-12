@@ -1,0 +1,337 @@
+openapi: "3.1.0"
+info:
+  title: Aither Sync API
+  description: |
+    Internal API endpoints for Aither's Hemera Academy integration.
+    These endpoints handle sync triggering, status monitoring, and
+    MUX recording URL transmission. All endpoints require Clerk
+    authentication; sync management requires admin role.
+  version: "1.0.0"
+  contact:
+    name: Aither Development
+
+servers:
+  - url: http://localhost:3000
+    description: Local development / Linux service
+
+security:
+  - clerkAuth: []
+
+paths:
+  /api/sync:
+    post:
+      operationId: triggerSync
+      summary: Trigger a data synchronization
+      description: |
+        Starts a new sync job that fetches HTML templates and participant
+        data from the hemera.academy API, populates templates, and
+        generates HTML files. Returns immediately with 202 Accepted and
+        a job ID. The sync runs asynchronously in the background.
+        Only one sync can run at a time (409 if already running).
+      tags:
+        - Sync
+      security:
+        - clerkAuth: []
+      responses:
+        "202":
+          description: Sync job started successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SyncJobResponse"
+              example:
+                jobId: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+                status: "running"
+                startTime: "2026-02-11T08:00:00Z"
+                endTime: null
+                recordsFetched: 0
+                htmlFilesGenerated: 0
+                htmlFilesSkipped: 0
+                recordsTransmitted: 0
+                errors: []
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "409":
+          description: A sync job is already running
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: "SYNC_ALREADY_RUNNING"
+                message: "A sync job is already in progress"
+                jobId: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+
+    get:
+      operationId: getSyncStatus
+      summary: Get current/last sync status
+      description: |
+        Returns the status of the current or most recent sync job.
+        If no sync has ever run, returns 404.
+      tags:
+        - Sync
+      security:
+        - clerkAuth: []
+      responses:
+        "200":
+          description: Sync job status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SyncJobResponse"
+              example:
+                jobId: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+                status: "success"
+                startTime: "2026-02-11T08:00:00Z"
+                endTime: "2026-02-11T08:02:34Z"
+                recordsFetched: 247
+                htmlFilesGenerated: 52
+                htmlFilesSkipped: 195
+                recordsTransmitted: 0
+                errors: []
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          description: No sync has been executed yet
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: "NO_SYNC_HISTORY"
+                message: "No synchronization has been executed yet"
+
+  /api/recordings:
+    post:
+      operationId: transmitRecordingUrl
+      summary: Transmit a MUX recording URL to hemera.academy
+      description: |
+        Accepts a MUX video recording URL for a seminar and immediately
+        forwards it to the hemera.academy API. This endpoint is designed
+        to be called by the camera/recording feature after a successful
+        MUX upload. The URL is NOT stored locally — it is passed directly
+        to the hemera.academy API (Constitution VII: stateless).
+      tags:
+        - Recordings
+      security:
+        - clerkAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RecordingTransmitRequest"
+            example:
+              seminarSourceId: "sem-001"
+              muxAssetId: "asset-abc123"
+              muxPlaybackUrl: "https://stream.mux.com/abc123.m3u8"
+              recordingDate: "2026-02-11T10:00:00Z"
+      responses:
+        "200":
+          description: Recording URL successfully transmitted to hemera.academy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RecordingTransmitResponse"
+              example:
+                success: true
+                seminarSourceId: "sem-001"
+                hemeraResponse:
+                  status: 200
+                  message: "Recording URL updated"
+        "400":
+          description: Invalid request body
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidationErrorResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "502":
+          description: hemera.academy API rejected the request or is unavailable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: "HEMERA_API_ERROR"
+                message: "hemera.academy API returned 404: seminar not found"
+                seminarSourceId: "sem-001"
+
+components:
+  securitySchemes:
+    clerkAuth:
+      type: http
+      scheme: bearer
+      description: Clerk session token or API key
+
+  schemas:
+    SyncJobResponse:
+      type: object
+      required:
+        - jobId
+        - status
+        - startTime
+        - recordsFetched
+        - htmlFilesGenerated
+        - htmlFilesSkipped
+        - recordsTransmitted
+        - errors
+      properties:
+        jobId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [running, success, failed]
+        startTime:
+          type: string
+          format: date-time
+        endTime:
+          type: string
+          format: date-time
+          nullable: true
+        recordsFetched:
+          type: integer
+          minimum: 0
+        htmlFilesGenerated:
+          type: integer
+          minimum: 0
+        htmlFilesSkipped:
+          type: integer
+          minimum: 0
+        recordsTransmitted:
+          type: integer
+          minimum: 0
+        errors:
+          type: array
+          items:
+            $ref: "#/components/schemas/SyncError"
+
+    SyncError:
+      type: object
+      required:
+        - entity
+        - message
+        - timestamp
+      properties:
+        entity:
+          type: string
+          description: "Entity reference, e.g., 'seminar:sem-001'"
+        message:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+
+    RecordingTransmitRequest:
+      type: object
+      required:
+        - seminarSourceId
+        - muxAssetId
+        - muxPlaybackUrl
+        - recordingDate
+      properties:
+        seminarSourceId:
+          type: string
+          description: Seminar ID on hemera.academy
+        muxAssetId:
+          type: string
+          description: MUX asset identifier
+        muxPlaybackUrl:
+          type: string
+          format: uri
+          description: MUX playback URL
+        recordingDate:
+          type: string
+          format: date-time
+          description: Date/time the recording was made
+
+    RecordingTransmitResponse:
+      type: object
+      required:
+        - success
+        - seminarSourceId
+      properties:
+        success:
+          type: boolean
+        seminarSourceId:
+          type: string
+        hemeraResponse:
+          type: object
+          properties:
+            status:
+              type: integer
+            message:
+              type: string
+
+    ErrorResponse:
+      type: object
+      required:
+        - error
+        - message
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+        jobId:
+          type: string
+          format: uuid
+        seminarSourceId:
+          type: string
+
+    ValidationErrorResponse:
+      type: object
+      required:
+        - error
+        - message
+        - details
+      properties:
+        error:
+          type: string
+          example: "VALIDATION_ERROR"
+        message:
+          type: string
+          example: "Request body validation failed"
+        details:
+          type: array
+          items:
+            type: object
+            properties:
+              field:
+                type: string
+              message:
+                type: string
+
+  responses:
+    Unauthorized:
+      description: Not authenticated — Clerk session required
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            error: "UNAUTHORIZED"
+            message: "Authentication required"
+    Forbidden:
+      description: Authenticated but insufficient permissions (admin role required)
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            error: "FORBIDDEN"
+            message: "Administrator role required"
+
+tags:
+  - name: Sync
+    description: Data synchronization operations (fetch templates + data, generate HTML)
+  - name: Recordings
+    description: MUX video recording URL transmission to hemera.academy
