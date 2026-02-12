@@ -6,6 +6,14 @@
 import { SyncJobResponseSchema } from "@/lib/sync/schemas";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+// Mock auth — bypass requireAdmin check
+vi.mock("@/lib/auth/role-check", () => ({
+	requireAdmin: vi.fn().mockReturnValue({
+		status: 200,
+		body: { sessionClaims: { metadata: { role: "admin" } } },
+	}),
+}));
+
 // Mock modules before importing route
 vi.mock("@/lib/hemera/client", () => ({
 	HemeraClient: vi.fn().mockImplementation(() => ({

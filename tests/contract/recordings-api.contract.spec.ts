@@ -6,6 +6,14 @@
 import { POST } from "@/app/api/recordings/route";
 import { describe, expect, it, vi } from "vitest";
 
+// Mock auth — bypass requireAdmin check
+vi.mock("@/lib/auth/role-check", () => ({
+	requireAdmin: vi.fn().mockReturnValue({
+		status: 200,
+		body: { sessionClaims: { metadata: { role: "admin" } } },
+	}),
+}));
+
 // Mock HemeraClient
 vi.mock("@/lib/hemera/client", () => ({
 	HemeraClient: vi.fn().mockImplementation(() => ({
