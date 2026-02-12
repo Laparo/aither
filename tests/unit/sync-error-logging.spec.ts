@@ -19,7 +19,9 @@ vi.mock("@/lib/monitoring/rollbar", () => ({
 import { beforeEach, describe, expect, it } from "vitest";
 
 describe("Sync Error Logging", () => {
-	let logSyncError: any, logSyncWarning: any, logSyncCritical: any;
+	let logSyncError: any;
+	let logSyncWarning: any;
+	let logSyncCritical: any;
 
 	beforeAll(async () => {
 		({ logSyncError, logSyncWarning, logSyncCritical } = await import(

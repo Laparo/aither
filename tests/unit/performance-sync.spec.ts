@@ -3,11 +3,11 @@
 // Task: T056 [Polish] — Laufzeitmessung < 5 Minuten
 // ---------------------------------------------------------------------------
 
-import { describe, it, expect } from "vitest";
+import fs from "node:fs/promises";
+import path from "node:path";
+import type { HemeraClient } from "@/lib/hemera/client";
 import { SyncOrchestrator } from "@/lib/sync/orchestrator";
-import { HemeraClient } from "@/lib/hemera/client";
-import fs from "fs/promises";
-import path from "path";
+import { describe, expect, it } from "vitest";
 
 // Mock-Client, der große Mengen an Daten liefert
 class MockHemeraClient {
@@ -20,7 +20,7 @@ class MockHemeraClient {
 					lessonId: null,
 					markup: "<html>{{title}}</html>",
 					version: "1.0",
-				}))
+				})),
 			);
 		}
 		if (path === "/seminars") {
@@ -33,13 +33,15 @@ class MockHemeraClient {
 					instructorIds: [],
 					lessonIds: [],
 					recordingUrl: null,
-				}))
+				})),
 			);
 		}
 		// Leere Arrays für andere Endpunkte
 		return Promise.resolve([]);
 	}
-	put() { return Promise.resolve({ status: 200, message: "OK" }); }
+	put() {
+		return Promise.resolve({ status: 200, message: "OK" });
+	}
 }
 
 describe("Performance: Sync mit 500 Records", () => {

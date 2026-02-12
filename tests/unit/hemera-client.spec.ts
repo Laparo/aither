@@ -62,7 +62,7 @@ describe("HemeraClient", () => {
 		it("strips trailing slashes from base URL", async () => {
 			const mockFetch = createMockFetch([{ status: 200, body: [{ id: "1", name: "Test" }] }]);
 			const client = new HemeraClient({
-				   baseUrl: "https://api.hemera.academy///",
+				baseUrl: "https://api.hemera.academy///",
 				apiKey: "key",
 				maxRetries: 0,
 				rateLimit: 100,

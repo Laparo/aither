@@ -64,7 +64,7 @@ export class HemeraClient {
 	}
 
 	/**
-	* Ruft eine Ressource von der Hemera API ab und validiert sie mit Zod.
+	 * Ruft eine Ressource von der Hemera API ab und validiert sie mit Zod.
 	 * Wiederholt bei 5xx- und Netzwerkfehlern. Beachtet 429 Retry-After.
 	 *
 	 * @param path   API-Endpoint (z.B. "/seminars")
@@ -118,7 +118,7 @@ export class HemeraClient {
 	}
 
 	/**
-	* PUT a resource to the Hemera API and validate the response against a Zod schema.
+	 * PUT a resource to the Hemera API and validate the response against a Zod schema.
 	 */
 	async put<T>(path: string, body: unknown, schema: z.ZodType<T>): Promise<T> {
 		const url = `${this.baseUrl}${path}`;

@@ -3,9 +3,9 @@
 // Task: T052 [Polish] — Playwright: API-Trigger bis HTML-Generierung
 // ---------------------------------------------------------------------------
 
-import path from "path";
+import fs from "node:fs/promises";
+import path from "node:path";
 import { expect, test } from "@playwright/test";
-import fs from "fs/promises";
 
 const API_URL = process.env.E2E_API_URL || "http://localhost:3000";
 const OUTPUT_DIR = process.env.E2E_OUTPUT_DIR || "output";

@@ -16,10 +16,10 @@ vi.mock("nodemailer", () => ({
 }));
 
 describe("Email Notifications", () => {
-	let sendFailureNotification: any,
-		resetFailureCounter: any,
-		getFailureCount: any,
-		_resetForTesting: any;
+	let sendFailureNotification: any;
+	let resetFailureCounter: any;
+	let getFailureCount: any;
+	let _resetForTesting: any;
 
 	beforeAll(async () => {
 		({ sendFailureNotification, resetFailureCounter, getFailureCount, _resetForTesting } =
