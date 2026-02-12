@@ -31,5 +31,15 @@ npm-debug.log*
 # Coverage
 coverage/
 
+# Next.js
+.next/
+next-env.d.ts
+
+# Turbo
+.turbo/
+
+# Generated HTML output
+output/
+
 # Misc
 .qodo/
