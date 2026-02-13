@@ -43,8 +43,8 @@ import {
 
 describe("Email Notifications", () => {
 	beforeEach(() => {
-		_resetForTesting();
 		mockSendMail.mockClear();
+		resetFailureCounter();
 	});
 
 	it("does not send email below failure threshold", async () => {
