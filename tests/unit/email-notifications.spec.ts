@@ -35,7 +35,6 @@ vi.mock("nodemailer", () => ({
 
 // Import module under test — mocks are hoisted, so this is safe
 import {
-	_resetForTesting,
 	getFailureCount,
 	resetFailureCounter,
 	sendFailureNotification,
