@@ -41,7 +41,7 @@ describe("Email Notifications", () => {
 	});
 
 	beforeEach(() => {
-		mockSendMail.mockClear();
+		mockSendMail.mockClear().mockResolvedValue({ messageId: "test-123" });
 		_resetForTesting();
 	});
 
