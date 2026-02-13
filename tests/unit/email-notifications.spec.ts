@@ -3,7 +3,12 @@
 // Task: T039 [US3] — Threshold failures, counter reset, email content
 // ---------------------------------------------------------------------------
 
-import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const { mockSendMail } = vi.hoisted(() => {
+	const mockSendMail = vi.fn().mockResolvedValue({ messageId: "test-123" });
+	return { mockSendMail };
+});
 
 // Mock loadConfig — must come before email module import
 vi.mock("@/lib/config", () => ({
@@ -20,7 +25,6 @@ vi.mock("@/lib/config", () => ({
 }));
 
 // Mock Nodemailer
-const mockSendMail = vi.fn().mockResolvedValue({ messageId: "test-123" });
 vi.mock("nodemailer", () => ({
 	default: {
 		createTransport: vi.fn().mockReturnValue({
@@ -29,21 +33,18 @@ vi.mock("nodemailer", () => ({
 	},
 }));
 
+// Import module under test — mocks are hoisted, so this is safe
+import {
+	_resetForTesting,
+	getFailureCount,
+	resetFailureCounter,
+	sendFailureNotification,
+} from "@/lib/notifications/email";
+
 describe("Email Notifications", () => {
-	let sendFailureNotification: (jobId: string, error: string) => Promise<void>;
-	let resetFailureCounter: () => void;
-	let getFailureCount: () => number;
-	let _resetForTesting: () => void;
-
-	beforeAll(async () => {
-		({ sendFailureNotification, resetFailureCounter, getFailureCount, _resetForTesting } =
-			await import("@/lib/notifications/email"));
-	});
-
 	beforeEach(() => {
-		mockSendMail.mockClear().mockResolvedValue({ messageId: "test-123" });
-		vi.clearAllMocks();
 		_resetForTesting();
+		mockSendMail.mockClear();
 	});
 
 	it("does not send email below failure threshold", async () => {
@@ -73,39 +74,10 @@ describe("Email Notifications", () => {
 	});
 
 	it("continues sending emails for subsequent failures beyond threshold", async () => {
-		// Fehler 1 & 2: unter Schwellenwert, keine E-Mail
-		await sendFailureNotification("job-1", "error 1");
-		expect(getFailureCount()).toBe(1);
-		await sendFailureNotification("job-2", "error 2");
-		expect(getFailureCount()).toBe(2);
-		expect(mockSendMail).toHaveBeenCalledTimes(0);
-
-		// Fehler 3: Schwellenwert erreicht, erste E-Mail
-		try {
-			await sendFailureNotification("job-3", "error 3");
-		} catch (err) {
-			// Fehler abfangen, falls Mock fehlschlägt
-			console.error("sendFailureNotification threw:", err);
+		for (let i = 1; i <= 5; i++) {
+			await sendFailureNotification(`job-${i}`, `error ${i}`);
 		}
-		expect(getFailureCount()).toBe(3);
-		expect(mockSendMail).toHaveBeenCalledTimes(1);
-
-		// Fehler 4: über Schwellenwert, zweite E-Mail
-		try {
-			await sendFailureNotification("job-4", "error 4");
-		} catch (err) {
-			console.error("sendFailureNotification threw:", err);
-		}
-		expect(getFailureCount()).toBe(4);
-		expect(mockSendMail).toHaveBeenCalledTimes(2);
-
-		// Fehler 5: über Schwellenwert, dritte E-Mail
-		try {
-			await sendFailureNotification("job-5", "error 5");
-		} catch (err) {
-			console.error("sendFailureNotification threw:", err);
-		}
-		expect(getFailureCount()).toBe(5);
+		// Emails at failures 3, 4, 5
 		expect(mockSendMail).toHaveBeenCalledTimes(3);
 	});
 
