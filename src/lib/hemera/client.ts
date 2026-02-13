@@ -31,14 +31,14 @@ export class HemeraApiError extends Error {
 }
 
 /**
- * HTTP-Client für die hemera.academy REST API.
+ * HTTP client for the hemera.academy REST API.
  *
  * Features:
- * - API-Key-Authentifizierung via Authorization-Header
- * - Rate-Limiting via p-throttle (Standard: 2 req/s)
- * - Automatisches Retry bei 5xx/Netzwerkfehlern via p-retry (Standard: 5 Versuche, Jitter)
- * - Retry-After-Header-Unterstützung für 429-Responses
- * - Zod-Validierung jeder Response
+ * - API key authentication via Authorization header
+ * - Rate limiting via p-throttle (default: 2 req/s)
+ * - Automatic retry on 5xx/network errors via p-retry (default: 5 attempts, jitter)
+ * - Retry-After header support for 429 responses
+ * - Zod validation of every response
  */
 export class HemeraClient {
 	private readonly baseUrl: string;
@@ -64,12 +64,12 @@ export class HemeraClient {
 	}
 
 	/**
-	 * Ruft eine Ressource von der Hemera API ab und validiert sie mit Zod.
-	 * Wiederholt bei 5xx- und Netzwerkfehlern. Beachtet 429 Retry-After.
+	 * Fetches a resource from the Hemera API and validates it with Zod.
+	 * Retries on 5xx and network errors. Respects 429 Retry-After.
 	 *
-	 * @param path   API-Endpoint (z.B. "/seminars")
-	 * @param schema Zod-Schema zur Validierung
-	 * @returns      Validiertes Ergebnis
+	 * @param path   API endpoint (e.g., "/seminars")
+	 * @param schema Zod schema for validation
+	 * @returns      Validated result
 	 */
 	async get<T>(path: string, schema: z.ZodType<T>): Promise<T> {
 		const url = `${this.baseUrl}${path}`;

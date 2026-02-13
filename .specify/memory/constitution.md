@@ -1,17 +1,12 @@
 <!--
   Sync Impact Report
   ===================
-  Version change: 2.1.0 → 2.2.0
+  Version change: 2.4.0 → 2.5.0
   Modified principles: N/A
   Added sections:
-    - IX. Aither Control API — external apps can control the HTML player via API
+    - Runtime Environment: Development port 5000
   Removed sections: N/A
-  Templates requiring updates:
-    - .specify/templates/plan-template.md ✅ compatible (Constitution Check generic)
-    - .specify/templates/spec-template.md ✅ compatible (no constitution refs)
-    - .specify/templates/tasks-template.md ✅ compatible (phase structure flexible)
-    - .specify/templates/checklist-template.md ✅ compatible (generic)
-    - .specify/templates/agent-file-template.md ✅ compatible (generic)
+  Templates requiring updates: N/A (all compatible)
   Follow-up TODOs:
     - Update specs/001-hemera-api-integration: remove all Prisma/database assumptions
     - Update specs/001-hemera-api-integration/plan.md: remove Prisma from tech stack
@@ -365,6 +360,22 @@ deployment):
 - **Rollback Capability**: Git revert is the rollback strategy for broken
   changes on `main`.
 
+### Production Deployment Flow
+
+Merging to `main` triggers a production build on the Linux host:
+
+- **Merge-to-Main = Production Build**: Every merge to the `main` branch
+  starts a production build (`npm run build && npm start`) on the target
+  Linux machine. This is the sole deployment mechanism.
+- **Environment Variables from `.env`**: The production build reads all
+  environment variables from the `.env` file on the Linux host. This file
+  is excluded from version control (`.gitignore`) and MUST be maintained
+  manually on the host machine.
+- **No Cloud CI/CD Deployment**: Deployment is NOT handled by GitHub Actions
+  or any cloud service. GitHub Actions enforces quality gates only; the
+  actual build and restart happen on the Linux host after a successful
+  merge.
+
 ### GitHub Actions Workflow Requirements
 
 The GitHub Actions workflow enforces quality standards:
@@ -418,11 +429,33 @@ The GitHub Actions workflow enforces quality standards:
 
 - **Linux Service**: The application runs as a service on a Linux machine
   in production and locally during development.
+- **Development Port**: The application runs on port **5000** in
+  development mode (`npm run dev -- -p 5000`).
 - **GitHub Repository**: Source code hosted on GitHub for version control
   and collaboration.
 - **Quality Gates**: Every pull request MUST pass TypeScript compilation,
   Biome formatting and linting, unit tests, and build verification
   through GitHub Actions.
+
+### X. Language Policy
+
+All code, comments, and documentation MUST be written in English:
+
+- **Code**: All variable names, function names, class names, and other
+  identifiers MUST be in English.
+- **Comments**: All inline comments, JSDoc annotations, and code
+  documentation MUST be in English.
+- **Documentation**: All markdown files, specifications, README files, and
+  technical documentation MUST be in English.
+- **Commit Messages**: All Git commit messages MUST be in English.
+- **Exception — Frontend Text**: User-facing text displayed in the frontend
+  (UI labels, messages, error texts shown to users) MUST be in German
+  (Deutsch). This is the only permitted exception to the English-only rule.
+
+**Rationale**: English is the lingua franca of software development.
+Consistent use of English ensures the codebase is accessible to all
+developers regardless of native language. German frontend text serves the
+target audience of the hemera.academy platform.
 
 ## Governance
 
@@ -462,4 +495,4 @@ followed strictly:
 - **Performance Benchmarks**: Authentication flows MUST meet sub-100 ms
   response requirements.
 
-**Version**: 2.2.0 | **Ratified**: 2026-02-10 | **Last Amended**: 2026-02-11
+**Version**: 2.4.0 | **Ratified**: 2026-02-10 | **Last Amended**: 2026-02-13

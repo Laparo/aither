@@ -7,10 +7,10 @@
 
 ## Out of Scope
 
-- Synchronisation von Clerk-Nutzern (Aither) mit Nutzerprofilen auf hemera.academy. Die beiden Nutzerverwaltungen bleiben getrennt.
-- Full-Screen HTML Player (Prinzip VIII) — wird als eigenständiges Feature spezifiziert.
-- Kameraaufnahme und MUX-Upload (Prinzip VIII) — wird als eigenständiges Feature spezifiziert.
-- Aither Control API (Prinzip IX) — wird als eigenständiges Feature spezifiziert.
+- Synchronization of Clerk users (Aither) with user profiles on hemera.academy. The two user management systems remain separate.
+- Full-Screen HTML Player (Principle VIII) — will be specified as a standalone feature.
+- Camera recording and MUX upload (Principle VIII) — will be specified as a standalone feature.
+- Aither Control API (Principle IX) — will be specified as a standalone feature.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -161,27 +161,27 @@ As an administrator, I want only authenticated and authorized users (managed via
 
 ### Session 2026-02-10
 
-- Q: Welche Datentypen liefert die hemera.academy API? → A: Seminare, Nutzerprofile, Texte, Bilder, Videos, Lektionen
+- Q: What data types does the hemera.academy API provide? → A: Seminars, user profiles, texts, images, videos, lessons
 
 ### Session 2026-02-11
 
-- Q: Ist eine API-Dokumentation für die hemera.academy API vorhanden? → A: Ja, als Postman Collection
-- Q: Hat die hemera.academy API Rate Limits? → A: Unbekannt — defensiv implementieren mit eingebautem Throttling
-- Q: Wie soll der automatische tägliche Sync auf Linux ausgelöst werden? → A: System-cron-Job
-- Q: Welche Größenordnung an Datensätzen wird erwartet? → A: Wenige Hundert Datensätze insgesamt
-- Q: Über welchen Kanal sollen Operatoren bei Sync-Fehlern benachrichtigt werden? → A: E-Mail
-- Q: Wie sollen Medien-Assets (Bilder, Videos) gespeichert werden? → A: Nur Metadaten und URLs speichern; Dateien bleiben bei hemera.academy
-- Q: Welches Sync-Intervall soll als Standard gelten? → A: Einmal täglich (alle 24 Stunden)
-- Q: Was liegt explizit außerhalb des Scope? → A: Bidirektionale Datenübertragung und Medien-Streaming/Hosting sind IN Scope. Nur die Synchronisation von Clerk-Nutzern mit hemera.academy-Nutzerprofilen ist OUT of Scope.
-- Q: Welche Daten werden von Hemera an die hemera.academy API übertragen? → A: URLs von Videoaufzeichnungen aus dem Seminar, die auf MUX gespeichert werden.
+- Q: Is API documentation available for the hemera.academy API? → A: Yes, as a Postman Collection
+- Q: Does the hemera.academy API have rate limits? → A: Unknown — implement defensively with built-in throttling
+- Q: How should the automatic daily sync be triggered on Linux? → A: System cron job
+- Q: What order of magnitude of records is expected? → A: A few hundred records total
+- Q: Through which channel should operators be notified of sync failures? → A: Email
+- Q: How should media assets (images, videos) be stored? → A: Store only metadata and URLs; files remain at hemera.academy
+- Q: What sync interval should be the default? → A: Once daily (every 24 hours)
+- Q: What is explicitly out of scope? → A: Bidirectional data transfer and media streaming/hosting are IN scope. Only the synchronization of Clerk users with hemera.academy user profiles is OUT of scope.
+- Q: What data is transmitted from Hemera to the hemera.academy API? → A: URLs of seminar video recordings stored on MUX.
 
-### Session 2026-02-11
+### Session 2026-02-11 (continued)
 
-- Q: Sollen HTML Player, Kameraaufnahme und Control API (Constitution VIII + IX) in Feature 001 oder als eigene Features geplant werden? → A: Eigene Features — 001 fokussiert auf API-Sync, HTML-Generierung und MUX-URL-Übertragung.
-- Q: Wie werden die generierten HTML-Dateien strukturiert — eine pro Entität, eine pro Typ oder eine einzige Datei? → A: Eine HTML-Datei pro Entität (pro Seminar, pro Lektion etc.).
-- Q: Wie wird die MUX-URL-Übertragung an hemera.academy ausgelöst? → A: Feature 001 stellt einen API-Endpunkt bereit, den das Kamera-Feature nach erfolgreichem MUX-Upload aufruft.
-- Q: Wie wird inkrementeller Sync umgesetzt, wenn die API keinen Timestamp-Filter bietet? → A: Full-Fetch + lokale Hash-Vergleiche — nur geänderte HTML-Dateien werden regeneriert.
-- Q: Wer erstellt die HTML-Templates und wie werden sie angepasst? → A: HTML-Vorlagen werden auf hemera.academy erzeugt und als Seminarmaterial gespeichert. Aither ruft diese Vorlagen über die API ab und befüllt sie mit Teilnehmerdaten (ebenfalls von der API).
+- Q: Should HTML Player, camera recording, and Control API (Constitution VIII + IX) be planned as part of Feature 001 or as separate features? → A: Separate features — 001 focuses on API sync, HTML generation, and MUX URL transmission.
+- Q: How are the generated HTML files structured — one per entity, one per type, or a single file? → A: One HTML file per entity (per seminar, per lesson, etc.).
+- Q: How is the MUX URL transmission to hemera.academy triggered? → A: Feature 001 provides an API endpoint that the camera feature calls after a successful MUX upload.
+- Q: How is incremental sync implemented when the API does not provide a timestamp filter? → A: Full fetch + local hash comparisons — only changed HTML files are regenerated.
+- Q: Who creates the HTML templates and how are they customized? → A: HTML templates are created on hemera.academy and stored as seminar material. Aither fetches these templates via the API and populates them with participant data (also from the API).
 
 ## Assumptions
 
