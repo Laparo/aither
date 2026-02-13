@@ -54,7 +54,8 @@ export function _resetState() {
 // ── POST /api/sync — Trigger a sync ──────────────────────────────────────
 
 export async function POST(req: NextRequest) {
-	const auth = (req as any).auth ?? null;
+	type AuthenticatedRequest = NextRequest & { auth?: unknown };
+	const auth = (req as AuthenticatedRequest).auth ?? null;
 	const authResult = requireAdmin(auth);
 	if (authResult.status !== 200) {
 		return NextResponse.json(authResult.body, { status: authResult.status });
@@ -136,7 +137,8 @@ export async function POST(req: NextRequest) {
 // ── GET /api/sync — Get sync status ──────────────────────────────────────
 
 export async function GET(req: NextRequest) {
-	const auth = (req as any).auth ?? null;
+	type AuthenticatedRequest = NextRequest & { auth?: unknown };
+	const auth = (req as AuthenticatedRequest).auth ?? null;
 	const authResult = requireAdmin(auth);
 	if (authResult.status !== 200) {
 		return NextResponse.json(authResult.body, { status: authResult.status });

@@ -14,10 +14,12 @@ let _transport: nodemailer.Transporter | null = null;
 function getTransport(): nodemailer.Transporter {
 	if (_transport) return _transport;
 	const cfg = loadConfig();
+	// secure: true für Port 465 (SMTPS), sonst aus Config oder false
+	const secure = cfg.SMTP_SECURE ?? cfg.SMTP_PORT === 465;
 	_transport = nodemailer.createTransport({
 		host: cfg.SMTP_HOST,
 		port: cfg.SMTP_PORT,
-		secure: false,
+		secure,
 		auth: {
 			user: cfg.SMTP_USER,
 			pass: cfg.SMTP_PASS,
@@ -38,7 +40,33 @@ export async function sendFailureNotification(jobId: string, errorSummary: strin
 		text: `Sync job ${jobId} failed.\n\nError summary: ${errorSummary}\n\nTimestamp: ${new Date().toISOString()}`,
 	};
 
-	await getTransport().sendMail(mailOptions);
+	try {
+		await getTransport().sendMail(mailOptions);
+		failureCount = 0;
+	} catch (err) {
+		// Redaktiere Empfängeradresse für Logging
+		const sanitizedMailOptions = {
+			...mailOptions,
+			to: Array.isArray(mailOptions.to)
+				? `[${mailOptions.to.length} Empfänger]`
+				: mailOptions.to
+					? "[REDACTED]"
+					: undefined,
+		};
+		// Fehlertext extrahieren
+		const msg = String(
+			err && typeof err === "object" && "message" in err
+				? (err as unknown as { message?: string }).message
+				: err,
+		);
+		// eslint-disable-next-line no-console
+		console.error("[Email] Fehler beim Senden der Sync-Failure-Mail:", msg, {
+			jobId,
+			mail: sanitizedMailOptions,
+		});
+		// failureCount bleibt erhöht, damit bei erneutem Fehler wieder versucht wird
+		throw err;
+	}
 }
 
 export function resetFailureCounter(): void {

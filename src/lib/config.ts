@@ -50,7 +50,12 @@ import { z } from "zod";
  */
 const envBool = (defaultValue: boolean) =>
 	z
-		.preprocess((v) => v === "1" || v === 1 || v === true || v === "true", z.boolean())
+		.preprocess((v) => {
+			if (v == null) return v;
+			if (v === "1" || v === 1 || v === true || v === "true") return true;
+			if (v === "0" || v === 0 || v === false || v === "false") return false;
+			return v;
+		}, z.boolean())
 		.default(defaultValue);
 
 const EnvSchema = z
@@ -69,6 +74,7 @@ const EnvSchema = z
 		SMTP_USER: z.string().min(1),
 		SMTP_PASS: z.string().min(1),
 		SMTP_FROM: z.string().email(),
+		SMTP_SECURE: envBool(false).optional(),
 		NOTIFY_EMAIL_TO: z.string().email(),
 		NOTIFY_FAILURE_THRESHOLD: z.coerce.number().int().positive().default(3),
 
