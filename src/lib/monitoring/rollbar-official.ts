@@ -80,9 +80,7 @@ export const serverInstance: Rollbar | RollbarTestInstance = isTestMode
 			},
 		}
 	: new Rollbar({
-			accessToken: isE2EMode
-				? "dummy-token-for-e2e"
-				: process.env.ROLLBAR_SERVER_TOKEN,
+			accessToken: isE2EMode ? "dummy-token-for-e2e" : process.env.ROLLBAR_SERVER_TOKEN,
 			...baseConfig,
 			payload: {
 				server: { root: process.cwd() },
@@ -90,7 +88,12 @@ export const serverInstance: Rollbar | RollbarTestInstance = isTestMode
 			// PII filtering: always scrub secrets; scrub user-identifying fields when consent is not granted
 			scrubFields: [
 				// Always scrub secrets
-				"password", "apiKey", "api_key", "secret", "token", "authorization",
+				"password",
+				"apiKey",
+				"api_key",
+				"secret",
+				"token",
+				"authorization",
 				// Scrub PII fields unless consent is explicitly granted
 				...(isTelemetryConsentGranted()
 					? []
@@ -135,7 +138,11 @@ export interface ErrorContext {
 	additionalData?: Record<string, unknown>;
 }
 
-export function createErrorContext(request?: Request, userId?: string, requestId?: string): ErrorContext {
+export function createErrorContext(
+	request?: Request,
+	userId?: string,
+	requestId?: string,
+): ErrorContext {
 	return {
 		userId,
 		requestId,
@@ -163,11 +170,15 @@ export function reportError(
 		const rateError = readNumberEnv("ROLLBAR_SAMPLE_RATE_ERROR", 1);
 		const rateCritical = readNumberEnv("ROLLBAR_SAMPLE_RATE_CRITICAL", 1);
 
-		const pick = (rate: number) => Math.random() < Math.max(0, Math.min(1, rate)) && Math.random() < rateAll;
+		const pick = (rate: number) =>
+			Math.random() < Math.max(0, Math.min(1, rate)) && Math.random() < rateAll;
 
 		const includePII = isTelemetryConsentGranted();
 		const rollbarContext: Record<string, unknown> = {
-			person: includePII && context?.userId ? { id: context.userId, email: context.userEmail } : undefined,
+			person:
+				includePII && context?.userId
+					? { id: context.userId, email: context.userEmail }
+					: undefined,
 			request: {
 				id: context?.requestId,
 				url: context?.route,
@@ -208,7 +219,11 @@ export function reportError(
 
 // ── User action tracking ──────────────────────────────────────────────────
 
-export function recordUserAction(action: string, userId?: string, metadata?: Record<string, unknown>): void {
+export function recordUserAction(
+	action: string,
+	userId?: string,
+	metadata?: Record<string, unknown>,
+): void {
 	if (!baseConfig.enabled) return;
 	try {
 		const includePII = isTelemetryConsentGranted();

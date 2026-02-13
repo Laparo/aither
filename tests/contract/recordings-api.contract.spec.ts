@@ -24,10 +24,10 @@ vi.mock("@/lib/hemera/client", () => ({
 
 // Mock config
 vi.mock("@/lib/config", () => ({
-	getConfig: vi.fn().mockReturnValue({
-		hemeraApiBaseUrl: "https://hemera.academy/api",
-		hemeraApiKey: "test-key",
-		htmlOutputDir: "/tmp/output",
+	loadConfig: vi.fn().mockReturnValue({
+		HEMERA_API_BASE_URL: "https://hemera.academy/api",
+		HEMERA_API_KEY: "test-key",
+		HTML_OUTPUT_DIR: "/tmp/output",
 	}),
 }));
 

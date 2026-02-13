@@ -41,7 +41,10 @@ export class ApiLogger {
 	 * Return a scrubbed copy of the request context.
 	 * When PII consent is not granted, `ip` and `userAgent` are stripped.
 	 */
-	private safeContext(): Omit<RequestContext, "ip" | "userAgent"> & { ip?: string; userAgent?: string } {
+	private safeContext(): Omit<RequestContext, "ip" | "userAgent"> & {
+		ip?: string;
+		userAgent?: string;
+	} {
 		if (isTelemetryConsentGranted()) return this.requestContext;
 		const { ip: _ip, userAgent: _ua, ...safe } = this.requestContext;
 		return safe;
@@ -104,13 +107,16 @@ export class ApiLogger {
 	 */
 	trackRequestCompletion(statusCode: number): void {
 		const duration = Date.now() - this.startTime;
-		serverInstance.info(`Request completed: ${this.requestContext.method} ${this.requestContext.url}`, {
-			requestId: this.requestContext.id,
-			statusCode,
-			durationMs: duration,
-			context: this.safeContext(),
-			timestamp: new Date().toISOString(),
-		});
+		serverInstance.info(
+			`Request completed: ${this.requestContext.method} ${this.requestContext.url}`,
+			{
+				requestId: this.requestContext.id,
+				statusCode,
+				durationMs: duration,
+				context: this.safeContext(),
+				timestamp: new Date().toISOString(),
+			},
+		);
 	}
 }
 

@@ -117,7 +117,10 @@ export function createRequestContext(
 /**
  * Create request context from NextRequest object
  */
-export function createRequestContextFromNextRequest(request: NextRequest, requestId?: string): RequestContext {
+export function createRequestContextFromNextRequest(
+	request: NextRequest,
+	requestId?: string,
+): RequestContext {
 	const id = requestId || getOrCreateRequestId(request);
 	const externalId = getExternalRequestIdFromHeaders(request.headers);
 

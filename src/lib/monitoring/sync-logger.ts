@@ -11,7 +11,11 @@ import { serverInstance } from "@/lib/monitoring/rollbar-official";
  * When PII consent is not granted, `sourceId` is redacted because it may
  * reference a user-facing identifier (e.g. an external student/teacher ID).
  */
-function safeSyncContext(jobId: string, entityType: string, sourceId: string): Record<string, string> {
+function safeSyncContext(
+	jobId: string,
+	entityType: string,
+	sourceId: string,
+): Record<string, string> {
 	return {
 		jobId,
 		entityType,

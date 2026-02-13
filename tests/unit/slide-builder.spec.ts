@@ -123,6 +123,7 @@ describe("buildCurriculumSlide", () => {
 
 		expect(html).toContain("<!DOCTYPE html>");
 		expect(html).toContain("width: 1920px");
+		expect(html).toContain("height: 1080px");
 	});
 });
 
