@@ -4,7 +4,7 @@
 // ---------------------------------------------------------------------------
 
 import { requireAdmin } from "@/lib/auth/role-check";
-import { getConfig } from "@/lib/config";
+import { loadConfig } from "@/lib/config";
 import { HemeraClient } from "@/lib/hemera/client";
 import { transmitRecording } from "@/lib/sync/recording-transmitter";
 import { RecordingTransmitRequestSchema } from "@/lib/sync/schemas";
@@ -21,10 +21,7 @@ export async function POST(request: Request): Promise<NextResponse> {
 	const auth = (request as any).auth ?? null;
 	const authResult = requireAdmin(auth);
 	if (authResult.status !== 200) {
-		return new Response(JSON.stringify(authResult.body), {
-			status: authResult.status,
-			headers: { "Content-Type": "application/json" },
-		});
+		return NextResponse.json(authResult.body, { status: authResult.status });
 	}
 
 	let body: unknown;
@@ -54,10 +51,10 @@ export async function POST(request: Request): Promise<NextResponse> {
 	}
 
 	// Create Hemera client
-	const config = getConfig();
+	const config = loadConfig();
 	const client = new HemeraClient({
-		baseUrl: config.hemeraApiBaseUrl,
-		apiKey: config.hemeraApiKey,
+		baseUrl: config.HEMERA_API_BASE_URL,
+		apiKey: config.HEMERA_API_KEY,
 	});
 
 	// Transmit to hemera.academy

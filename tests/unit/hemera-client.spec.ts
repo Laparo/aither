@@ -14,7 +14,7 @@ function createMockFetch(
 	responses: Array<{ status: number; body?: unknown; headers?: Record<string, string> }>,
 ) {
 	let callIndex = 0;
-	return vi.fn(async () => {
+	return vi.fn(async (_url: string, _init?: RequestInit) => {
 		const resp = responses[callIndex] ?? responses[responses.length - 1];
 		callIndex++;
 		return {
@@ -104,12 +104,23 @@ describe("HemeraClient", () => {
 	// ── 429 Retry-After ──────────────────────────────────────────────────
 
 	describe("rate limit handling", () => {
-		it("respects 429 response", async () => {
+		it("retries after 429 and succeeds on next attempt", async () => {
+			const mockFetch = createMockFetch([
+				{ status: 429, headers: { "Retry-After": "1" } },
+				{ status: 200, body: [{ id: "1", name: "Test" }] },
+			]);
+			const client = createClient(mockFetch);
+
+			const result = await client.get("/seminars", TestArraySchema);
+			expect(result).toEqual([{ id: "1", name: "Test" }]);
+			expect(mockFetch).toHaveBeenCalledTimes(2);
+		});
+
+		it("throws HemeraApiError after exhausting retries on 429", async () => {
 			const mockFetch = createMockFetch([{ status: 429, headers: { "Retry-After": "1" } }]);
 			const client = createClient(mockFetch, { maxRetries: 0 });
 
-			// With maxRetries=0 and AbortError on 429, it should throw
-			await expect(client.get("/seminars", TestArraySchema)).rejects.toThrow();
+			await expect(client.get("/seminars", TestArraySchema)).rejects.toThrow(HemeraApiError);
 		});
 	});
 

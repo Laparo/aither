@@ -3,7 +3,21 @@
 // Task: T039 [US3] — Threshold failures, counter reset, email content
 // ---------------------------------------------------------------------------
 
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+
+// Mock loadConfig — must come before email module import
+vi.mock("@/lib/config", () => ({
+	loadConfig: vi.fn(() => ({
+		SMTP_HOST: "localhost",
+		SMTP_PORT: 587,
+		SMTP_USER: "user",
+		SMTP_PASS: "pass",
+		SMTP_FROM: "aither@localhost",
+		SMTP_TO: undefined,
+		NOTIFY_EMAIL_TO: "admin@localhost",
+		NOTIFY_FAILURE_THRESHOLD: 3,
+	})),
+}));
 
 // Mock Nodemailer
 const mockSendMail = vi.fn().mockResolvedValue({ messageId: "test-123" });

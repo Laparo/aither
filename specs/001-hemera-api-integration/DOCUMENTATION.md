@@ -8,7 +8,7 @@ This project integrates the Hemera Academy API into the Aither platform. It sync
 
 ## Architecture
 
-- **Framework:** Next.js 16, React 19, TypeScript 5
+- **Framework:** Next.js 15.5.6, React 18, TypeScript 5
 - **Core Modules:**
   - `src/lib/hemera/`: API client, types, schemas
   - `src/lib/sync/`: Orchestrator, hash manifest, mutex, recording transmitter

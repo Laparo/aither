@@ -16,11 +16,32 @@ Authorization: Bearer {HEMERA_API_KEY}
 Content-Type: application/json
 ```
 
-API key stored in `process.env.HEMERA_API_KEY`.
+
+
+### Authentication Error Responses
+
+**Error Responses:**
+
+- `401 Unauthorized` — The token is invalid or expired. Example:
+  ```json
+  { "error": "Unauthorized", "message": "Missing or invalid API key." }
+  ```
+- `403 Forbidden` — The token is valid, but permissions are insufficient. Example:
+  ```json
+  { "error": "Forbidden", "message": "Insufficient permissions." }
+  ```
+
+**Retry Strategy:**
+- For `401 Unauthorized`, a single retry with token refresh is allowed **only if** a runtime refresh mechanism exists (e.g., OAuth or session-based tokens). If authentication uses a static Bearer API key (such as `HEMERA_API_KEY` from environment), a 401 must be reported immediately with **no retry**.
+- For `403 Forbidden`, no retry is allowed — the error must be reported directly to the client.
+
+**Note:**
+Authentication is performed via the header `Authorization: Bearer {HEMERA_API_KEY}`. The API key is read from `process.env.HEMERA_API_KEY`.
 
 ---
 
 ## Expected Endpoints
+
 
 ### GET /seminars
 
@@ -50,6 +71,24 @@ Retrieve all seminars.
   }
 }
 ```
+**Error Responses:**
+- `401 Unauthorized` — Invalid or missing API key
+  ```json
+  { "error": "Unauthorized", "message": "Missing or invalid API key." }
+  ```
+- `404 Not Found` — Resource not found
+  ```json
+  { "error": "Not Found", "message": "Resource not found." }
+  ```
+- `429 Too Many Requests` — Rate limit exceeded
+  ```json
+  { "error": "Too Many Requests", "message": "Rate limit exceeded. Retry later." }
+  ```
+- `500 Internal Server Error` — Unexpected server error
+  ```json
+  { "error": "Internal Server Error", "message": "An unexpected error occurred." }
+  ```
+
 
 ### GET /lessons
 
@@ -70,6 +109,24 @@ Retrieve all lessons.
   ]
 }
 ```
+**Error Responses:**
+- `401 Unauthorized` — Invalid or missing API key
+  ```json
+  { "error": "Unauthorized", "message": "Missing or invalid API key." }
+  ```
+- `404 Not Found` — Resource not found
+  ```json
+  { "error": "Not Found", "message": "Resource not found." }
+  ```
+- `429 Too Many Requests` — Rate limit exceeded
+  ```json
+  { "error": "Too Many Requests", "message": "Rate limit exceeded. Retry later." }
+  ```
+- `500 Internal Server Error` — Unexpected server error
+  ```json
+  { "error": "Internal Server Error", "message": "An unexpected error occurred." }
+  ```
+
 
 ### GET /users
 
@@ -89,6 +146,24 @@ Retrieve user profiles (participants and instructors).
   ]
 }
 ```
+**Error Responses:**
+- `401 Unauthorized` — Invalid or missing API key
+  ```json
+  { "error": "Unauthorized", "message": "Missing or invalid API key." }
+  ```
+- `404 Not Found` — Resource not found
+  ```json
+  { "error": "Not Found", "message": "Resource not found." }
+  ```
+- `429 Too Many Requests` — Rate limit exceeded
+  ```json
+  { "error": "Too Many Requests", "message": "Rate limit exceeded. Retry later." }
+  ```
+- `500 Internal Server Error` — Unexpected server error
+  ```json
+  { "error": "Internal Server Error", "message": "An unexpected error occurred." }
+  ```
+
 
 ### GET /texts
 
@@ -107,6 +182,24 @@ Retrieve text content blocks.
   ]
 }
 ```
+**Error Responses:**
+- `401 Unauthorized` — Invalid or missing API key
+  ```json
+  { "error": "Unauthorized", "message": "Missing or invalid API key." }
+  ```
+- `404 Not Found` — Resource not found
+  ```json
+  { "error": "Not Found", "message": "Resource not found." }
+  ```
+- `429 Too Many Requests` — Rate limit exceeded
+  ```json
+  { "error": "Too Many Requests", "message": "Rate limit exceeded. Retry later." }
+  ```
+- `500 Internal Server Error` — Unexpected server error
+  ```json
+  { "error": "Internal Server Error", "message": "An unexpected error occurred." }
+  ```
+
 
 ### GET /media
 
@@ -127,6 +220,24 @@ Retrieve media asset metadata.
   ]
 }
 ```
+**Error Responses:**
+- `401 Unauthorized` — Invalid or missing API key
+  ```json
+  { "error": "Unauthorized", "message": "Missing or invalid API key." }
+  ```
+- `404 Not Found` — Resource not found
+  ```json
+  { "error": "Not Found", "message": "Resource not found." }
+  ```
+- `429 Too Many Requests` — Rate limit exceeded
+  ```json
+  { "error": "Too Many Requests", "message": "Rate limit exceeded. Retry later." }
+  ```
+- `500 Internal Server Error` — Unexpected server error
+  ```json
+  { "error": "Internal Server Error", "message": "An unexpected error occurred." }
+  ```
+
 
 ### GET /templates
 
@@ -146,6 +257,23 @@ Retrieve HTML templates (seminar material).
   ]
 }
 ```
+**Error Responses:**
+- `401 Unauthorized` — Invalid or missing API key
+  ```json
+  { "error": "Unauthorized", "message": "Missing or invalid API key." }
+  ```
+- `404 Not Found` — Resource not found
+  ```json
+  { "error": "Not Found", "message": "Resource not found." }
+  ```
+- `429 Too Many Requests` — Rate limit exceeded
+  ```json
+  { "error": "Too Many Requests", "message": "Rate limit exceeded. Retry later." }
+  ```
+- `500 Internal Server Error` — Unexpected server error
+  ```json
+  { "error": "Internal Server Error", "message": "An unexpected error occurred." }
+  ```
 
 ### PUT /seminars/{id}/recording
 
@@ -176,12 +304,24 @@ Transmit a MUX recording URL for a seminar.
 
 ---
 
+
+
 ## Pagination
 
-If supported, expect standard page-based pagination:
-- Query params: `?page=1&pageSize=50`
-- Response includes `pagination` object with `totalPages` and `totalRecords`
-- Aither iterates all pages until `page >= totalPages`
+The following table shows which GET endpoints support pagination:
+
+| Endpoint    | Pagination Supported | Details                                                        |
+|-------------|---------------------|----------------------------------------------------------------|
+| /seminars   | Yes                 | Standard page-based pagination, see example above              |
+| /lessons    | No                  | Returns all lessons in a single response                       |
+| /users      | No                  | Returns all users in a single response                         |
+| /texts      | No                  | Returns all texts in a single response                         |
+| /media      | No                  | Returns all media in a single response                         |
+| /templates  | No                  | Returns all templates in a single response                     |
+
+**Note:**
+- Only `/seminars` supports pagination with a `pagination` object and query parameters `?page=1&pageSize=50`.
+- All other endpoints return complete datasets without pagination.
 
 ---
 
@@ -194,7 +334,11 @@ Unknown. Aither implements:
 
 ---
 
+
 ## Notes
+
+
+- **PII protection for GET /users:** The /users response contains names and email addresses. These data must **never** be logged, must be redacted in error logs and monitoring, and implementations must avoid emitting raw PII (e.g., email, name) in logs or metrics. Handlers for GET /users must apply redaction and safe logging/metrics practices.
 
 - **These are EXPECTED shapes** — verify each endpoint against the actual Postman Collection before implementation
 - **Field names may differ** — create mapping layer in `lib/hemera/schemas.ts` to normalize API responses to internal types

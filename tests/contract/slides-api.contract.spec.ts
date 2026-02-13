@@ -5,6 +5,15 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+// Mock loadConfig
+vi.mock("@/lib/config", () => ({
+	loadConfig: vi.fn(() => ({
+		HEMERA_API_BASE_URL: "https://api.hemera.test",
+		HEMERA_API_KEY: "test-key",
+		SLIDES_OUTPUT_DIR: "output/slides",
+	})),
+}));
+
 // Mock auth — default: admin
 const mockRequireAdmin = vi.fn().mockReturnValue({
 	status: 200,

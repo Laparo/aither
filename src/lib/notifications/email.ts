@@ -3,35 +3,42 @@
 // Task: T041 [US3] — Threshold-based sending, failure counter
 // ---------------------------------------------------------------------------
 
+import { loadConfig } from "@/lib/config";
 import nodemailer from "nodemailer";
 
-const NOTIFY_FAILURE_THRESHOLD = Number(process.env.NOTIFY_FAILURE_THRESHOLD) || 3;
 let failureCount = 0;
 
-const smtpConfig = {
-	host: process.env.SMTP_HOST ?? "localhost",
-	port: Number(process.env.SMTP_PORT) || 587,
-	secure: false,
-	auth: {
-		user: process.env.SMTP_USER ?? "",
-		pass: process.env.SMTP_PASS ?? "",
-	},
-};
+/** Lazily created transport — avoids reading env at module load time. */
+let _transport: nodemailer.Transporter | null = null;
 
-const mailTransport = nodemailer.createTransport(smtpConfig);
+function getTransport(): nodemailer.Transporter {
+	if (_transport) return _transport;
+	const cfg = loadConfig();
+	_transport = nodemailer.createTransport({
+		host: cfg.SMTP_HOST,
+		port: cfg.SMTP_PORT,
+		secure: false,
+		auth: {
+			user: cfg.SMTP_USER,
+			pass: cfg.SMTP_PASS,
+		},
+	});
+	return _transport;
+}
 
 export async function sendFailureNotification(jobId: string, errorSummary: string): Promise<void> {
+	const cfg = loadConfig();
 	failureCount++;
-	if (failureCount < NOTIFY_FAILURE_THRESHOLD) return;
+	if (failureCount < cfg.NOTIFY_FAILURE_THRESHOLD) return;
 
 	const mailOptions = {
-		from: process.env.SMTP_FROM ?? "aither@localhost",
-		to: process.env.SMTP_TO ?? "admin@localhost",
+		from: cfg.SMTP_FROM,
+		to: cfg.SMTP_TO ?? cfg.NOTIFY_EMAIL_TO,
 		subject: `Aither Sync Failure Notification (job ${jobId})`,
 		text: `Sync job ${jobId} failed.\n\nError summary: ${errorSummary}\n\nTimestamp: ${new Date().toISOString()}`,
 	};
 
-	await mailTransport.sendMail(mailOptions);
+	await getTransport().sendMail(mailOptions);
 }
 
 export function resetFailureCounter(): void {
@@ -44,4 +51,5 @@ export function getFailureCount(): number {
 
 export function _resetForTesting(): void {
 	failureCount = 0;
+	_transport = null;
 }

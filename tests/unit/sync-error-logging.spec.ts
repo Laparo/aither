@@ -17,16 +17,23 @@ vi.mock("@/lib/monitoring/rollbar-official", () => ({
 		info: vi.fn(),
 		debug: vi.fn(),
 		log: vi.fn(),
-		wait: vi.fn((cb?: () => void) => { if (typeof cb === "function") cb(); }),
+		wait: vi.fn((cb?: () => void) => {
+			if (typeof cb === "function") cb();
+		}),
 	},
 }));
 
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 describe("Sync Error Logging", () => {
-	let logSyncError: any;
-	let logSyncWarning: any;
-	let logSyncCritical: any;
+	let logSyncError: (jobId: string, entityType: string, sourceId: string, message: string) => void;
+	let logSyncWarning: (
+		jobId: string,
+		entityType: string,
+		sourceId: string,
+		message: string,
+	) => void;
+	let logSyncCritical: (jobId: string, message: string) => void;
 
 	beforeAll(async () => {
 		({ logSyncError, logSyncWarning, logSyncCritical } = await import(

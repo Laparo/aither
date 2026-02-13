@@ -22,9 +22,9 @@ export {
 	serverInstance,
 } from "./rollbar-official";
 
+import type Rollbar from "rollbar";
 // Legacy-compatible re-export: getRollbar() returns the serverInstance
 import { serverInstance } from "./rollbar-official";
-import type Rollbar from "rollbar";
 
 /** @deprecated Use `serverInstance` from `./rollbar-official` instead. */
 export function getRollbar(): Rollbar {

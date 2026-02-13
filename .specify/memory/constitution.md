@@ -1,15 +1,13 @@
 <!--
   Sync Impact Report
   ===================
-  Version change: 2.4.0 → 2.5.0
+  Version change: 2.5.0 → 2.6.0
   Modified principles: N/A
   Added sections:
-    - Runtime Environment: Development port 5000
+    - Runtime Environment: Hemera API development port 3000
   Removed sections: N/A
   Templates requiring updates: N/A (all compatible)
-  Follow-up TODOs:
-    - Update specs/001-hemera-api-integration: remove all Prisma/database assumptions
-    - Update specs/001-hemera-api-integration/plan.md: remove Prisma from tech stack
+  Follow-up TODOs: N/A
 -->
 
 # Aither Constitution
@@ -429,8 +427,10 @@ The GitHub Actions workflow enforces quality standards:
 
 - **Linux Service**: The application runs as a service on a Linux machine
   in production and locally during development.
-- **Development Port**: The application runs on port **5000** in
-  development mode (`npm run dev -- -p 5000`).
+- **Development Port**: The application runs on port **3001** in
+  development mode (`npm run dev -- -p 3001`).
+- **Hemera API Port**: The Hemera API runs on port **3000** in
+  development mode.
 - **GitHub Repository**: Source code hosted on GitHub for version control
   and collaboration.
 - **Quality Gates**: Every pull request MUST pass TypeScript compilation,
@@ -495,4 +495,4 @@ followed strictly:
 - **Performance Benchmarks**: Authentication flows MUST meet sub-100 ms
   response requirements.
 
-**Version**: 2.4.0 | **Ratified**: 2026-02-10 | **Last Amended**: 2026-02-13
+**Version**: 2.6.0 | **Ratified**: 2026-02-10 | **Last Amended**: 2026-02-13

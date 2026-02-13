@@ -50,7 +50,11 @@ export function createErrorResponse(
 /**
  * Create a successful API response
  */
-export function createSuccessResponse<T>(data: T, requestId?: string, httpStatus?: number): Response {
+export function createSuccessResponse<T>(
+	data: T,
+	requestId?: string,
+	httpStatus?: number,
+): Response {
 	const successResponse: ApiResponse<T> = {
 		success: true,
 		data,
