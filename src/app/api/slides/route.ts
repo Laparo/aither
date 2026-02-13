@@ -22,7 +22,8 @@ export function _resetState() {
 // ── POST /api/slides — Trigger slide generation ──────────────────────────
 
 export async function POST(req: NextRequest) {
-	const auth = (req as any).auth ?? null;
+	type AuthenticatedRequest = NextRequest & { auth?: unknown };
+	const auth = (req as AuthenticatedRequest).auth ?? null;
 	const authResult = requireAdmin(auth);
 	if (authResult.status !== 200) {
 		return NextResponse.json(authResult.body, { status: authResult.status });

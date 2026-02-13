@@ -4,7 +4,7 @@
   Version change: 2.5.0 → 2.6.0
   Modified principles: N/A
   Added sections:
-    - Runtime Environment: Hemera API development port 3000
+    - Hemera API Port
   Removed sections: N/A
   Templates requiring updates: N/A (all compatible)
   Follow-up TODOs: N/A

@@ -21,7 +21,7 @@ const mockRequireAdmin = vi.fn().mockReturnValue({
 });
 
 vi.mock("@/lib/auth/role-check", () => ({
-	requireAdmin: (...args: any[]) => mockRequireAdmin(...args),
+	requireAdmin: (...args: unknown[]) => mockRequireAdmin(...args),
 }));
 
 // Mock SlideGenerator
@@ -110,7 +110,7 @@ describe("POST /api/slides", () => {
 		let resolveGenerate!: () => void;
 		mockGenerate.mockImplementation(
 			() =>
-				new Promise<any>((resolve) => {
+				new Promise<unknown>((resolve) => {
 					resolveGenerate = () =>
 						resolve({
 							slidesGenerated: 5,

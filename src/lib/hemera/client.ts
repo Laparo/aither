@@ -118,7 +118,9 @@ export class HemeraClient {
 	/**
 	 * PUT a resource to the Hemera API and validate the response against a Zod schema.
 	 */
-	async put<T = unknown>(path: string, body: unknown, schema?: z.ZodType<T>): Promise<T> {
+	async put<T>(path: string, body: unknown, schema: z.ZodType<T>): Promise<T>;
+	async put(path: string, body: unknown): Promise<unknown>;
+	async put<T = unknown>(path: string, body: unknown, schema?: z.ZodType<T>): Promise<T | unknown> {
 		const url = `${this.baseUrl}${path}`;
 
 		const response = await pRetry(
@@ -161,7 +163,10 @@ export class HemeraClient {
 		);
 
 		const json = await response.json();
-		return schema ? schema.parse(json) : (json as T);
+		if (schema) {
+			return schema.parse(json);
+		}
+		return json;
 	}
 
 	private delay(ms: number): Promise<void> {

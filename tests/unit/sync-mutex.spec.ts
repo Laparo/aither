@@ -98,7 +98,7 @@ describe("Sync Mutex", () => {
 			() =>
 				({
 					run: vi.fn().mockRejectedValue(new Error("fetch failed")),
-				}) as any,
+				}) as unknown as InstanceType<typeof SyncOrchestrator>,
 		);
 
 		const res1 = await POST(createRequest("POST"));
