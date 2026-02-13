@@ -8,12 +8,17 @@ const mockError = vi.fn();
 const mockWarning = vi.fn();
 const mockCritical = vi.fn();
 
-vi.mock("@/lib/monitoring/rollbar", () => ({
-	getRollbar: vi.fn().mockReturnValue({
+vi.mock("@/lib/monitoring/rollbar-official", () => ({
+	serverInstance: {
 		error: mockError,
 		warning: mockWarning,
 		critical: mockCritical,
-	}),
+		warn: vi.fn(),
+		info: vi.fn(),
+		debug: vi.fn(),
+		log: vi.fn(),
+		wait: vi.fn((cb?: () => void) => { if (typeof cb === "function") cb(); }),
+	},
 }));
 
 import { beforeEach, describe, expect, it } from "vitest";
@@ -44,7 +49,8 @@ describe("Sync Error Logging", () => {
 		expect(context).toMatchObject({
 			jobId: "job-123",
 			entityType: "seminars",
-			sourceId: "sem-001",
+			// sourceId is redacted when PII consent is not granted (default in tests)
+			sourceId: "[redacted]",
 		});
 	});
 
