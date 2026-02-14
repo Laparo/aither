@@ -126,6 +126,12 @@ Output a Markdown report (no file writes) with the following structure:
 
 ## Specification Analysis Report
 
+**IMPORTANT**: All tables MUST follow strict formatting rules to prevent renderer rejection:
+- Each cell MUST have exactly one space before and after content: `| Content |`
+- Header separator MUST have at least 3 dashes per column: `|--------|`
+- All rows MUST have the same number of columns
+- No trailing spaces after the final pipe
+
 | ID | Category | Severity | Location(s) | Summary | Recommendation |
 |----|----------|----------|-------------|---------|----------------|
 | D1 | Duplication | HIGH | spec.md:L120-134 | Two similar requirements ... | Merge phrasing; keep clearer version |

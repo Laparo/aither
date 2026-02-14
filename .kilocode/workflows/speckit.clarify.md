@@ -106,7 +106,7 @@ Execution steps:
           - Alignment with any explicit project goals or constraints visible in the spec
        - Present your **recommended option prominently** at the top with clear reasoning (1-2 sentences explaining why this is the best choice).
        - Format as: `**Recommended:** Option [X] - <reasoning>`
-       - Then render all options as a Markdown table:
+       - Then render all options as a Markdown table with **strict formatting**:
 
        | Option | Description |
        |--------|-------------|
@@ -114,6 +114,12 @@ Execution steps:
        | B | <Option B description> |
        | C | <Option C description> (add D/E as needed up to 5) |
        | Short | Provide a different short answer (<=5 words) (Include only if free-form alternative is appropriate) |
+
+       **Table Formatting Rules** (MUST follow to prevent renderer rejection):
+       - Each cell MUST have exactly one space before and after content: `| Content |`
+       - Header separator MUST have at least 3 dashes: `|--------|`
+       - All rows MUST have the same number of columns
+       - No trailing spaces after the final pipe
 
        - After the table, add: `You can reply with the option letter (e.g., "A"), accept the recommendation by saying "yes" or "recommended", or provide your own short answer.`
     - For short‑answer style (no meaningful discrete options):

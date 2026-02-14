@@ -177,11 +177,34 @@ Given that feature description, do this:
            **Your choice**: _[Wait for user response]_
            ```
 
-        4. **CRITICAL - Table Formatting**: Ensure markdown tables are properly formatted:
-           - Use consistent spacing with pipes aligned
-           - Each cell should have spaces around content: `| Content |` not `|Content|`
-           - Header separator must have at least 3 dashes: `|--------|`
-           - Test that the table renders correctly in markdown preview
+        4. **CRITICAL - Table Formatting**: Ensure markdown tables are properly formatted to prevent renderer rejection:
+           
+           **Validation Rules**:
+           - Each cell MUST have exactly one space before and after content: `| Content |` not `|Content|` or `|  Content  |`
+           - Header separator MUST have at least 3 dashes per column: `|--------|` not `|--|`
+           - All rows MUST have the same number of columns (pipes)
+           - No trailing spaces after the final pipe on each line
+           - Pipes MUST be aligned vertically for readability (though not strictly required by spec)
+           
+           **Correct Example**:
+           ```markdown
+           | Option | Answer | Implications |
+           |--------|--------|--------------|
+           | A      | Use OAuth2 | Requires external provider setup |
+           | B      | Use JWT | Simpler but needs key management |
+           | Custom | Provide your own answer | Explain how to provide custom input |
+           ```
+           
+           **Incorrect Examples** (DO NOT USE):
+           ```markdown
+           |Option|Answer|Implications|          ❌ No spaces around content
+           | Option | Answer | Implications|     ❌ Missing space before final pipe
+           |Option | Answer | Implications |     ❌ Inconsistent spacing
+           | Option | Answer |                   ❌ Missing column
+           |--------|--------|-----|              ❌ Separator too short
+           ```
+           
+           **Before finalizing**: Validate each table against these rules to ensure downstream renderers accept it
         5. Number questions sequentially (Q1, Q2, Q3 - max 3 total)
         6. Present all questions together before waiting for responses
         7. Wait for user to respond with their choices for all questions (e.g., "Q1: A, Q2: Custom - [details], Q3: B")
