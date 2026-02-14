@@ -18,7 +18,7 @@ export function createHemeraClient(): HemeraClient {
 	const tokenManager = getTokenManager();
 
 	// Defensive validation: ensure tokenManager exposes a getToken() function
-	if (!tokenManager || typeof (tokenManager as any).getToken !== "function") {
+	if (!tokenManager || typeof (tokenManager as { getToken?: unknown }).getToken !== "function") {
 		throw new Error(
 			"createHemeraClient error: token manager does not provide `getToken()`.\n" +
 			"Ensure getTokenManager() returns an object with `getToken(): Promise<string>` and that HEMERA_SERVICE_TOKEN is configured.",

@@ -12,9 +12,9 @@ export async function searchLibrary(query: string, libraryName: string) {
   return client.searchLibrary(query, libraryName);
 }
 
-export async function getContext(libraryId: string, question: string, opts?: any) {
+export async function getContext(libraryId: string, question: string, opts?: Record<string, unknown>) {
   const client = createContext7Client();
-  return client.getContext(question, libraryId, opts || { type: "txt" });
+  return client.getContext(question, libraryId, opts ?? { type: "txt" });
 }
 
 export default { createContext7Client, searchLibrary, getContext };

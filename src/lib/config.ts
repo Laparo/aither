@@ -78,9 +78,7 @@ const EnvSchema = z
 					return parts.every((p) => /^[A-Za-z0-9_-]+$/.test(p));
 				},
 				{
-					message:
-						`HEMERA_SERVICE_TOKEN must be a valid JWT (header.payload.signature). ` +
-						`Obtain a durable service credential for ${SERVICE_USER_EMAIL} (see Clerk Backend API or dedicated service tokens).`,
+					message: `HEMERA_SERVICE_TOKEN must be a valid JWT (header.payload.signature). Obtain a durable service credential for ${SERVICE_USER_EMAIL} (see Clerk Backend API or dedicated service tokens).`,
 				},
 				),
 

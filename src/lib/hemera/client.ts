@@ -266,9 +266,9 @@ export class HemeraClient {
 					throw new Error(`Invalid base64url encoding in part ${i + 1}`);
 				}
 			}
-		} catch (err) {
+		} catch (_err) {
 			throw new HemeraTokenError(
-				`Token validation failed: invalid base64url encoding. ${err instanceof Error ? err.message : String(err)}`
+				`Token validation failed: invalid base64url encoding. ${_err instanceof Error ? _err.message : String(_err)}`
 			);
 		}
 	}
@@ -296,9 +296,9 @@ export class HemeraClient {
 			let decoded: string;
 			try {
 				decoded = decodeURIComponent(safeSeg);
-			} catch (err) {
+			} catch (_err) {
 				// Treat invalid percent-encodings as invalid input
-				throw new Error('Invalid percent-encoding in path');
+				throw new Error("Invalid percent-encoding in path");
 			}
 			if (decoded === '..') {
 				// Pop last valid segment if present
