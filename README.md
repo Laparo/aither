@@ -1,3 +1,21 @@
+# aither
+
+## Development
+
+- **Open in VS Code**: if you installed the `code` CLI, run:
+
+```bash
+npm run open:code
+```
+
+- **Python tools**: the repository uses a local virtualenv at `.venv`. Activate it with:
+
+```bash
+source .venv/bin/activate
+# then run Python CLI tools like `specify`
+specify --help
+```
+
 # spec-kit
 
 ## Rollbar API Tokens

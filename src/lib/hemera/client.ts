@@ -6,10 +6,19 @@
 import pRetry, { AbortError } from "p-retry";
 import pThrottle from "p-throttle";
 import type { z } from "zod";
+import {
+	CoursesResponseSchema,
+	CourseWithParticipantsSchema,
+	ParticipationResponseSchema,
+	type CoursesResponse,
+	type CourseWithParticipants,
+	type Participation,
+	type ResultOutcome,
+} from "./schemas";
 
 export interface HemeraClientOptions {
 	baseUrl: string;
-	apiKey: string;
+	getToken: () => Promise<string>;
 	/** Requests per second (default: 2) */
 	rateLimit?: number;
 	/** Max retries on failure (default: 5) */
@@ -42,14 +51,14 @@ export class HemeraApiError extends Error {
  */
 export class HemeraClient {
 	private readonly baseUrl: string;
-	private readonly apiKey: string;
+	private readonly getToken: () => Promise<string>;
 	private readonly maxRetries: number;
 	private readonly fetchFn: typeof fetch;
 	private readonly throttledFetch: typeof fetch;
 
 	constructor(options: HemeraClientOptions) {
 		this.baseUrl = options.baseUrl.replace(/\/+$/, "");
-		this.apiKey = options.apiKey;
+		this.getToken = options.getToken;
 		this.maxRetries = options.maxRetries ?? 5;
 		this.fetchFn = options.fetchFn ?? globalThis.fetch;
 
@@ -71,15 +80,34 @@ export class HemeraClient {
 	 * @param schema Zod schema for validation
 	 * @returns      Validated result
 	 */
+	/**
+	 * Resolve and validate the auth token. Throws HemeraApiError if invalid.
+	 */
+	private async resolveToken(url: string): Promise<string> {
+		const token = await this.getToken();
+		if (!token || typeof token !== "string" || token.trim().length === 0) {
+			throw new AbortError(
+				new HemeraApiError(
+					401,
+					"Unauthorized",
+					"Service token is empty or invalid — check getToken() implementation and credentials",
+					url,
+				),
+			);
+		}
+		return token;
+	}
+
 	async get<T>(path: string, schema: z.ZodType<T>): Promise<T> {
 		const url = `${this.baseUrl}${path}`;
 
 		const response = await pRetry(
 			async () => {
+				const token = await this.resolveToken(url);
 				const res = await this.throttledFetch(url, {
 					method: "GET",
 					headers: {
-						Authorization: `Bearer ${this.apiKey}`,
+						Authorization: `Bearer ${token}`,
 						Accept: "application/json",
 					},
 				});
@@ -125,10 +153,11 @@ export class HemeraClient {
 
 		const response = await pRetry(
 			async () => {
+				const token = await this.resolveToken(url);
 				const res = await this.throttledFetch(url, {
 					method: "PUT",
 					headers: {
-						Authorization: `Bearer ${this.apiKey}`,
+						Authorization: `Bearer ${token}`,
 						"Content-Type": "application/json",
 						Accept: "application/json",
 					},
@@ -167,6 +196,23 @@ export class HemeraClient {
 			return schema.parse(json);
 		}
 		return json;
+	}
+
+	// Service API methods
+	async getServiceCourses(): Promise<CoursesResponse> {
+		return this.get('/service/courses', CoursesResponseSchema);
+	}
+
+	async getServiceCourse(id: string): Promise<CourseWithParticipants> {
+		return this.get(`/service/courses/${id}`, CourseWithParticipantsSchema);
+	}
+
+	async getServiceParticipation(id: string): Promise<Participation> {
+		return this.get(`/service/participations/${id}`, ParticipationResponseSchema);
+	}
+
+	async updateServiceParticipationResult(id: string, data: { resultOutcome?: ResultOutcome | null; resultNotes?: string | null }): Promise<Participation> {
+		return this.put(`/service/participations/${id}/result`, data, ParticipationResponseSchema);
 	}
 
 	private delay(ms: number): Promise<void> {

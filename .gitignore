@@ -15,18 +15,6 @@ out/
 .env.backup
 .env.local.backup
 
-# Python
-/.venv
-venv/
-__pycache__/
-*.py[cod]
-*.pyo
-*.pyd
-.Python
-python-env/
-.pytest_cache/
-
-
 # IDE
 .vscode/
 .idea/
@@ -57,6 +45,13 @@ next-env.d.ts
 
 # Generated HTML output
 output/
+
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
 
 # Misc
 .qodo/

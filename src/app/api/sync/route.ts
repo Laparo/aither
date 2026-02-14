@@ -4,6 +4,7 @@
 // ---------------------------------------------------------------------------
 
 import { requireAdmin } from "@/lib/auth/role-check";
+import { getServiceToken } from "@/lib/auth/service-token";
 import { loadConfig } from "@/lib/config";
 import { HemeraClient } from "@/lib/hemera/client";
 import { SyncOrchestrator } from "@/lib/sync/orchestrator";
@@ -98,10 +99,9 @@ export async function POST(req: NextRequest) {
 	// Fire-and-forget: start orchestrator async
 	const cfg = loadConfig();
 	const baseUrl = cfg.HEMERA_API_BASE_URL;
-	const apiKey = cfg.HEMERA_API_KEY;
 	const outputDir = cfg.HTML_OUTPUT_DIR;
 
-	const client = new HemeraClient({ baseUrl, apiKey });
+	const client = new HemeraClient({ baseUrl, getToken: getServiceToken });
 	const orchestrator = new SyncOrchestrator({
 		client,
 		outputDir,

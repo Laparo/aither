@@ -4,6 +4,7 @@
 // ---------------------------------------------------------------------------
 
 import { requireAdmin } from "@/lib/auth/role-check";
+import { getServiceToken } from "@/lib/auth/service-token";
 import { loadConfig } from "@/lib/config";
 import { HemeraClient } from "@/lib/hemera/client";
 import { transmitRecording } from "@/lib/sync/recording-transmitter";
@@ -54,7 +55,7 @@ export async function POST(request: Request): Promise<NextResponse> {
 	const config = loadConfig();
 	const client = new HemeraClient({
 		baseUrl: config.HEMERA_API_BASE_URL,
-		apiKey: config.HEMERA_API_KEY,
+		getToken: getServiceToken,
 	});
 
 	// Transmit to hemera.academy

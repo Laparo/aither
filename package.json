@@ -15,6 +15,7 @@
 		"test:e2e": "playwright test",
 		"test:watch": "vitest",
 		"typecheck": "tsc --noEmit",
+		"open:code": "code .",
 		"prepare": "husky install"
 	},
 	"dependencies": {
