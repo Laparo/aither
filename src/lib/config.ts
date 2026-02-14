@@ -61,8 +61,25 @@ const envBool = (defaultValue: boolean) =>
 const EnvSchema = z
 	.object({
 		// Hemera Academy API
+		// Base URL must include the full origin (e.g. https://hemera-academy.vercel.app)
 		HEMERA_API_BASE_URL: z.string().url(),
-		HEMERA_API_KEY: z.string().min(1),
+		// Service token must be a valid JWT (three base64url-encoded parts separated by dots)
+		HEMERA_SERVICE_TOKEN: z
+			.string()
+			.min(1)
+			.refine(
+				(token) => {
+					const parts = token.split(".");
+					if (parts.length !== 3) return false;
+					if (parts.some((p) => p.length === 0)) return false;
+					return parts.slice(0, 2).every((p) => /^[A-Za-z0-9_-]+$/.test(p));
+				},
+				{
+					message:
+						"HEMERA_SERVICE_TOKEN must be a valid JWT (header.payload.signature). " +
+						"Obtain a Clerk session token for the service user (aither-service@hemera-academy.com).",
+				},
+			),
 
 		// Clerk Authentication
 		NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: z.string().min(1),
