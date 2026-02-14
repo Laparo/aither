@@ -24,14 +24,29 @@ git config --get remote.origin.url
 > [!CAUTION]
 > ONLY PROCEED TO NEXT STEPS IF THE REMOTE IS A GITHUB URL
 
-	**Validation rules**:
-	- Accept SSH: `git@github.com:OWNER/REPO.git`
-	- Accept HTTPS: `https://github.com/OWNER/REPO` or `https://github.com/OWNER/REPO.git`
-	- Accept Enterprise GitHub hosts: `git@github.example.com:OWNER/REPO.git` or `https://github.example.com/OWNER/REPO(.git)`
-	- Extract `OWNER/REPO` and store as the target repository identifier for issue creation
-	- If the URL cannot be parsed as a GitHub-hosted repository, abort with a clear error message and exit code (do not attempt to create issues)
+	**Validation rules with explicit regex constraints**:
+	
+	1. **Extract remote URL** and validate against these patterns:
+	   - SSH format: `^git@github\.com:([a-zA-Z0-9_-]+)/([a-zA-Z0-9_.-]+?)(\.git)?$`
+	   - HTTPS format: `^https://github\.com/([a-zA-Z0-9_-]+)/([a-zA-Z0-9_.-]+?)(\.git)?$`
+	   - Enterprise SSH: `^git@github\.[a-zA-Z0-9.-]+:([a-zA-Z0-9_-]+)/([a-zA-Z0-9_.-]+?)(\.git)?$`
+	   - Enterprise HTTPS: `^https://github\.[a-zA-Z0-9.-]+/([a-zA-Z0-9_-]+)/([a-zA-Z0-9_.-]+?)(\.git)?$`
+	
+	2. **Canonicalize OWNER/REPO**:
+	   - Extract capture groups 1 (OWNER) and 2 (REPO) from the matched pattern
+	   - Strip `.git` suffix from REPO if present
+	   - Validate OWNER matches `^[a-zA-Z0-9_-]+$` (no special chars, no path traversal)
+	   - Validate REPO matches `^[a-zA-Z0-9_.-]+$` (alphanumeric, dash, dot, underscore only)
+	   - Reject if OWNER or REPO contains `..`, `/`, `\`, or other path traversal sequences
+	   - Store canonicalized `OWNER/REPO` as the target repository identifier
+	
+	3. **Security checks**:
+	   - If the URL does not match any GitHub pattern, abort with error: "Remote URL is not a GitHub repository"
+	   - If OWNER or REPO validation fails, abort with error: "Invalid repository identifier format"
+	   - Prevent SSRF by rejecting non-GitHub domains (only `github.com` or `github.*` enterprise hosts)
+	   - Log the canonicalized `OWNER/REPO` for audit purposes before proceeding
 
-	**Before creating issues**: verify the repository target supplied to the MCP server matches the extracted `OWNER/REPO`. If they differ, fail safely with a descriptive message and do not create any issues.
+	**Before creating issues**: verify the repository target supplied to the MCP server exactly matches the extracted and canonicalized `OWNER/REPO`. If they differ, fail safely with a descriptive message and do not create any issues.
 
 	**Error handling**: When creating issues via the MCP/GitHub API, handle permission/API errors and rate-limits by:
 	- Checking for 401/403 and logging a clear permission error indicating missing scopes/token
