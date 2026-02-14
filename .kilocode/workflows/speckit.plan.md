@@ -33,7 +33,7 @@ You **MUST** consider the user input before proceeding (if not empty).
    - Phase 1: Update agent context by running the agent script
    - Re-evaluate Constitution Check post-design
 
-4. **Stop and report**: Command ends after Phase 2 planning. Report branch, IMPL_PLAN path, and generated artifacts.
+4. **Stop and report**: Command ends after Phase 1 planning. Report branch, IMPL_PLAN path, and generated artifacts.
 
 ## Phases
 
@@ -79,7 +79,25 @@ You **MUST** consider the user input before proceeding (if not empty).
    - These scripts detect which AI agent is in use
    - Update the appropriate agent-specific context file
    - Add only new technology from current plan
-   - Preserve manual additions between markers
+   - Preserve manual additions between explicit markers. Use a clearly defined start/end pair such as:
+
+      <!-- MANUAL_START:agent-context -->
+      (manual content goes here)
+      <!-- MANUAL_END:agent-context -->
+
+      Or, for non-HTML files, use comment-style markers, e.g.:
+
+      # MANUAL_START:agent-context
+      # (manual content)
+      # MANUAL_END:agent-context
+
+      Example (agent file snippet):
+
+      <!-- MANUAL_START:agent-context -->
+      - Notes: These lines are maintained manually and will not be overwritten by the update script
+      <!-- MANUAL_END:agent-context -->
+
+      The update script must detect these markers and preserve any content between them when updating the surrounding generated content.
 
 **Output**: data-model.md, /contracts/*, quickstart.md, agent-specific file
 

@@ -109,9 +109,9 @@ export const ResultOutcomeEnum = z.enum([
 export type ResultOutcome = z.infer<typeof ResultOutcomeEnum>;
 
 export const ParticipationSchema = z.object({
-  id: z.string(),
-  courseId: z.string(),
-  userId: z.string(),
+	id: z.string().min(1),
+	courseId: z.string().min(1),
+	userId: z.string().min(1),
   resultOutcome: ResultOutcomeEnum.nullable(),
   resultNotes: z.string().max(2000).nullable(),
 });

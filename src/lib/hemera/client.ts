@@ -204,15 +204,15 @@ export class HemeraClient {
 	}
 
 	async getServiceCourse(id: string): Promise<CourseWithParticipants> {
-		return this.get(`/service/courses/${id}`, CourseWithParticipantsSchema);
+		return this.get(`/service/courses/${encodeURIComponent(id)}`, CourseWithParticipantsSchema);
 	}
 
 	async getServiceParticipation(id: string): Promise<Participation> {
-		return this.get(`/service/participations/${id}`, ParticipationResponseSchema);
+		return this.get(`/service/participations/${encodeURIComponent(id)}`, ParticipationResponseSchema);
 	}
 
 	async updateServiceParticipationResult(id: string, data: { resultOutcome?: ResultOutcome | null; resultNotes?: string | null }): Promise<Participation> {
-		return this.put(`/service/participations/${id}/result`, data, ParticipationResponseSchema);
+		return this.put(`/service/participations/${encodeURIComponent(id)}/result`, data, ParticipationResponseSchema);
 	}
 
 	private delay(ms: number): Promise<void> {

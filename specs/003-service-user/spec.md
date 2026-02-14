@@ -70,6 +70,16 @@ sequenceDiagram
 - Rate limiting on `/api/service/*`
 - Optional IP whitelisting
 
+Additional Security Requirements (explicit):
+
+- **HTTPS mandatory**: All client and service-to-service traffic MUST use TLS/HTTPS. HTTP endpoints are not permitted for production traffic and must redirect to HTTPS.
+- **Rate limiting**: `/api/service/*` endpoints MUST enforce a per-service-user limit of `100 requests/minute` with a reasonable burst allowance; on exceeding limits return `429 Too Many Requests` and include a `Retry-After` header. Clients should implement exponential backoff when receiving 429s.
+- **Security monitoring & alerting**: All service-user activity MUST be exported to centralized logging/monitoring (structured logs and metrics). Implement anomaly detection for unusual access patterns (e.g., spikes in requests, unusual endpoints accessed) and configure alerts for suspicious activity tiers (warning/critical). Ensure audit logs are tamper-evident and retained according to policy.
+- **Token rotation & secret management**: Service credentials (API keys or secret tokens) MUST be stored in a secrets manager (Vault/AWS Secrets Manager/etc.). Define a rotation policy (e.g., rotate at least every 90 days or on suspected compromise), a revocation procedure, and an automated test/rollback process. Implement short-lived tokens where possible and proactive refresh with limited retries on expiry.
+- **Least-privilege enforcement**: The `api-client` role MUST only have the permissions required (see Permission Model). Do not grant `manage:*` permissions to the service user.
+- **Transport & encryption**: Secrets and tokens MUST never be logged in plaintext. Sensitive fields in logs must be redacted or hashed.
+- **Incident handling**: Document a clear incident response flow for compromised service credentials: immediate revocation, rotation, audit review, and affected-data assessment.
+
 ## Implementation Notes
 
 - Use short-lived JWTs (15 minutes) with proactive refresh
@@ -78,11 +88,21 @@ sequenceDiagram
 - Ensure server-side token management (no client-side session tokens)
 
 ## Environment Variables
-
 - `HEMERA_API_URL`: Hemera API base URL
 - `CLERK_SECRET_KEY`: For backend SDK
 - `CLERK_SERVICE_USER_EMAIL`: Service user email reference
 - `CLERK_SERVICE_USER_ID` or API key: Service credentials
+
+- `HEMERA_API_URL`: Hemera API base URL
+- `CLERK_SECRET_KEY`: Clerk backend secret for server-side SDK operations (keep in secrets manager)
+- `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`: Clerk publishable key required for client-side Clerk initialization
+- `CLERK_SERVICE_USER_EMAIL`: Service user email reference (informational)
+- `CLERK_SERVICE_USER_ID`: Clerk user id for the service user (used for lookups)
+- `CLERK_SERVICE_API_KEY` or `CLERK_SERVICE_USER_SECRET`: Service credential (prefer an API key / machine token stored in secrets manager). Do NOT store plaintext passwords in source.
+
+Notes:
+- Both `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` and `CLERK_SECRET_KEY` are typically required across Aither and Hemera for proper Clerk integration (client initialization and backend verification).
+- Service credentials should be fetched from a vault or environment (in CI/CD) and never committed to the repository.
 
 ## Acceptance Criteria
 

@@ -36,10 +36,13 @@ If the token expires, Aither automatically refreshes it and retries the request.
    - Review audit logs for suspicious activity
 
 2. **Limited Damage**:
-   - Attacker can only read course/participation data
-   - Attacker can only write to `resultOutcome` and `resultNotes` fields
-   - Attacker cannot manage users, courses, or other sensitive operations
-   - Rate limiting prevents mass data extraction
+   - Attacker can read non-PII course and participation metadata such as:
+      - `participantId` (internal identifier), enrollment status, and participation state
+      - Course metadata: `courseId`, title, dates, public metadata
+      - Aggregated counts (e.g., participant counts)
+   - PII is excluded or pseudonymized before exposure. Specifically, full name, email, postal address, and other PII are stripped or masked according to the PII removal policy; only non-identifying participant references (IDs or pseudonyms) are returned by service endpoints.
+   - Writable fields are strictly limited to `resultOutcome` and `resultNotes` on `CourseParticipation` and no management endpoints (create/update/delete users, courses, bookings, payment info) are permitted.
+   - Additional mitigations apply in case of compromise: masking, aggressive rate-limiting, logging/alerting, and audit review to detect bulk data access patterns.
 
 3. **Detection**:
    - Monitor for unusual API usage patterns
@@ -48,36 +51,43 @@ If the token expires, Aither automatically refreshes it and retries the request.
 
 ### Q4: How is token caching implemented?
 
-**Answer**: Token caching follows this pattern:
+Answer: Token caching follows a safe pattern with retry-on-expiry. Example (in-memory for single-instance; use Redis/Vercel KV in production):
 
 ```typescript
-// In-memory cache (for single-instance deployments)
-const tokenCache = new Map<string, { value: string; expiresAt: Date }>();
+const tokenCache = new Map<string, { token: string; expiresAt: number }>();
 
 async function getServiceToken() {
-  const cached = tokenCache.get('hemera-service-token');
-  
-  // Return cached token if still valid (with 2-minute buffer)
-  if (cached && cached.expiresAt > new Date(Date.now() + 120000)) {
-    return cached.value;
-  }
-  
-  // Obtain new token from Clerk
-  const token = await obtainServiceTokenFromClerkBackend({ 
-    scope: 'hemera-api' 
-  });
-  
-  // Cache with expiration
-  tokenCache.set('hemera-service-token', { 
-    value: token, 
-    expiresAt: new Date(Date.now() + 15 * 60 * 1000) // 15 minutes
-  });
-  
-  return token;
-}
-```
+   const cacheKey = 'hemera-service-token';
+   const cached = tokenCache.get(cacheKey);
 
-For horizontal scaling (multiple Aither instances), use a shared cache like Redis or Vercel KV.
+   // Return cached token if still valid (2-minute buffer)
+   if (cached && cached.expiresAt > Date.now() + 120000) return cached.token;
+
+   // Try to obtain a fresh token, with one retry on 401-like failures
+   try {
+      const tokenResp = await obtainServiceTokenFromClerkBackend({ scope: 'hemera-api' });
+      // Expect { token: string, expiresAt: number }
+      tokenCache.set(cacheKey, { token: tokenResp.token, expiresAt: tokenResp.expiresAt });
+      return tokenResp.token;
+   } catch (err) {
+      // If the error indicates an authentication/401 issue, attempt one refresh and retry
+      if (isAuthError(err)) {
+         try {
+            const retryResp = await obtainServiceTokenFromClerkBackend({ scope: 'hemera-api' });
+            tokenCache.set(cacheKey, { token: retryResp.token, expiresAt: retryResp.expiresAt });
+            return retryResp.token;
+         } catch (retryErr) {
+            console.error('getServiceToken: retry failed', retryErr);
+            return null; // or throw depending on caller expectations
+         }
+      }
+
+      console.error('getServiceToken: failed to obtain token', err);
+      return null; // avoid crashing; callers should handle null (and surface 5xx/401 as appropriate)
+   }
+}
+
+// For horizontal scaling (multiple Aither instances), use a shared cache like Redis or Vercel KV and store `{ token, expiresAt }`.
 
 ### Q5: What data can the service user access?
 
@@ -132,7 +142,7 @@ This ensures:
 **Answer**: Rate limiting is applied at multiple levels:
 
 1. **Client-Side** (Aither):
-   - `p-throttle`: 2 requests/second to Hemera API
+   - `p-throttle`: ~1.67 requests/second (≈100 requests/minute) to Hemera API
    - Prevents overwhelming the API
 
 2. **Server-Side** (Hemera):

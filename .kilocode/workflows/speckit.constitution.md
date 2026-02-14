@@ -46,7 +46,7 @@ Follow this execution flow:
    - Read `.specify/templates/plan-template.md` and ensure any "Constitution Check" or rules align with updated principles.
    - Read `.specify/templates/spec-template.md` for scope/requirements alignment—update if constitution adds/removes mandatory sections or constraints.
    - Read `.specify/templates/tasks-template.md` and ensure task categorization reflects new or removed principle-driven task types (e.g., observability, versioning, testing discipline).
-   - Read each command file in `.specify/templates/commands/*.md` (including this one) to verify no outdated references (agent-specific names like CLAUDE only) remain when generic guidance is required.
+   - Read each command file in `.specify/templates/commands/*.md` (including this one) to verify no outdated references remain. Avoid hard-coding product/brand or proprietary agent names (e.g., "Claude", "Copilot"). Instead use generic phrasing such as "an AI assistant" or "agent-specific configuration". Example acceptable wording: "Do not include product-specific agent names; use a generic placeholder like 'AgentName' when describing agent-agnostic behavior." Also ensure command templates do not reference vendor-specific identifiers.
    - Read any runtime guidance docs (e.g., `README.md`, `docs/quickstart.md`, or agent-specific guidance files if present). Update references to principles changed.
 
 5. Produce a Sync Impact Report (prepend as an HTML comment at top of the constitution file after update):
@@ -63,7 +63,15 @@ Follow this execution flow:
    - Dates ISO format YYYY-MM-DD.
    - Principles are declarative, testable, and free of vague language ("should" → replace with MUST/SHOULD rationale where appropriate).
 
-7. Write the completed constitution back to `.specify/memory/constitution.md` (overwrite).
+7. Write the completed constitution back to `.specify/memory/constitution.md` using a safe, atomic procedure:
+
+   - Ensure the directory `.specify/memory/` exists; create it if missing (preserve permissions where possible).
+   - Write the new content to a temporary file in the same directory (e.g., `.specify/memory/constitution.md.tmp.<pid>`).
+   - Validate the temporary file was written and is readable before replacing the target.
+   - Atomically rename the temporary file to `.specify/memory/constitution.md` (e.g., `mv` or `rename` on POSIX systems) so partial writes are never left in place.
+   - Wrap the write/rename logic in a try/catch (or Promise `.catch`) to capture IO and permission errors. On error, log the detailed error (message and stack where available) and return a non-success status (throw an exception or return an error code) so callers can react appropriately.
+   - Implement a short retry with exponential backoff (e.g., 1s → 2s) for transient IO errors; limit retries to a small number (e.g., 2 attempts total).
+   - Ensure callers of this routine check for errors and do not assume success (propagate the error and avoid silent failures).
 
 8. Output a final summary to the user with:
    - New version and bump rationale.
@@ -81,4 +89,4 @@ If the user supplies partial updates (e.g., only one principle revision), still 
 
 If critical info missing (e.g., ratification date truly unknown), insert `TODO(<FIELD_NAME>): explanation` and include in the Sync Impact Report under deferred items.
 
-Do not create a new template; always operate on the existing `.specify/memory/constitution.md` file.
+Template handling policy: If `.specify/memory/constitution.md` exists, operate on that file. If it does not exist or is unreadable, create a new `.specify/memory/constitution.md` by copying the fallback template from `.specify/templates/constitution-template.md` and then proceed with placeholder replacement. When copying, record in the Sync Impact Report that the memory file was initialized from the template and document any default principles/placeholder counts used. If the template is missing or copying fails (permission/IO), abort with a clear error and exit code.

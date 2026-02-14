@@ -45,8 +45,15 @@ import { clerkClient } from '@clerk/nextjs/server';
 
 export async function getUserRole(userId: string): Promise<string | null> {
   if (!userId) return null;
-  const user = await clerkClient.users.getUser(userId);
-  return (user?.publicMetadata?.role as string) || null;
+  try {
+    const user = await clerkClient.users.getUser(userId);
+    if (!user) return null;
+    const role = user?.publicMetadata?.role;
+    return typeof role === 'string' && role.length > 0 ? role : null;
+  } catch (error) {
+    console.error(`getUserRole: failed to fetch user ${userId}:`, error instanceof Error ? error.message : error);
+    return null;
+  }
 }
 ```
 
@@ -136,16 +143,22 @@ Neue Route-Gruppe `app/api/service/` mit:
 
 Jeder Endpunkt prüft:
 ```typescript
-// Server-side guard for service endpoints
-const { userId } = await auth();
-if (!userId) {
-  return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-}
+import { auth } from '@clerk/nextjs/server';
 
-// getUserRole should be implemented using clerkClient.users.getUser(userId)
-const role = await getUserRole(userId);
-if (role !== 'api-client' && role !== 'admin') {
-  return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+// Server-side guard for service endpoints — ensure the route handler is declared `async`
+export async function handler(request: Request) {
+  const { userId } = await auth();
+  if (!userId) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  // getUserRole should be implemented using clerkClient.users.getUser(userId)
+  const role = await getUserRole(userId);
+  if (role !== 'api-client' && role !== 'admin') {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+
+  // ... handler logic continues here
 }
 ```
 
@@ -156,19 +169,28 @@ Wichtig: Für Service‑zu‑Service Flows darf die Aither‑Seite **nicht** auf
 Pseudocode / Pattern (serverseitig in Aither):
 
 ```typescript
-import { clerkClient } from '@clerk/nextjs/server';
+// CONCEPTUAL PSEUDOCODE - needs a real backend implementation
+// Use CLERK_SECRET_KEY from env and Clerk backend APIs or a configured JWT template.
+// Implement a concrete tokenCache (process memory for dev, Redis/Vercel KV for production).
 
-// Simplified token cache helper (in-memory or external cache for horizontal scale)
+const tokenCache = new Map<string, { token: string; expiresAt: number }>();
+
 async function getServiceToken() {
-  const cached = tokenCache.get('hemera-service-token');
-  if (cached && !cached.isExpired()) return cached.value;
+  const cacheKey = 'hemera-service-token';
+  const cached = tokenCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now() + 120000) return cached.token;
 
-  // Obtain a service token via Clerk backend SDK or your configured service credential
-  // Exact API depends on Clerk SDK version; the idea is to mint/obtain a machine token scoped to 'hemera-api'
-  const token = await obtainServiceTokenFromClerkBackend({ scope: 'hemera-api' });
-
-  tokenCache.set('hemera-service-token', { value: token, expiresAt: token.expiresAt });
-  return token;
+  // Attempt to obtain a service/machine token from Clerk backend
+  // The exact API depends on Clerk SDK version; implement using the official backend pattern
+  try {
+    const tokenResp = await obtainServiceTokenFromClerkBackend({ scope: 'hemera-api' });
+    // Expect tokenResp: { token: string, expiresAt: number }
+    tokenCache.set(cacheKey, { token: tokenResp.token, expiresAt: tokenResp.expiresAt });
+    return tokenResp.token;
+  } catch (err) {
+    console.error('getServiceToken failed', err);
+    throw err; // caller should handle retries or surface an error
+  }
 }
 
 const token = await getServiceToken();

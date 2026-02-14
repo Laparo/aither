@@ -17,15 +17,19 @@ This plan outlines the implementation steps for creating a dedicated service use
 #### 1.1 Create Service User in Clerk
 - [ ] Log into Clerk Dashboard
 - [ ] Navigate to Users section
-- [ ] Create new user: `aither-service@hemera-academy.com`
-- [ ] Set `publicMetadata`:
+- [ ] Create new service user `aither-service@hemera-academy.com` and set `publicMetadata`:
   ```json
   {
     "role": "api-client",
     "service": "aither"
   }
   ```
-- [ ] Document the user ID for environment configuration
+- [ ] Use a machine-oriented credential (API token/service key) instead of a reusable plaintext password where possible. If a password is created, use a strong randomly generated secret.
+- [ ] Store the secret/API token in a corporate secrets manager (e.g., Vault, AWS Secrets Manager) and reference it via environment variables; do NOT commit credentials to the repo.
+- [ ] Disable interactive/password-based sign-in for the service user if the Clerk plan supports it; prefer token-based/M2M auth.
+- [ ] Document service user ID and the secret's secret-name/key location in your environment/CI documentation (do not include the secret value in plaintext).
+- [ ] Define credential rotation policy: rotation interval, automated rotation steps, test-and-rollback process, and immediate revocation procedure in case of compromise.
+- [ ] Consider enabling additional protections (scope restrictions, IP whitelisting, or MFA for human accounts) where applicable.
 
 #### 1.2 Configure Clerk JWT Template (if needed)
 - [ ] Review Clerk JWT template settings
@@ -46,14 +50,21 @@ This plan outlines the implementation steps for creating a dedicated service use
     - `manage:users` ❌
 
 #### 2.2 Implement getUserRole Helper
-- [ ] Create server-side helper function:
+- [ ] Create server-side helper function and include robust error handling:
   ```typescript
   import { clerkClient } from '@clerk/nextjs/server';
-  
+
   export async function getUserRole(userId: string): Promise<string | null> {
     if (!userId) return null;
-    const user = await clerkClient.users.getUser(userId);
-    return (user?.publicMetadata?.role as string) || null;
+    try {
+      const user = await clerkClient.users.getUser(userId);
+      if (!user) return null;
+      const role = user?.publicMetadata?.role;
+      return typeof role === 'string' && role.length > 0 ? role : null;
+    } catch (error) {
+      console.error(`getUserRole failed for userId=${userId}:`, error instanceof Error ? error.message : error);
+      return null;
+    }
   }
   ```
 
@@ -85,19 +96,62 @@ This plan outlines the implementation steps for creating a dedicated service use
 
 #### 3.1 Token Management
 - [x] Update `HemeraClient` to accept `getToken` callback
-- [x] Implement token caching mechanism:
+- [x] Implement token caching mechanism with explicit shape and error handling:
   ```typescript
-  async function getServiceToken() {
-    const cached = tokenCache.get('hemera-service-token');
-    if (cached && !cached.isExpired()) return cached.value;
-    
-    const token = await obtainServiceTokenFromClerkBackend({ scope: 'hemera-api' });
-    tokenCache.set('hemera-service-token', { value: token, expiresAt: token.expiresAt });
-    return token;
+  // Simple in-memory cache for dev; use Redis/Vercel KV in production
+  const tokenCache = new Map<string, { token: string; expiresAt: number }>();
+
+  async function getServiceToken(): Promise<string | null> {
+    const cacheKey = 'hemera-service-token';
+    const cached = tokenCache.get(cacheKey);
+
+    // Return cached token if still valid (2-minute buffer)
+    if (cached && cached.expiresAt > Date.now() + 120000) return cached.token;
+
+    // Attempt token acquisition with error handling and one retry-on-401
+    try {
+      const tokenResp = await obtainServiceTokenFromClerkBackend({ scope: 'hemera-api' });
+      // Expect tokenResp: { token: string, expiresAt: number }
+      tokenCache.set(cacheKey, { token: tokenResp.token, expiresAt: tokenResp.expiresAt });
+      return tokenResp.token;
+    } catch (err) {
+      // If auth-related (401), try once more; otherwise surface the error
+      if (isAuthError(err)) {
+        try {
+          const retryResp = await obtainServiceTokenFromClerkBackend({ scope: 'hemera-api' });
+          tokenCache.set(cacheKey, { token: retryResp.token, expiresAt: retryResp.expiresAt });
+          return retryResp.token;
+        } catch (retryErr) {
+          console.error('getServiceToken: retry failed', retryErr);
+          return null;
+        }
+      }
+      console.error('getServiceToken: failed to obtain token', err);
+      return null;
+    }
   }
+
+  // Token structure: { token: string, expiresAt: number } and store keyed by 'hemera-service-token'
+
+  // Constants and retry policy for refresh-on-expiry
+  const MAX_REFRESH_RETRIES = 2;
+  async function refreshTokenWithBackoff(flow) {
+    for (let attempt = 0; attempt < MAX_REFRESH_RETRIES; attempt++) {
+      try {
+        return await obtainServiceTokenFromClerkBackend(flow);
+      } catch (err) {
+        if (attempt + 1 >= MAX_REFRESH_RETRIES) throw err;
+        const backoffMs = 1000 * Math.pow(2, attempt) + Math.floor(Math.random() * 300);
+        await new Promise((r) => setTimeout(r, backoffMs));
+      }
+    }
+  }
+
+  // Fallback: if token operations fail persistently, callers should fallback to re-auth/alerting
+
   ```
 - [ ] Implement token refresh logic
-- [ ] Add retry-on-expiry mechanism
+- [ ] Add retry-on-expiry mechanism (see `refreshTokenWithBackoff` above)
 
 #### 3.2 Environment Configuration
 - [x] Add environment variables to `src/lib/config.ts`:
@@ -137,6 +191,13 @@ This plan outlines the implementation steps for creating a dedicated service use
 - [ ] Create contract tests for service API endpoints
 - [ ] Verify request/response schemas
 - [ ] Test error handling
+
+#### 4.4 Performance & Load Testing
+- [ ] Load-test service endpoints under expected concurrency (target: 100 req/min per service user) and verify 95th/99th latency bounds
+- [ ] Performance tests for token-caching and token-refresh logic (verify cache hit rate and refresh latency)
+- [ ] End-to-end latency measurements for representative workflows (success criteria: p95 < X ms — define X per environment)
+- [ ] Stress tests to validate rate-limiting and graceful degradation under peak load (verify 429 behavior and Retry-After handling)
+- [ ] Define pass/fail criteria for each test (e.g., max error rate, latency thresholds, recovery time)
 
 ### Phase 5: Security & Monitoring
 
@@ -237,6 +298,7 @@ If issues arise during deployment:
 | API endpoint vulnerabilities | High | Security audit, penetration testing |
 | Performance degradation | Medium | Load testing, optimize token caching |
 | Deployment issues | Medium | Staged rollout, comprehensive rollback plan |
+| Migration/Abwärtskompatibilität | Hoch | Parallelbetrieb beider Systeme während der Migration, Feature-Flags für kontrollierten Rollout, Canary-Deployments |
 
 ## Notes
 

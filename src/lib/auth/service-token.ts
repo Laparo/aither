@@ -105,23 +105,22 @@ async function obtainTokenFromClerk(userId: string): Promise<string> {
 			);
 		}
 
-		// Create a sign-in token for the service user
-		// This is the recommended approach for programmatic authentication
-		const signInToken = await clerk.signInTokens.createSignInToken({
-			userId: user.id,
-			expiresInSeconds: 900, // 15 minutes to match cache expiration
-		});
-
-		if (!signInToken?.token) {
-			throw new Error(
-				"Failed to generate sign-in token from Clerk. " +
-				"Check Clerk configuration and service user permissions.",
-			);
+		// Prefer a machine/service token or session JWT for M2M flows.
+		// Create a server-side session for the service user and obtain a JWT
+		// NOTE: Clerk SDK versions differ; if `sessions.create` / `sessions.getToken` are not available,
+		// document the required backend pattern and consult Clerk docs.
+		const session = await clerk.sessions.create({ userId: user.id });
+		if (!session?.id) {
+			throw new Error('Failed to create session for service user in Clerk');
 		}
 
-		// The sign-in token can be used to create a session and get a JWT
-		// For now, we'll use the sign-in token directly as it's a valid bearer token
-		return signInToken.token;
+		// Obtain a JWT for the session. The second argument may be a template name depending on SDK.
+		const jwt = await clerk.sessions.getToken(session.id, 'hemera-api');
+		if (!jwt) {
+			throw new Error('Failed to obtain session JWT from Clerk for service user');
+		}
+
+		return jwt;
 	} catch (error) {
 		// Redact sensitive details from error logs
 		const safeMessage =

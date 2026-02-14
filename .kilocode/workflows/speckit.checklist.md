@@ -88,12 +88,12 @@ You **MUST** consider the user input before proceeding (if not empty).
 
 5. **Generate checklist** - Create "Unit Tests for Requirements":
    - Create `FEATURE_DIR/checklists/` directory if it doesn't exist
-   - Generate unique checklist filename:
-     - Use short, descriptive name based on domain (e.g., `ux.md`, `api.md`, `security.md`)
-     - Format: `[domain].md`
-     - If file exists, append to existing file
-   - Number items sequentially starting from CHK001
-   - Each `/speckit.checklist` run creates a NEW file (never overwrites existing checklists)
+     - Generate unique checklist filename:
+        - Use short, descriptive name based on domain (e.g., `ux.md`, `api.md`, `security.md`)
+        - Base format: `[domain].md`
+        - If a file with the base name already exists, create a new file using a numeric suffix (e.g., `api-1.md`, `api-2.md`) to avoid appending or overwriting existing checklists
+     - Number items sequentially starting from CHK001 within each generated file
+     - Each `/speckit.checklist` run creates a NEW file (never appends to or overwrites existing checklist files)
 
    **CORE PRINCIPLE - Test the Requirements, Not the Implementation**:
    Every checklist item MUST evaluate the REQUIREMENTS THEMSELVES for:
@@ -211,7 +211,7 @@ You **MUST** consider the user input before proceeding (if not empty).
    - Actor/timing
    - Any explicit user-specified must-have items incorporated
 
-**Important**: Each `/speckit.checklist` command invocation creates a checklist file using short, descriptive names unless file already exists. This allows:
+**Important**: Each `/speckit.checklist` command invocation creates a NEW checklist file using short, descriptive base names. If a file with the base name already exists, the tool will create a uniquely suffixed filename (e.g., `security-1.md`) rather than appending to or overwriting the existing file. This allows:
 
 - Multiple checklists of different types (e.g., `ux.md`, `test.md`, `security.md`)
 - Simple, memorable filenames that indicate checklist purpose

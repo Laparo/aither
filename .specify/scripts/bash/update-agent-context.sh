@@ -58,6 +58,9 @@ eval $(get_feature_paths)
 NEW_PLAN="$IMPL_PLAN"  # Alias for compatibility with existing code
 AGENT_TYPE="${1:-}"
 
+# Centralized list of valid agent identifiers (used for usage/help and validation)
+VALID_AGENTS="claude|gemini|copilot|cursor-agent|qwen|opencode|codex|windsurf|kilocode|auggie|roo|codebuddy|qoder|amp|shai|q|agy|bob"
+
 # Agent-specific file paths  
 CLAUDE_FILE="$REPO_ROOT/CLAUDE.md"
 GEMINI_FILE="$REPO_ROOT/GEMINI.md"
@@ -639,7 +642,7 @@ update_specific_agent() {
             ;;
         *)
             log_error "Unknown agent type '$agent_type'"
-            log_error "Expected: claude|gemini|copilot|cursor-agent|qwen|opencode|codex|windsurf|kilocode|auggie|roo|amp|shai|q|agy|bob|qoder"
+            log_error "Expected: ${VALID_AGENTS}"
             exit 1
             ;;
     esac
@@ -753,7 +756,7 @@ print_summary() {
     
     echo
 
-    log_info "Usage: $0 [claude|gemini|copilot|cursor-agent|qwen|opencode|codex|windsurf|kilocode|auggie|codebuddy|shai|q|agy|bob|qoder]"
+    log_info "Usage: $0 [${VALID_AGENTS}]"
 }
 
 #==============================================================================
