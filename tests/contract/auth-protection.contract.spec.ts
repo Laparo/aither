@@ -16,6 +16,14 @@ vi.mock("@/lib/config", () => ({
 	})),
 }));
 
+// Mock hemera factory
+vi.mock("@/lib/hemera/factory", () => ({
+	createHemeraClient: vi.fn(() => ({
+		get: vi.fn().mockResolvedValue([]),
+		put: vi.fn().mockResolvedValue({}),
+	})),
+}));
+
 // Mock requireAdmin
 vi.mock("@/lib/auth/role-check", () => ({
 	requireAdmin: vi.fn((auth) => {

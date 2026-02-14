@@ -32,6 +32,13 @@ vi.mock("@/lib/hemera/client", () => ({
 	})),
 }));
 
+vi.mock("@/lib/hemera/factory", () => ({
+	createHemeraClient: vi.fn(() => ({
+		get: vi.fn().mockResolvedValue([]),
+		put: vi.fn().mockResolvedValue({}),
+	})),
+}));
+
 vi.mock("@/lib/sync/orchestrator", () => ({
 	SyncOrchestrator: vi.fn().mockImplementation(() => ({
 		run: vi.fn().mockImplementation(

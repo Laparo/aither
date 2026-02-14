@@ -31,6 +31,13 @@ vi.mock("@/lib/hemera/client", () => ({
 	})),
 }));
 
+vi.mock("@/lib/hemera/factory", () => ({
+	createHemeraClient: vi.fn(() => ({
+		get: vi.fn().mockResolvedValue([]),
+		put: vi.fn(),
+	})),
+}));
+
 // We test the route handlers directly by importing and calling them
 import { GET, POST, _resetState } from "@/app/api/sync/route";
 import { NextRequest } from "next/server";
