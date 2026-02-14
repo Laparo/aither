@@ -4,6 +4,7 @@
 // ---------------------------------------------------------------------------
 
 import { requireAdmin } from "@/lib/auth/role-check";
+import { loadConfig } from "@/lib/config";
 import { HemeraClient } from "@/lib/hemera/client";
 import { SyncOrchestrator } from "@/lib/sync/orchestrator";
 import type { SyncJob } from "@/lib/sync/types";
@@ -53,7 +54,8 @@ export function _resetState() {
 // ── POST /api/sync — Trigger a sync ──────────────────────────────────────
 
 export async function POST(req: NextRequest) {
-	const auth = (req as any).auth ?? null;
+	type AuthenticatedRequest = NextRequest & { auth?: unknown };
+	const auth = (req as AuthenticatedRequest).auth ?? null;
 	const authResult = requireAdmin(auth);
 	if (authResult.status !== 200) {
 		return NextResponse.json(authResult.body, { status: authResult.status });
@@ -94,9 +96,10 @@ export async function POST(req: NextRequest) {
 	syncStartedAt = Date.now();
 
 	// Fire-and-forget: start orchestrator async
-	const baseUrl = process.env.HEMERA_API_BASE_URL ?? "";
-	const apiKey = process.env.HEMERA_API_KEY ?? "";
-	const outputDir = process.env.HTML_OUTPUT_DIR ?? "output";
+	const cfg = loadConfig();
+	const baseUrl = cfg.HEMERA_API_BASE_URL;
+	const apiKey = cfg.HEMERA_API_KEY;
+	const outputDir = cfg.HTML_OUTPUT_DIR;
 
 	const client = new HemeraClient({ baseUrl, apiKey });
 	const orchestrator = new SyncOrchestrator({
@@ -134,7 +137,8 @@ export async function POST(req: NextRequest) {
 // ── GET /api/sync — Get sync status ──────────────────────────────────────
 
 export async function GET(req: NextRequest) {
-	const auth = (req as any).auth ?? null;
+	type AuthenticatedRequest = NextRequest & { auth?: unknown };
+	const auth = (req as AuthenticatedRequest).auth ?? null;
 	const authResult = requireAdmin(auth);
 	if (authResult.status !== 200) {
 		return NextResponse.json(authResult.body, { status: authResult.status });

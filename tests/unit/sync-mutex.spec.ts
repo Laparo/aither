@@ -7,6 +7,15 @@ import { GET, POST, _getState, _resetState } from "@/app/api/sync/route";
 import { NextRequest } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+// Mock loadConfig — provide validated env vars for route handlers
+vi.mock("@/lib/config", () => ({
+	loadConfig: vi.fn(() => ({
+		HEMERA_API_BASE_URL: "https://api.hemera.test",
+		HEMERA_API_KEY: "test-key",
+		HTML_OUTPUT_DIR: "output",
+	})),
+}));
+
 // Mock auth — bypass requireAdmin check
 vi.mock("@/lib/auth/role-check", () => ({
 	requireAdmin: vi.fn().mockReturnValue({
@@ -89,7 +98,7 @@ describe("Sync Mutex", () => {
 			() =>
 				({
 					run: vi.fn().mockRejectedValue(new Error("fetch failed")),
-				}) as any,
+				}) as unknown as InstanceType<typeof SyncOrchestrator>,
 		);
 
 		const res1 = await POST(createRequest("POST"));

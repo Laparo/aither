@@ -6,14 +6,14 @@
 import Handlebars from "handlebars";
 
 /**
- * Füllt ein HTML-Template mit Daten per Handlebars.
- * - XSS-Escaping ist standardmäßig aktiv ({{var}})
- * - Triple-Stache ({{{var}}}) für vertrauenswürdigen HTML-Inhalt
- * - Fehlende Platzhalter werden zu leeren Strings
+ * Populates an HTML template with data using Handlebars.
+ * - XSS escaping is active by default ({{var}})
+ * - Triple-stache ({{{var}}}) for trusted HTML content
+ * - Missing placeholders resolve to empty strings
  *
- * @param templateHtml HTML-Template-String
- * @param data         Datenobjekt für Platzhalter
- * @returns            Gerendertes HTML
+ * @param templateHtml HTML template string
+ * @param data         Data object for placeholders
+ * @returns            Rendered HTML
  */
 export function populateTemplate(templateHtml: string, data: Record<string, unknown>): string {
 	const compiled = Handlebars.compile(templateHtml, { noEscape: false });
@@ -21,12 +21,12 @@ export function populateTemplate(templateHtml: string, data: Record<string, unkn
 }
 
 /**
- * Registriert Handlebars-Helper für Medien-Einbettung.
- * Muss einmalig bei App-Start aufgerufen werden.
+ * Registers Handlebars helpers for media embedding.
+ * Must be called once at app startup.
  *
  * Usage in Templates:
- *   {{image sourceUrl altText}}   → <img> mit onerror-Fallback
- *   {{video sourceUrl}}           → <video> mit Fallback-Text
+ *   {{image sourceUrl altText}}   → <img> with onerror fallback
+ *   {{video sourceUrl}}           → <video> with fallback text
  */
 export function registerMediaHelpers(): void {
 	Handlebars.registerHelper("image", (sourceUrl: string, altText: string) => {

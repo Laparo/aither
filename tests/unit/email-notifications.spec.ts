@@ -5,8 +5,26 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+const { mockSendMail } = vi.hoisted(() => {
+	const mockSendMail = vi.fn().mockResolvedValue({ messageId: "test-123" });
+	return { mockSendMail };
+});
+
+// Mock loadConfig — must come before email module import
+vi.mock("@/lib/config", () => ({
+	loadConfig: vi.fn(() => ({
+		SMTP_HOST: "localhost",
+		SMTP_PORT: 587,
+		SMTP_USER: "user",
+		SMTP_PASS: "pass",
+		SMTP_FROM: "aither@localhost",
+		SMTP_TO: undefined,
+		NOTIFY_EMAIL_TO: "admin@localhost",
+		NOTIFY_FAILURE_THRESHOLD: 3,
+	})),
+}));
+
 // Mock Nodemailer
-const mockSendMail = vi.fn().mockResolvedValue({ messageId: "test-123" });
 vi.mock("nodemailer", () => ({
 	default: {
 		createTransport: vi.fn().mockReturnValue({
@@ -15,20 +33,17 @@ vi.mock("nodemailer", () => ({
 	},
 }));
 
+// Import module under test — mocks are hoisted, so this is safe
+import {
+	getFailureCount,
+	resetFailureCounter,
+	sendFailureNotification,
+} from "@/lib/notifications/email";
+
 describe("Email Notifications", () => {
-	let sendFailureNotification: any;
-	let resetFailureCounter: any;
-	let getFailureCount: any;
-	let _resetForTesting: any;
-
-	beforeAll(async () => {
-		({ sendFailureNotification, resetFailureCounter, getFailureCount, _resetForTesting } =
-			await import("@/lib/notifications/email"));
-	});
-
 	beforeEach(() => {
-		_resetForTesting();
 		mockSendMail.mockClear();
+		resetFailureCounter();
 	});
 
 	it("does not send email below failure threshold", async () => {
