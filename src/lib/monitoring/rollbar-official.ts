@@ -28,7 +28,6 @@ const isTestMode =
 	typeof process.env.JEST_WORKER_ID !== "undefined";
 const isDevelopment = process.env.NODE_ENV === "development";
 const isExplicitlyDisabled =
-	process.env.NEXT_PUBLIC_DISABLE_ROLLBAR === "1" ||
 	process.env.NEXT_PUBLIC_ROLLBAR_ENABLED === "0" ||
 	process.env.ROLLBAR_ENABLED === "0";
 

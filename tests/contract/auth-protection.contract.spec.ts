@@ -8,13 +8,13 @@ import { POST as syncPOST } from "@/app/api/sync/route";
 import { describe, expect, it, vi } from "vitest";
 
 // Mock loadConfig
-vi.mock("@/lib/config", () => ({
-	loadConfig: vi.fn(() => ({
-		HEMERA_API_BASE_URL: "https://api.hemera.test",
-		HEMERA_API_KEY: "test-key",
-		HTML_OUTPUT_DIR: "output",
-	})),
-}));
+	vi.mock("@/lib/config", () => ({
+		loadConfig: vi.fn(() => ({
+			HEMERA_API_BASE_URL: "https://api.hemera.test",
+			HEMERA_SERVICE_TOKEN: "test-key",
+			HTML_OUTPUT_DIR: "output",
+		})),
+	}));
 
 // Mock requireAdmin
 vi.mock("@/lib/auth/role-check", () => ({

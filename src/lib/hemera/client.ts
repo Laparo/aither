@@ -130,20 +130,20 @@ export class HemeraClient {
 
 				// Auth failures: abort immediately — no retry, token is invalid or lacks permissions
 				if (res.status === 401 || res.status === 403) {
-					const body = await res.text();
+					const responseBody = await res.text();
 					throw new AbortError(
-						new HemeraApiError(res.status, res.statusText, body, url),
+						new HemeraApiError(res.status, res.statusText, responseBody, url),
 					);
 				}
 
 				if (res.status >= 500) {
-					const body = await res.text();
-					throw new HemeraApiError(res.status, res.statusText, body, url);
+					const responseBody = await res.text();
+					throw new HemeraApiError(res.status, res.statusText, responseBody, url);
 				}
 
 				if (!res.ok) {
-					const body = await res.text();
-					throw new AbortError(new HemeraApiError(res.status, res.statusText, body, url));
+					const responseBody = await res.text();
+					throw new AbortError(new HemeraApiError(res.status, res.statusText, responseBody, url));
 				}
 
 				return res;
@@ -193,20 +193,20 @@ export class HemeraClient {
 
 				// Auth failures: abort immediately — no retry, token is invalid or lacks permissions
 				if (res.status === 401 || res.status === 403) {
-					const body = await res.text();
+					const responseBody = await res.text();
 					throw new AbortError(
-						new HemeraApiError(res.status, res.statusText, body, url),
+						new HemeraApiError(res.status, res.statusText, responseBody, url),
 					);
 				}
 
 				if (res.status >= 500) {
-					const body = await res.text();
-					throw new HemeraApiError(res.status, res.statusText, body, url);
+					const responseBody = await res.text();
+					throw new HemeraApiError(res.status, res.statusText, responseBody, url);
 				}
 
 				if (!res.ok) {
-					const body = await res.text();
-					throw new AbortError(new HemeraApiError(res.status, res.statusText, body, url));
+					const responseBody = await res.text();
+					throw new AbortError(new HemeraApiError(res.status, res.statusText, responseBody, url));
 				}
 
 				return res;
@@ -283,18 +283,31 @@ export class HemeraClient {
 	 * and ensures a single leading slash.
 	 */
 	private normalizePath(path: string): string {
-		// Collapse multiple slashes into one
+		// Collapse multiple slashes into one (preserve leading/trailing behavior)
 		const collapsed = path.replace(/\/+/g, '/');
-		// Split into segments and resolve . and ..
-		const segments: string[] = [];
-		for (const segment of collapsed.split('/')) {
-			if (segment === '..') {
-				segments.pop();
-			} else if (segment !== '.' && segment !== '') {
-				segments.push(segment);
+		// Split on raw '/' first — do NOT decode encoded '/' (%2F) so splitting
+		// remains stable. Decode each segment individually in a safe way.
+		const rawSegments = collapsed.split('/');
+		const decodedSegments: string[] = [];
+		for (const seg of rawSegments) {
+			if (seg === '' || seg === '.') continue;
+			// Prevent decoded '%2F' from becoming a path separator: escape it first
+			const safeSeg = seg.replace(/%2F/gi, '%252F');
+			let decoded: string;
+			try {
+				decoded = decodeURIComponent(safeSeg);
+			} catch (err) {
+				// Treat invalid percent-encodings as invalid input
+				throw new Error('Invalid percent-encoding in path');
 			}
+			if (decoded === '..') {
+				// Pop last valid segment if present
+				if (decodedSegments.length > 0) decodedSegments.pop();
+				continue;
+			}
+			decodedSegments.push(decoded);
 		}
-		return `/${segments.join('/')}`;
+		return `/${decodedSegments.join('/')}`;
 	}
 
 	/**

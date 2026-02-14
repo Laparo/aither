@@ -26,7 +26,7 @@ vi.mock("@/lib/hemera/client", () => ({
 vi.mock("@/lib/config", () => ({
 	loadConfig: vi.fn().mockReturnValue({
 		HEMERA_API_BASE_URL: "https://hemera.academy/api",
-		HEMERA_API_KEY: "test-key",
+		HEMERA_SERVICE_TOKEN: "test-key",
 		HTML_OUTPUT_DIR: "/tmp/output",
 	}),
 }));

@@ -4,8 +4,7 @@
 // ---------------------------------------------------------------------------
 
 import { requireAdmin } from "@/lib/auth/role-check";
-import { loadConfig } from "@/lib/config";
-import { HemeraClient } from "@/lib/hemera/client";
+import { createHemeraClient } from "@/lib/hemera/factory";
 import { transmitRecording } from "@/lib/sync/recording-transmitter";
 import { RecordingTransmitRequestSchema } from "@/lib/sync/schemas";
 import { NextResponse } from "next/server";
@@ -51,11 +50,7 @@ export async function POST(request: Request): Promise<NextResponse> {
 	}
 
 	// Create Hemera client
-	const config = loadConfig();
-	const client = new HemeraClient({
-		baseUrl: config.HEMERA_API_BASE_URL,
-		apiKey: config.HEMERA_API_KEY,
-	});
+	const client = createHemeraClient();
 
 	// Transmit to hemera.academy
 	const result = await transmitRecording(client, parsed.data);

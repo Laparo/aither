@@ -54,18 +54,8 @@
 **Rationale**: Native fetch eliminates external HTTP client dependencies. `p-retry` and `p-throttle` are lightweight, well-maintained, and composable. Starting at 2 req/s with the ability to back off on 429 responses provides defensive throttling without prior knowledge of rate limits. Both libraries have full TypeScript support.
 
 **Alternatives considered**:
-- **axios**: Feature-rich but adds a large dependency for features we don't need (interceptors, browser compat). Rejected: native fetch sufficient.
-- **got**: Excellent retry built-in, but ESM-only since v12 may cause issues with Next.js config. Rejected: compatibility risk.
-- **bottleneck**: Powerful job scheduler with Redis support. Rejected: overkill for single-instance use.
-- **Fixed-rate throttling**: Simpler but wasteful when API can handle more. Rejected: adaptive approach is more efficient.
 
 **Implementation notes**:
-- `p-throttle`: configure `limit: 2, interval: 1000` (2 req/s initial)
-- `p-retry`: configure `retries: 5, minTimeout: 1000, factor: 2, randomize: true` (jitter)
-- On HTTP 429: read `Retry-After` header, pause throttle for that duration, log warning
-- On HTTP 5xx: retry via p-retry; on 4xx (except 429): fail immediately, log error
-- Wrap in `HemeraClient` class: `get<T>(path, schema): Promise<T>` with Zod validation on response
-- API key in `Authorization` header from `process.env.HEMERA_API_KEY`
 
 ---
 

@@ -12,7 +12,7 @@
 
 All requests include:
 ```
-Authorization: Bearer {HEMERA_API_KEY}
+Authorization: Bearer {HEMERA_SERVICE_TOKEN}
 Content-Type: application/json
 ```
 
@@ -32,11 +32,11 @@ Content-Type: application/json
   ```
 
 **Retry Strategy:**
-- For `401 Unauthorized`, a single retry with token refresh is allowed **only if** a runtime refresh mechanism exists (e.g., OAuth or session-based tokens). If authentication uses a static Bearer API key (such as `HEMERA_API_KEY` from environment), a 401 must be reported immediately with **no retry**.
+- For `401 Unauthorized`, a single retry with token refresh is allowed **only if** a runtime refresh mechanism exists (e.g., Clerk session refresh). If authentication uses a static service session token (such as `HEMERA_SERVICE_TOKEN` from environment), a 401 must be reported immediately with **no retry**.
 - For `403 Forbidden`, no retry is allowed — the error must be reported directly to the client.
 
 **Note:**
-Authentication is performed via the header `Authorization: Bearer {HEMERA_API_KEY}`. The API key is read from `process.env.HEMERA_API_KEY`.
+Authentication is performed via the header `Authorization: Bearer {HEMERA_SERVICE_TOKEN}`. The service token is read from `process.env.HEMERA_SERVICE_TOKEN` and should be a durable service credential (generate via Clerk Backend API or an organisation/service-token system). Session tokens from the Dashboard are short-lived and not suitable for unattended service-to-service auth.
 
 ---
 

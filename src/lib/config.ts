@@ -10,7 +10,6 @@
 // ├──────────────────────────────┼──────────┼──────────┼──────────┤
 // │ ROLLBAR_ENABLED              │ 1        │ 0        │ 1        │
 // │ NEXT_PUBLIC_ROLLBAR_ENABLED  │ 1        │ 0        │ 1        │
-// │ NEXT_PUBLIC_DISABLE_ROLLBAR  │ 0        │ 1        │ 0        │
 // │ E2E_TEST                     │ 0        │ 1        │ 0        │
 // │ NEXT_PUBLIC_TELEMETRY_CONSENT│ 0        │ 0        │ 0 *      │
 // │ ROLLBAR_ALLOW_PII            │ 0        │ 0        │ 0 *      │
@@ -26,6 +25,9 @@
 // ---------------------------------------------------------------------------
 
 import { z } from "zod";
+
+// Email used in documentation and error messages for the configured service user
+export const SERVICE_USER_EMAIL = "aither-service@hemera-academy.com";
 
 /**
  * Coerce environment variable strings to booleans for use in Zod schemas.
@@ -72,14 +74,23 @@ const EnvSchema = z
 					const parts = token.split(".");
 					if (parts.length !== 3) return false;
 					if (parts.some((p) => p.length === 0)) return false;
-					return parts.slice(0, 2).every((p) => /^[A-Za-z0-9_-]+$/.test(p));
+					// Validate all three parts for base64url-safe characters
+					return parts.every((p) => /^[A-Za-z0-9_-]+$/.test(p));
 				},
 				{
 					message:
-						"HEMERA_SERVICE_TOKEN must be a valid JWT (header.payload.signature). " +
-						"Obtain a Clerk session token for the service user (aither-service@hemera-academy.com).",
+						`HEMERA_SERVICE_TOKEN must be a valid JWT (header.payload.signature). ` +
+						`Obtain a durable service credential for ${SERVICE_USER_EMAIL} (see Clerk Backend API or dedicated service tokens).`,
 				},
-			),
+				),
+
+		// Context7 API key (optional) — use secret key starting with ctx7sk_
+		CONTEXT7_API_KEY: z
+			.string()
+			.optional()
+			.refine((v) => !v || v.startsWith("ctx7sk_"), {
+				message: "CONTEXT7_API_KEY must start with 'ctx7sk_'",
+			}),
 
 		// Clerk Authentication
 		NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: z.string().min(1),
@@ -98,15 +109,12 @@ const EnvSchema = z
 		// Rollbar — server & client tokens
 		ROLLBAR_SERVER_TOKEN: z.string().default(""),
 		NEXT_PUBLIC_ROLLBAR_CLIENT_TOKEN: z.string().default(""),
-		// Rollbar MCP/AI tools (read+write, see .env.example for read-only note)
-		ROLLBAR_ACCESS_TOKEN: z
-			.string()
-			.default("")
-			.describe("Read/write token for Rollbar MCP/AI tools. Use read-only if possible."),
+		// Rollbar MCP/AI tools — prefer read-only token for automation
+		ROLLBAR_ACCESS_TOKEN: z.string().default("").describe("Optional write token for Rollbar; prefer read-only token when possible."),
+		ROLLBAR_ACCESS_TOKEN_READONLY: z.string().default("").describe("Preferred read-only token for Rollbar automation"),
 
 		// Rollbar control flags
 		NEXT_PUBLIC_ROLLBAR_ENABLED: envBool(true),
-		NEXT_PUBLIC_DISABLE_ROLLBAR: envBool(false),
 		ROLLBAR_ENABLED: envBool(true),
 
 		// Rollbar sampling rates (0.0–1.0)
