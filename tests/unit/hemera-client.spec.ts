@@ -29,7 +29,8 @@ function createMockFetch(
 }
 
 // Valid JWT token structure for testing (doesn't need to be a real JWT)
-const VALID_TEST_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dozjgNryP4J3jVmNHl0w5N_XgL0n3I9PlFUP0THsR8U";
+const VALID_TEST_TOKEN =
+	"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dozjgNryP4J3jVmNHl0w5N_XgL0n3I9PlFUP0THsR8U";
 
 function createClient(
 	fetchFn: ReturnType<typeof createMockFetch>,
@@ -47,17 +48,18 @@ function createClient(
 }
 
 describe("HemeraClient", () => {
-
 	it("throws if constructed without getToken()", () => {
-		const badOptions: any = {
+		const badOptions = {
 			baseUrl: "https://api.hemera.academy",
 			// intentionally missing getToken
 			maxRetries: 0,
 			rateLimit: 100,
 			fetchFn: (async () => null) as unknown as typeof fetch,
-		};
+		} as unknown as ConstructorParameters<typeof HemeraClient>[0];
 
-		expect(() => new HemeraClient(badOptions)).toThrow(/a valid `getToken\(\)` function is required/);
+		expect(() => new HemeraClient(badOptions)).toThrow(
+			/a valid `getToken\(\)` function is required/,
+		);
 	});
 
 	// ── Token Validation ─────────────────────────────────────────────────
@@ -110,7 +112,9 @@ describe("HemeraClient", () => {
 			});
 
 			await expect(client.get("/seminars", TestArraySchema)).rejects.toThrow(HemeraTokenError);
-			await expect(client.get("/seminars", TestArraySchema)).rejects.toThrow(/malformed JWT structure/);
+			await expect(client.get("/seminars", TestArraySchema)).rejects.toThrow(
+				/malformed JWT structure/,
+			);
 			expect(mockFetch).not.toHaveBeenCalled();
 		});
 
@@ -127,7 +131,9 @@ describe("HemeraClient", () => {
 			});
 
 			await expect(client.get("/seminars", TestArraySchema)).rejects.toThrow(HemeraTokenError);
-			await expect(client.get("/seminars", TestArraySchema)).rejects.toThrow(/malformed JWT structure/);
+			await expect(client.get("/seminars", TestArraySchema)).rejects.toThrow(
+				/malformed JWT structure/,
+			);
 			expect(mockFetch).not.toHaveBeenCalled();
 		});
 
@@ -161,7 +167,9 @@ describe("HemeraClient", () => {
 			});
 
 			await expect(client.get("/seminars", TestArraySchema)).rejects.toThrow(HemeraTokenError);
-			await expect(client.get("/seminars", TestArraySchema)).rejects.toThrow(/invalid base64url encoding/);
+			await expect(client.get("/seminars", TestArraySchema)).rejects.toThrow(
+				/invalid base64url encoding/,
+			);
 			expect(mockFetch).not.toHaveBeenCalled();
 		});
 
@@ -194,7 +202,9 @@ describe("HemeraClient", () => {
 				fetchFn: mockFetch as unknown as typeof fetch,
 			});
 
-			await expect(client.put("/item/1", { name: "Test" }, TestSchema)).rejects.toThrow(HemeraTokenError);
+			await expect(client.put("/item/1", { name: "Test" }, TestSchema)).rejects.toThrow(
+				HemeraTokenError,
+			);
 			expect(mockFetch).not.toHaveBeenCalled();
 		});
 	});
@@ -351,7 +361,9 @@ describe("HemeraClient", () => {
 				fetchFn: mockFetch as unknown as typeof fetch,
 			});
 
-			await expect(client.get("/api/service/../public/secret", TestArraySchema)).rejects.toThrow(/disallowed path/);
+			await expect(client.get("/api/service/../public/secret", TestArraySchema)).rejects.toThrow(
+				/disallowed path/,
+			);
 			expect(mockFetch).not.toHaveBeenCalled();
 		});
 
@@ -367,7 +379,9 @@ describe("HemeraClient", () => {
 				fetchFn: mockFetch as unknown as typeof fetch,
 			});
 
-			await expect(client.get("//api/service/../public", TestArraySchema)).rejects.toThrow(/disallowed path/);
+			await expect(client.get("//api/service/../public", TestArraySchema)).rejects.toThrow(
+				/disallowed path/,
+			);
 			expect(mockFetch).not.toHaveBeenCalled();
 		});
 

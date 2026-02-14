@@ -16,7 +16,16 @@ async function getDocs(libraryName: string, question: string) {
   const libs = await client.searchLibrary(question, libraryName);
   if (!libs || libs.length === 0) return null;
   const lib = libs[0];
-  const context = await client.getContext(question, lib.id, { type: "txt" });
+  let context;
+  try {
+    // getContext may throw; guard and return a defined fallback on error
+    context = await client.getContext(lib.id, question, { type: "txt" });
+  } catch (err) {
+    // Surface the error to the existing logging/monitoring pipeline and
+    // return a safe fallback so callers can handle an empty context.
+    console.error('Context7 getContext failed', { libraryId: lib.id, err });
+    context = { text: "", error: String(err) };
+  }
   return { lib, context };
 }
 

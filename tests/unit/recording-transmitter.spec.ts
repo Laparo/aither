@@ -3,6 +3,7 @@
 // Task: T032 [US1b] — TDD: PUT to Hemera, handle responses
 // ---------------------------------------------------------------------------
 
+import type { HemeraClient } from "@/lib/hemera/client";
 import type { SeminarRecording } from "@/lib/hemera/types";
 import { transmitRecording } from "@/lib/sync/recording-transmitter";
 import { describe, expect, it, vi } from "vitest";
@@ -27,7 +28,7 @@ const validRecording: SeminarRecording = {
 describe("transmitRecording", () => {
 	it("calls PUT on the correct Hemera API path", async () => {
 		const client = createMockClient({ status: 200, message: "Recording URL updated" });
-		const result = await transmitRecording(client as any, validRecording);
+		const result = await transmitRecording(client as unknown as HemeraClient, validRecording);
 
 		expect(client.put).toHaveBeenCalledTimes(1);
 		const callArgs = client.put.mock.calls[0];
@@ -37,7 +38,7 @@ describe("transmitRecording", () => {
 
 	it("returns success with Hemera response details", async () => {
 		const client = createMockClient({ status: 200, message: "OK" });
-		const result = await transmitRecording(client as any, validRecording);
+		const result = await transmitRecording(client as unknown as HemeraClient, validRecording);
 
 		expect(result.success).toBe(true);
 		expect(result.seminarSourceId).toBe("sem-001");
@@ -48,7 +49,7 @@ describe("transmitRecording", () => {
 		const client = createMockClient(
 			new Error("Hemera API error 404 (Not Found) for /seminars/sem-001/recording"),
 		);
-		const result = await transmitRecording(client as any, validRecording);
+		const result = await transmitRecording(client as unknown as HemeraClient, validRecording);
 
 		expect(result.success).toBe(false);
 		expect(result.error).toBeDefined();
@@ -58,7 +59,7 @@ describe("transmitRecording", () => {
 		const client = createMockClient({ status: 200, message: "OK" });
 		const invalid = { ...validRecording, muxPlaybackUrl: "not-a-url" };
 
-		const result = await transmitRecording(client as any, invalid);
+		const result = await transmitRecording(client as unknown as HemeraClient, invalid);
 		expect(result.success).toBe(false);
 		expect(result.error).toContain("validation");
 	});

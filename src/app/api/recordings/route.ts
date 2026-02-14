@@ -50,24 +50,31 @@ export async function POST(request: Request): Promise<NextResponse> {
 		);
 	}
 
-		// Create Hemera client
-		const client = createHemeraClient();
+	// Create Hemera client
+	const client = createHemeraClient();
 
-		// Transmit to hemera.academy — catch and handle unexpected errors
-		let result: TransmitResult;
-		try {
-			result = await transmitRecording(client, parsed.data);
-		} catch (err) {
-			console.error('transmitRecording failed', { err, parsedData: parsed.data });
-			// Return a controlled error response rather than letting the exception bubble
-			return NextResponse.json(
-				{
-					error: 'Internal Server Error',
-					message: 'Failed to transmit recording to Hemera API',
-				},
-				{ status: 500 },
-			);
-		}
+	// Transmit to hemera.academy — catch and handle unexpected errors
+	let result: TransmitResult;
+	try {
+		result = await transmitRecording(client, parsed.data);
+	} catch (err) {
+		// Mask sensitive fields before logging to avoid leaking PII/URLs
+		const masked = {
+			...parsed.data,
+			seminarSourceId: parsed.data?.seminarSourceId ? "***" : undefined,
+			muxAssetId: parsed.data?.muxAssetId ? "***" : undefined,
+			muxPlaybackUrl: parsed.data?.muxPlaybackUrl ? "***" : undefined,
+		};
+		console.error("transmitRecording failed", { err, parsedData: masked });
+		// Return a controlled error response rather than letting the exception bubble
+		return NextResponse.json(
+			{
+				error: "Internal Server Error",
+				message: "Failed to transmit recording to Hemera API",
+			},
+			{ status: 500 },
+		);
+	}
 
 	if (result.success) {
 		return NextResponse.json(result, { status: 200 });

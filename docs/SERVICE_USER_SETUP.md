@@ -255,49 +255,53 @@ Für Production sollte ein automatischer Token-Refresh implementiert werden:
 // In Aither: src/lib/hemera/token-manager.ts erweitern
 
 import { clerkClient } from '@clerk/nextjs/server';
+import type { Session } from '@clerk/nextjs/server';
 
 class HemeraTokenManager {
   private tokenCache: { token: string; expiresAt: number } | null = null;
 
   async getToken(): Promise<string> {
-    // Prüfe ob Token noch gültig (> 2 Minuten verbleibend)
+    // Return cached token if still valid (> 2 minutes remaining)
     if (this.tokenCache && this.isTokenValid(this.tokenCache)) {
       return this.tokenCache.token;
     }
 
-    // Fetch neues Token via Clerk Backend API
+    // Fetch new token via Clerk Backend API
     const newToken = await this.fetchNewToken();
     return newToken;
   }
 
   private async fetchNewToken(): Promise<string> {
     // Use the Clerk server client instance provided by the SDK
-    // (imported above as `clerkClient`). The current Clerk backend API
-    // exposes session creation via `clerkClient.sessions.create`.
-    const session = await clerkClient.sessions.create({
+    // The Clerk backend API exposes session creation via `clerkClient.sessions.create`.
+    const session: Session = await clerkClient.sessions.create({
       userId: process.env.CLERK_SERVICE_USER_ID!,
-      expiresInSeconds: 900, // 15 Minuten
-    });
+      expiresInSeconds: 900, // 15 minutes
+    } as any);
 
-    // The returned session object contains the issued token. SDKs and
-    // API versions may surface the token under different properties;
-    // the common locations are `session.lastActiveToken.raw` or
-    // `session.lastActiveToken.jwt`. Assert whichever exists.
-    const token =
-      // prefer raw token field when present
-      (session as any)?.lastActiveToken?.raw ||
-      (session as any)?.lastActiveToken?.jwt ||
-      (session as any)?.token ||
-      (session as any)?.jwt;
+    // Access typed token fields on the returned session.
+    // Clerk session types typically expose `lastActiveToken` which itself
+    // contains a typed `raw` or `jwt` property. Use these typed fields
+    // instead of unsafe `any` casts.
+    const lastActiveToken = (session as unknown as { lastActiveToken?: { raw?: string; jwt?: string } }).lastActiveToken;
+    const token = lastActiveToken?.raw ?? lastActiveToken?.jwt ?? (session as unknown as { token?: string }).token ?? (session as unknown as { jwt?: string }).jwt;
 
     if (!token) throw new Error('Failed to obtain service token from Clerk session response');
 
     this.tokenCache = {
       token,
-      expiresAt: Date.now() + 900 * 1000 - 30000, // -30s Sicherheitsmarge
+      expiresAt: Date.now() + 900 * 1000 - 30000, // -30s safety margin
     };
 
     return this.tokenCache.token;
+  }
+
+  // Validate cached token structure and expiry
+  private isTokenValid(cache: { token: string; expiresAt: number } | null): cache is { token: string; expiresAt: number } {
+    if (!cache) return false;
+    if (!cache.token || typeof cache.token !== 'string') return false;
+    if (!cache.expiresAt || typeof cache.expiresAt !== 'number') return false;
+    return cache.expiresAt > Date.now();
   }
 }
 ```

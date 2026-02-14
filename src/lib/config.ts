@@ -80,7 +80,7 @@ const EnvSchema = z
 				{
 					message: `HEMERA_SERVICE_TOKEN must be a valid JWT (header.payload.signature). Obtain a durable service credential for ${SERVICE_USER_EMAIL} (see Clerk Backend API or dedicated service tokens).`,
 				},
-				),
+			),
 
 		// Context7 API key (optional) — use secret key starting with ctx7sk_
 		CONTEXT7_API_KEY: z
@@ -108,8 +108,14 @@ const EnvSchema = z
 		ROLLBAR_SERVER_TOKEN: z.string().default(""),
 		NEXT_PUBLIC_ROLLBAR_CLIENT_TOKEN: z.string().default(""),
 		// Rollbar MCP/AI tools — prefer read-only token for automation
-		ROLLBAR_ACCESS_TOKEN: z.string().default("").describe("Optional write token for Rollbar; prefer read-only token when possible."),
-		ROLLBAR_ACCESS_TOKEN_READONLY: z.string().default("").describe("Preferred read-only token for Rollbar automation"),
+		ROLLBAR_ACCESS_TOKEN: z
+			.string()
+			.default("")
+			.describe("Optional write token for Rollbar; prefer read-only token when possible."),
+		ROLLBAR_ACCESS_TOKEN_READONLY: z
+			.string()
+			.default("")
+			.describe("Preferred read-only token for Rollbar automation"),
 
 		// Rollbar control flags
 		NEXT_PUBLIC_ROLLBAR_ENABLED: envBool(true),

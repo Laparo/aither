@@ -6,6 +6,7 @@
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
+import type { HemeraClient } from "@/lib/hemera/client";
 import type { Lesson, MediaAsset, Seminar, TextContent } from "@/lib/hemera/types";
 import { SlideGenerator } from "@/lib/slides/generator";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -89,7 +90,7 @@ function createMockClient() {
 			return Promise.resolve([]);
 		}),
 		put: vi.fn(),
-	} as any;
+	} as unknown as HemeraClient;
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────
@@ -190,7 +191,7 @@ describe("SlideGenerator", () => {
 				return Promise.resolve([]);
 			}),
 			put: vi.fn(),
-		} as any;
+		} as unknown as HemeraClient;
 
 		const generator = new SlideGenerator({ client: noLessonClient, outputDir });
 		const result = await generator.generate();
@@ -207,7 +208,7 @@ describe("SlideGenerator", () => {
 
 		const intro = result.slides.find((s) => s.type === "intro");
 		expect(intro).toBeDefined();
-		expect(intro!.filename).toBe("01_intro.html");
+		if (intro) expect(intro.filename).toBe("01_intro.html");
 
 		const materials = result.slides.filter((s) => s.type === "material");
 		expect(materials.length).toBe(2);

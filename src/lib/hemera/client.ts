@@ -66,7 +66,11 @@ export class HemeraClient {
 	private readonly throttledFetch: typeof fetch;
 
 	/** Cached decoded JWT payload to avoid repeated base64 parsing */
-	private cachedPayload: { token: string; payload: Record<string, unknown>; expiresAt: number } | null = null;
+	private cachedPayload: {
+		token: string;
+		payload: Record<string, unknown>;
+		expiresAt: number;
+	} | null = null;
 	/** TTL for the cached payload in milliseconds (default: 30s) */
 	private static readonly PAYLOAD_CACHE_TTL_MS = 30_000;
 
@@ -75,8 +79,8 @@ export class HemeraClient {
 		if (!options.getToken || typeof options.getToken !== "function") {
 			throw new Error(
 				"HemeraClient construction error: a valid `getToken()` function is required in options.\n" +
-				"Provide `getToken: () => Promise<string>` (e.g. from `getTokenManager().getToken`) or use `createHemeraClient()` which wires the token manager.\n" +
-				"Ensure HEMERA_SERVICE_TOKEN is set for the token manager when using the default factory."
+					"Provide `getToken: () => Promise<string>` (e.g. from `getTokenManager().getToken`) or use `createHemeraClient()` which wires the token manager.\n" +
+					"Ensure HEMERA_SERVICE_TOKEN is set for the token manager when using the default factory.",
 			);
 		}
 		this.getToken = options.getToken;
@@ -131,9 +135,7 @@ export class HemeraClient {
 				// Auth failures: abort immediately — no retry, token is invalid or lacks permissions
 				if (res.status === 401 || res.status === 403) {
 					const responseBody = await res.text();
-					throw new AbortError(
-						new HemeraApiError(res.status, res.statusText, responseBody, url),
-					);
+					throw new AbortError(new HemeraApiError(res.status, res.statusText, responseBody, url));
 				}
 
 				if (res.status >= 500) {
@@ -194,9 +196,7 @@ export class HemeraClient {
 				// Auth failures: abort immediately — no retry, token is invalid or lacks permissions
 				if (res.status === 401 || res.status === 403) {
 					const responseBody = await res.text();
-					throw new AbortError(
-						new HemeraApiError(res.status, res.statusText, responseBody, url),
-					);
+					throw new AbortError(new HemeraApiError(res.status, res.statusText, responseBody, url));
 				}
 
 				if (res.status >= 500) {
@@ -238,22 +238,22 @@ export class HemeraClient {
 		if (!token || token.trim().length === 0) {
 			throw new HemeraTokenError(
 				"Token validation failed: getToken() returned an empty token. " +
-				"Ensure HEMERA_SERVICE_TOKEN is properly configured and the token manager is initialized."
+					"Ensure HEMERA_SERVICE_TOKEN is properly configured and the token manager is initialized.",
 			);
 		}
 
 		// Check basic JWT structure (3 parts separated by dots)
-		const parts = token.split('.');
+		const parts = token.split(".");
 		if (parts.length !== 3) {
 			throw new HemeraTokenError(
-				`Token validation failed: malformed JWT structure (expected 3 parts, got ${parts.length}). The token must be a valid JWT with header, payload, and signature.`
+				`Token validation failed: malformed JWT structure (expected 3 parts, got ${parts.length}). The token must be a valid JWT with header, payload, and signature.`,
 			);
 		}
 
 		// Check that each part is non-empty
-		if (parts.some(part => part.length === 0)) {
+		if (parts.some((part) => part.length === 0)) {
 			throw new HemeraTokenError(
-				"Token validation failed: JWT contains empty segments. All three parts (header, payload, signature) must be non-empty."
+				"Token validation failed: JWT contains empty segments. All three parts (header, payload, signature) must be non-empty.",
 			);
 		}
 
@@ -268,7 +268,7 @@ export class HemeraClient {
 			}
 		} catch (_err) {
 			throw new HemeraTokenError(
-				`Token validation failed: invalid base64url encoding. ${_err instanceof Error ? _err.message : String(_err)}`
+				`Token validation failed: invalid base64url encoding. ${_err instanceof Error ? _err.message : String(_err)}`,
 			);
 		}
 	}
@@ -284,15 +284,15 @@ export class HemeraClient {
 	 */
 	private normalizePath(path: string): string {
 		// Collapse multiple slashes into one (preserve leading/trailing behavior)
-		const collapsed = path.replace(/\/+/g, '/');
+		const collapsed = path.replace(/\/+/g, "/");
 		// Split on raw '/' first — do NOT decode encoded '/' (%2F) so splitting
 		// remains stable. Decode each segment individually in a safe way.
-		const rawSegments = collapsed.split('/');
+		const rawSegments = collapsed.split("/");
 		const decodedSegments: string[] = [];
 		for (const seg of rawSegments) {
-			if (seg === '' || seg === '.') continue;
+			if (seg === "" || seg === ".") continue;
 			// Prevent decoded '%2F' from becoming a path separator: escape it first
-			const safeSeg = seg.replace(/%2F/gi, '%252F');
+			const safeSeg = seg.replace(/%2F/gi, "%252F");
 			let decoded: string;
 			try {
 				decoded = decodeURIComponent(safeSeg);
@@ -300,14 +300,14 @@ export class HemeraClient {
 				// Treat invalid percent-encodings as invalid input
 				throw new Error("Invalid percent-encoding in path");
 			}
-			if (decoded === '..') {
+			if (decoded === "..") {
 				// Pop last valid segment if present
 				if (decodedSegments.length > 0) decodedSegments.pop();
 				continue;
 			}
 			decodedSegments.push(decoded);
 		}
-		return `/${decodedSegments.join('/')}`;
+		return `/${decodedSegments.join("/")}`;
 	}
 
 	/**
@@ -316,26 +316,32 @@ export class HemeraClient {
 	private async ensurePathAllowed(path: string) {
 		const normalized = this.normalizePath(path);
 		if (!normalized.startsWith(this.allowedPathPrefix)) {
-			throw new Error(`HemeraClient: disallowed path "${path}" (normalized: "${normalized}") — only ${this.allowedPathPrefix} endpoints are permitted`);
+			throw new Error(
+				`HemeraClient: disallowed path "${path}" (normalized: "${normalized}") — only ${this.allowedPathPrefix} endpoints are permitted`,
+			);
 		}
 
 		if (this.allowedAudiences || this.requiredRole) {
 			const token = await this.getToken();
+			// Validate token structure and base64url encoding before decoding claims.
+			this.validateToken(token);
 			const payload = this.getCachedPayload(token);
 
 			if (this.allowedAudiences && this.allowedAudiences.length > 0) {
 				const aud = payload.aud;
-				const audList = Array.isArray(aud) ? aud : (aud ? [aud] : []);
+				const audList = Array.isArray(aud) ? aud : aud ? [aud] : [];
 				const matched = audList.some((a) => this.allowedAudiences?.includes(String(a)));
 				if (!matched) {
-					throw new Error('HemeraClient: token audience not allowed for service endpoints');
+					throw new Error("HemeraClient: token audience not allowed for service endpoints");
 				}
 			}
 
 			if (this.requiredRole) {
 				const role = this.extractRoleFromPayload(payload);
 				if (!role || role !== this.requiredRole) {
-					throw new Error(`HemeraClient: token does not contain required role '${this.requiredRole}'`);
+					throw new Error(
+						`HemeraClient: token does not contain required role '${this.requiredRole}'`,
+					);
 				}
 			}
 		}
@@ -365,12 +371,15 @@ export class HemeraClient {
 
 	private decodeJwtPayload(token: string): Record<string, unknown> {
 		try {
-			const parts = token.split('.');
+			const parts = token.split(".");
 			if (parts.length < 2) return {};
 			const raw = parts[1];
-			const padded = raw.replace(/-/g, '+').replace(/_/g, '/');
-			const buf = Buffer.from(padded.padEnd(padded.length + (4 - (padded.length % 4)) % 4, '='), 'base64');
-			return JSON.parse(buf.toString('utf8'));
+			const padded = raw.replace(/-/g, "+").replace(/_/g, "/");
+			const buf = Buffer.from(
+				padded.padEnd(padded.length + ((4 - (padded.length % 4)) % 4), "="),
+				"base64",
+			);
+			return JSON.parse(buf.toString("utf8"));
 		} catch (_err) {
 			return {};
 		}
@@ -383,7 +392,8 @@ export class HemeraClient {
 		if (payload.role) return payload.role;
 		if (payload.public_metadata?.role) return payload.public_metadata.role;
 		if (payload.publicMetadata?.role) return payload.publicMetadata.role;
-		if (payload['https://hasura.io/jwt/claims']?.['x-hasura-role']) return payload['https://hasura.io/jwt/claims']['x-hasura-role'];
+		if (payload["https://hasura.io/jwt/claims"]?.["x-hasura-role"])
+			return payload["https://hasura.io/jwt/claims"]["x-hasura-role"];
 		if (payload.claims?.role) return payload.claims.role;
 		return undefined;
 	}
