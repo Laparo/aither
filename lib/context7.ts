@@ -1,4 +1,4 @@
-import { Context7, Context7Error } from "@upstash/context7-sdk";
+import { Context7 } from "@upstash/context7-sdk";
 
 const apiKey = process.env.CONTEXT7_API_KEY;
 
@@ -9,13 +9,7 @@ export function createContext7Client() {
 
 export async function searchLibrary(query: string, libraryName: string) {
   const client = createContext7Client();
-  try {
-    const results = await client.searchLibrary(query, libraryName);
-    return results;
-  } catch (err) {
-    if (err instanceof Context7Error) throw err;
-    throw err;
-  }
+  return client.searchLibrary(query, libraryName);
 }
 
 export async function getContext(libraryId: string, question: string, opts?: any) {

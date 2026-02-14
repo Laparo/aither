@@ -254,6 +254,8 @@ Für Production sollte ein automatischer Token-Refresh implementiert werden:
 ```typescript
 // In Aither: src/lib/hemera/token-manager.ts erweitern
 
+import { clerkClient } from '@clerk/nextjs/server';
+
 class HemeraTokenManager {
   private tokenCache: { token: string; expiresAt: number } | null = null;
 
@@ -269,14 +271,29 @@ class HemeraTokenManager {
   }
 
   private async fetchNewToken(): Promise<string> {
-    const clerk = await clerkClient();
-    const session = await clerk.sessions.createSession({
+    // Use the Clerk server client instance provided by the SDK
+    // (imported above as `clerkClient`). The current Clerk backend API
+    // exposes session creation via `clerkClient.sessions.create`.
+    const session = await clerkClient.sessions.create({
       userId: process.env.CLERK_SERVICE_USER_ID!,
       expiresInSeconds: 900, // 15 Minuten
     });
 
+    // The returned session object contains the issued token. SDKs and
+    // API versions may surface the token under different properties;
+    // the common locations are `session.lastActiveToken.raw` or
+    // `session.lastActiveToken.jwt`. Assert whichever exists.
+    const token =
+      // prefer raw token field when present
+      (session as any)?.lastActiveToken?.raw ||
+      (session as any)?.lastActiveToken?.jwt ||
+      (session as any)?.token ||
+      (session as any)?.jwt;
+
+    if (!token) throw new Error('Failed to obtain service token from Clerk session response');
+
     this.tokenCache = {
-      token: session.lastActiveToken.jwt,
+      token,
       expiresAt: Date.now() + 900 * 1000 - 30000, // -30s Sicherheitsmarge
     };
 

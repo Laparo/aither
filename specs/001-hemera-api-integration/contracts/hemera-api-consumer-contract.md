@@ -32,11 +32,14 @@ Content-Type: application/json
   ```
 
 **Retry Strategy:**
-- For `401 Unauthorized`, a single retry with token refresh is allowed **only if** a runtime refresh mechanism exists (e.g., Clerk session refresh). If authentication uses a static service session token (such as `HEMERA_SERVICE_TOKEN` from environment), a 401 must be reported immediately with **no retry**.
-- For `403 Forbidden`, no retry is allowed — the error must be reported directly to the client.
+- When using `HEMERA_SERVICE_TOKEN` as a durable service credential (recommended), authentication failures must be reported immediately to the client:
+  - `401 Unauthorized` — report immediately, do NOT retry. Service credentials are not expected to support runtime refresh.
+  - `403 Forbidden` — report immediately, do NOT retry.
+
+  If your integration explicitly implements a runtime refresh (e.g. Clerk session refresh for short-lived dashboard sessions), document and implement the refresh flow clearly. In that case only apply a single retry on `401` after a successful refresh; `403` should never be retried.
 
 **Note:**
-Authentication is performed via the header `Authorization: Bearer {HEMERA_SERVICE_TOKEN}`. The service token is read from `process.env.HEMERA_SERVICE_TOKEN` and should be a durable service credential (generate via Clerk Backend API or an organisation/service-token system). Session tokens from the Dashboard are short-lived and not suitable for unattended service-to-service auth.
+Authentication is performed via the header `Authorization: Bearer {HEMERA_SERVICE_TOKEN}`. The service token is read from `process.env.HEMERA_SERVICE_TOKEN` and MUST be a long-lived, non-refreshable service credential generated via the Clerk Backend API (a Clerk Backend service token) or an organisation-level service-token mechanism. Do NOT use short-lived Clerk session tokens from the Dashboard for unattended service-to-service authentication; those require runtime refresh and are unsuitable for production S2S usage.
 
 ---
 

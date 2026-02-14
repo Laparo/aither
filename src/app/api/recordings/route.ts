@@ -49,11 +49,24 @@ export async function POST(request: Request): Promise<NextResponse> {
 		);
 	}
 
-	// Create Hemera client
-	const client = createHemeraClient();
+		// Create Hemera client
+		const client = createHemeraClient();
 
-	// Transmit to hemera.academy
-	const result = await transmitRecording(client, parsed.data);
+		// Transmit to hemera.academy — catch and handle unexpected errors
+		let result;
+		try {
+			result = await transmitRecording(client, parsed.data);
+		} catch (err) {
+			console.error('transmitRecording failed', { err, parsedData: parsed.data });
+			// Return a controlled error response rather than letting the exception bubble
+			return NextResponse.json(
+				{
+					error: 'Internal Server Error',
+					message: 'Failed to transmit recording to Hemera API',
+				},
+				{ status: 500 },
+			);
+		}
 
 	if (result.success) {
 		return NextResponse.json(result, { status: 200 });
