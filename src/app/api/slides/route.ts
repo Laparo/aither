@@ -5,7 +5,7 @@
 
 import { requireAdmin } from "@/lib/auth/role-check";
 import { loadConfig } from "@/lib/config";
-import { HemeraClient } from "@/lib/hemera/client";
+import { createHemeraClient } from "@/lib/hemera/factory";
 import { reportError } from "@/lib/monitoring/rollbar-official";
 import { SlideGenerator } from "@/lib/slides/generator";
 import { type NextRequest, NextResponse } from "next/server";
@@ -44,11 +44,9 @@ export async function POST(req: NextRequest) {
 
 	try {
 		const cfg = loadConfig();
-		const baseUrl = cfg.HEMERA_API_BASE_URL;
-		const apiKey = cfg.HEMERA_API_KEY;
 		const outputDir = cfg.SLIDES_OUTPUT_DIR;
 
-		const client = new HemeraClient({ baseUrl, apiKey });
+		const client = createHemeraClient();
 		const generator = new SlideGenerator({ client, outputDir });
 
 		const result = await generator.generate();

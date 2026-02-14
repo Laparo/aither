@@ -9,7 +9,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("@/lib/config", () => ({
 	loadConfig: vi.fn(() => ({
 		HEMERA_API_BASE_URL: "https://api.hemera.test",
-		HEMERA_API_KEY: "test-key",
+		HEMERA_SERVICE_TOKEN: "test-key",
 		SLIDES_OUTPUT_DIR: "output/slides",
 	})),
 }));
@@ -41,6 +41,13 @@ vi.mock("@/lib/slides/generator", () => ({
 // Mock HemeraClient
 vi.mock("@/lib/hemera/client", () => ({
 	HemeraClient: vi.fn().mockImplementation(() => ({})),
+}));
+
+vi.mock("@/lib/hemera/factory", () => ({
+	createHemeraClient: vi.fn(() => ({
+		get: vi.fn().mockResolvedValue([]),
+		put: vi.fn().mockResolvedValue({}),
+	})),
 }));
 
 // Mock Rollbar

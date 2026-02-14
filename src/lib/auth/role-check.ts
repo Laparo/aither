@@ -7,11 +7,14 @@
  * Checks if the user is authenticated and has admin role.
  * Returns { status, body } for use in API routes.
  */
-export function requireAdmin(auth: any): { status: number; body: any } {
+type AuthLike = { sessionClaims?: { metadata?: { role?: string } } };
+
+export function requireAdmin(auth: unknown): { status: number; body: unknown } {
 	if (!auth) {
 		return { status: 401, body: { error: "UNAUTHENTICATED" } };
 	}
-	if (auth.sessionClaims?.metadata?.role !== "admin") {
+	const a = auth as AuthLike;
+	if (a.sessionClaims?.metadata?.role !== "admin") {
 		return { status: 403, body: { error: "FORBIDDEN" } };
 	}
 	return { status: 200, body: auth };
