@@ -42,13 +42,13 @@ interface FetchedData {
 }
 
 /**
- * Orchestriert die gesamte Sync-Pipeline:
- * 1. Alle Entitäten von der hemera.academy API abrufen
- * 2. Templates den Entitäten zuordnen
- * 3. Hashes berechnen & mit Manifest vergleichen
- * 4. Nur geänderte Templates befüllen → HTML schreiben
- * 5. Orphans bereinigen
- * 6. Manifest aktualisieren
+ * Orchestrates the entire sync pipeline:
+ * 1. Fetch all entities from the hemera.academy API
+ * 2. Match templates to entities
+ * 3. Compute hashes & compare with manifest
+ * 4. Populate only changed templates → write HTML
+ * 5. Clean up orphans
+ * 6. Update manifest
  */
 export class SyncOrchestrator {
 	private readonly client: HemeraClient;
@@ -62,9 +62,9 @@ export class SyncOrchestrator {
 	}
 
 	/**
-	 * Startet den vollständigen Sync-Prozess (fetch → hash → populate → write → manifest).
+	 * Starts the full sync process (fetch → hash → populate → write → manifest).
 	 *
-	 * @returns SyncJob-Objekt mit Status und Fehlern
+	 * @returns SyncJob object with status and errors
 	 */
 	async run(): Promise<SyncJob> {
 		const job: SyncJob = {

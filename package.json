@@ -13,7 +13,9 @@
 		"test:unit": "vitest run tests/unit/",
 		"test:contract": "vitest run tests/contract/",
 		"test:e2e": "playwright test",
-		"test:watch": "vitest"
+		"test:watch": "vitest",
+		"typecheck": "tsc --noEmit",
+		"prepare": "husky install"
 	},
 	"dependencies": {
 		"@clerk/nextjs": "^6.12.0",
@@ -33,12 +35,15 @@
 	},
 	"devDependencies": {
 		"@biomejs/biome": "^1.9.0",
+		"@cspell/dict-de-de": "^4.1.2",
 		"@playwright/test": "^1.50.0",
 		"@types/node": "^22.0.0",
 		"@types/nodemailer": "^6.4.17",
 		"@types/react": "^19.0.0",
 		"@types/react-dom": "^19.0.0",
 		"@types/uuid": "^10.0.0",
+		"cspell": "^9.6.4",
+		"husky": "^9.1.7",
 		"typescript": "^5.9.3",
 		"vite-tsconfig-paths": "^6.1.0",
 		"vitest": "^3.0.0"

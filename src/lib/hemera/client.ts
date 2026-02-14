@@ -3,7 +3,7 @@
 // Task: T013 — Auth, throttling (p-throttle 2 req/s), retry (p-retry)
 // ---------------------------------------------------------------------------
 
-import pRetry from "p-retry";
+import pRetry, { AbortError } from "p-retry";
 import pThrottle from "p-throttle";
 import type { z } from "zod";
 
@@ -31,14 +31,14 @@ export class HemeraApiError extends Error {
 }
 
 /**
- * HTTP-Client für die hemera.academy REST API.
+ * HTTP client for the hemera.academy REST API.
  *
  * Features:
- * - API-Key-Authentifizierung via Authorization-Header
- * - Rate-Limiting via p-throttle (Standard: 2 req/s)
- * - Automatisches Retry bei 5xx/Netzwerkfehlern via p-retry (Standard: 5 Versuche, Jitter)
- * - Retry-After-Header-Unterstützung für 429-Responses
- * - Zod-Validierung jeder Response
+ * - API key authentication via Authorization header
+ * - Rate limiting via p-throttle (default: 2 req/s)
+ * - Automatic retry on 5xx/network errors via p-retry (default: 5 attempts, jitter)
+ * - Retry-After header support for 429 responses
+ * - Zod validation of every response
  */
 export class HemeraClient {
 	private readonly baseUrl: string;
@@ -64,12 +64,12 @@ export class HemeraClient {
 	}
 
 	/**
-	 * Ruft eine Ressource von der Hemera API ab und validiert sie mit Zod.
-	 * Wiederholt bei 5xx- und Netzwerkfehlern. Beachtet 429 Retry-After.
+	 * Fetches a resource from the Hemera API and validates it with Zod.
+	 * Retries on 5xx and network errors. Respects 429 Retry-After.
 	 *
-	 * @param path   API-Endpoint (z.B. "/seminars")
-	 * @param schema Zod-Schema zur Validierung
-	 * @returns      Validiertes Ergebnis
+	 * @param path   API endpoint (e.g., "/seminars")
+	 * @param schema Zod schema for validation
+	 * @returns      Validated result
 	 */
 	async get<T>(path: string, schema: z.ZodType<T>): Promise<T> {
 		const url = `${this.baseUrl}${path}`;
@@ -88,9 +88,7 @@ export class HemeraClient {
 					const retryAfter = res.headers.get("Retry-After");
 					const delayMs = retryAfter ? Number.parseInt(retryAfter, 10) * 1000 : 5000;
 					await this.delay(delayMs);
-					throw new pRetry.AbortError(
-						`Rate limited (429) for ${url}. Retrying after ${delayMs}ms.`,
-					);
+					throw new HemeraApiError(res.status, res.statusText, "", url);
 				}
 
 				if (res.status >= 500) {
@@ -100,7 +98,7 @@ export class HemeraClient {
 
 				if (!res.ok) {
 					const body = await res.text();
-					throw new pRetry.AbortError(new HemeraApiError(res.status, res.statusText, body, url));
+					throw new AbortError(new HemeraApiError(res.status, res.statusText, body, url));
 				}
 
 				return res;
@@ -120,7 +118,9 @@ export class HemeraClient {
 	/**
 	 * PUT a resource to the Hemera API and validate the response against a Zod schema.
 	 */
-	async put<T>(path: string, body: unknown, schema: z.ZodType<T>): Promise<T> {
+	async put<T>(path: string, body: unknown, schema: z.ZodType<T>): Promise<T>;
+	async put(path: string, body: unknown): Promise<unknown>;
+	async put<T = unknown>(path: string, body: unknown, schema?: z.ZodType<T>): Promise<T | unknown> {
 		const url = `${this.baseUrl}${path}`;
 
 		const response = await pRetry(
@@ -149,7 +149,7 @@ export class HemeraClient {
 
 				if (!res.ok) {
 					const body = await res.text();
-					throw new pRetry.AbortError(new HemeraApiError(res.status, res.statusText, body, url));
+					throw new AbortError(new HemeraApiError(res.status, res.statusText, body, url));
 				}
 
 				return res;
@@ -163,7 +163,10 @@ export class HemeraClient {
 		);
 
 		const json = await response.json();
-		return schema.parse(json);
+		if (schema) {
+			return schema.parse(json);
+		}
+		return json;
 	}
 
 	private delay(ms: number): Promise<void> {

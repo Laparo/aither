@@ -3,7 +3,26 @@
 // Task: T042 [US3] — Structured error logging for sync jobs
 // ---------------------------------------------------------------------------
 
-import { getRollbar } from "@/lib/monitoring/rollbar";
+import { isTelemetryConsentGranted } from "@/lib/monitoring/privacy";
+import { serverInstance } from "@/lib/monitoring/rollbar-official";
+
+/**
+ * Build a safe context payload for sync log entries.
+ * When PII consent is not granted, `sourceId` is redacted because it may
+ * reference a user-facing identifier (e.g. an external student/teacher ID).
+ */
+function safeSyncContext(
+	jobId: string,
+	entityType: string,
+	sourceId: string,
+): Record<string, string> {
+	return {
+		jobId,
+		entityType,
+		sourceId: isTelemetryConsentGranted() ? sourceId : "[redacted]",
+		timestamp: new Date().toISOString(),
+	};
+}
 
 export function logSyncError(
 	jobId: string,
@@ -11,13 +30,7 @@ export function logSyncError(
 	sourceId: string,
 	message: string,
 ): void {
-	const rollbar = getRollbar();
-	rollbar.error(`Sync error: ${message}`, {
-		jobId,
-		entityType,
-		sourceId,
-		timestamp: new Date().toISOString(),
-	});
+	serverInstance.error(`Sync error: ${message}`, safeSyncContext(jobId, entityType, sourceId));
 }
 
 export function logSyncWarning(
@@ -26,18 +39,11 @@ export function logSyncWarning(
 	sourceId: string,
 	message: string,
 ): void {
-	const rollbar = getRollbar();
-	rollbar.warning(`Sync warning: ${message}`, {
-		jobId,
-		entityType,
-		sourceId,
-		timestamp: new Date().toISOString(),
-	});
+	serverInstance.warning(`Sync warning: ${message}`, safeSyncContext(jobId, entityType, sourceId));
 }
 
 export function logSyncCritical(jobId: string, message: string): void {
-	const rollbar = getRollbar();
-	rollbar.critical(`Sync critical: ${message}`, {
+	serverInstance.critical(`Sync critical: ${message}`, {
 		jobId,
 		timestamp: new Date().toISOString(),
 	});

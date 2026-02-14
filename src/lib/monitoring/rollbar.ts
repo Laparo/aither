@@ -1,48 +1,37 @@
 // ---------------------------------------------------------------------------
-// Rollbar Server-Side Integration
-// Task: T015 — Singleton instance with PII filtering
+// DEPRECATED: This file is kept for backward compatibility only.
+// Please import directly from './rollbar-official' instead.
+//
+// All Rollbar exports have been consolidated into rollbar-official.ts
+// to maintain a single source of truth and prevent import drift.
 // ---------------------------------------------------------------------------
 
-import Rollbar from "rollbar";
+// Re-export everything from the official module
+export {
+	clientConfig,
+	clientRollbarConfig,
+	createErrorContext,
+	type ErrorContext,
+	ErrorSeverity,
+	type ErrorSeverityType,
+	flushRollbar,
+	recordUserAction,
+	reportError,
+	rollbar,
+	rollbarConfig,
+	serverInstance,
+} from "./rollbar-official";
 
-let _rollbar: Rollbar | null = null;
+import type Rollbar from "rollbar";
+// Legacy-compatible re-export: getRollbar() returns the serverInstance
+import { serverInstance } from "./rollbar-official";
 
-/**
- * Get the singleton Rollbar instance.
- * If ROLLBAR_SERVER_TOKEN is not set, returns a no-op instance that logs to console.
- */
+/** @deprecated Use `serverInstance` from `./rollbar-official` instead. */
 export function getRollbar(): Rollbar {
-	if (_rollbar) return _rollbar;
-
-	const token = process.env.ROLLBAR_SERVER_TOKEN;
-
-	if (!token) {
-		// No-op: log warnings to console when Rollbar is not configured
-		_rollbar = new Rollbar({
-			enabled: false,
-			accessToken: "disabled",
-		});
-		return _rollbar;
-	}
-
-	_rollbar = new Rollbar({
-		accessToken: token,
-		environment: process.env.NODE_ENV ?? "development",
-		captureUncaught: true,
-		captureUnhandledRejections: true,
-		payload: {
-			server: {
-				root: process.cwd(),
-			},
-		},
-		// PII filtering: scrub email fields from payloads
-		scrubFields: ["email", "user_email", "userEmail", "password", "apiKey", "api_key"],
-	});
-
-	return _rollbar;
+	return serverInstance as Rollbar;
 }
 
-/** Reset singleton (for testing). */
+/** @deprecated No-op — singleton is now module-scoped. */
 export function resetRollbar(): void {
-	_rollbar = null;
+	// no-op: singleton lifecycle is managed by rollbar-official.ts
 }

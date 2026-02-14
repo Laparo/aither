@@ -6,6 +6,15 @@
 import { SyncJobResponseSchema } from "@/lib/sync/schemas";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+// Mock loadConfig
+vi.mock("@/lib/config", () => ({
+	loadConfig: vi.fn(() => ({
+		HEMERA_API_BASE_URL: "https://api.hemera.test",
+		HEMERA_API_KEY: "test-key",
+		HTML_OUTPUT_DIR: "output",
+	})),
+}));
+
 // Mock auth — bypass requireAdmin check
 vi.mock("@/lib/auth/role-check", () => ({
 	requireAdmin: vi.fn().mockReturnValue({
