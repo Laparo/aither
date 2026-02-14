@@ -42,7 +42,7 @@ export async function sendFailureNotification(jobId: string, errorSummary: strin
 
 	try {
 		await getTransport().sendMail(mailOptions);
-		failureCount = 0;
+		// Counter nicht zurücksetzen - weiterhin E-Mails bei jedem Fehler senden
 	} catch (err) {
 		// Redaktiere Empfängeradresse für Logging
 		const sanitizedMailOptions = {
