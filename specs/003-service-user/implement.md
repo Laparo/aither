@@ -379,8 +379,7 @@ export async function GET(
             user: {
               select: {
                 id: true,
-                name: true,
-                email: true,
+                // PII (name, email) excluded per clarify.md requirements
               },
             },
           },
@@ -429,8 +428,7 @@ export async function GET(
         user: {
           select: {
             id: true,
-            name: true,
-            email: true,
+            // PII (name, email) excluded per clarify.md requirements
           },
         },
       },
