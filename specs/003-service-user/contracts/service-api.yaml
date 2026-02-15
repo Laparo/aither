@@ -51,6 +51,7 @@ components:
             $ref: '#/components/schemas/ParticipationDetail'
     ParticipationDetail:
       type: object
+      description: "PII excluded by policy; only pseudonymous identifiers."
       properties:
         id:
           type: string
@@ -58,6 +59,7 @@ components:
           type: string
         userId:
           type: string
+          description: "Pseudonymous identifier; no name/email returned."
         resultOutcome:
           type: string
           nullable: true
@@ -65,6 +67,7 @@ components:
         resultNotes:
           type: string
           nullable: true
+          maxLength: 2048
     CourseListResponse:
       type: object
       properties:
@@ -104,6 +107,7 @@ paths:
           schema:
             type: integer
             default: 20
+            maximum: 100
       responses:
         '200':
           description: OK

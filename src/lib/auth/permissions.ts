@@ -1,5 +1,7 @@
-// Minimal permission definitions and role mapping for Hemera
-// This file provides a small, explicit permission map used by service endpoints.
+// ---------------------------------------------------------------------------
+// Permission Definitions and RBAC Logic
+// Centralized role-based access control for service endpoints
+// ---------------------------------------------------------------------------
 
 export type Permission =
   | 'read:courses'
@@ -11,14 +13,12 @@ export type Permission =
   | 'manage:users'
   | string;
 
-export enum UserRole {
-  Admin = 'admin',
-  User = 'user',
-  ApiClient = 'api-client',
-}
+// Consolidated role type - single source of truth
+export type Role = 'admin' | 'api-client' | 'instructor' | 'participant';
 
-export const rolePermissions: Record<UserRole, Permission[]> = {
-  [UserRole.Admin]: [
+// Centralized RBAC map
+export const rolePermissions: Record<Role, Permission[]> = {
+  admin: [
     'read:courses',
     'read:bookings',
     'read:participations',
@@ -27,27 +27,22 @@ export const rolePermissions: Record<UserRole, Permission[]> = {
     'manage:courses',
     'manage:users',
   ],
-  [UserRole.User]: [
-    'read:courses',
-    'read:participations',
-  ],
-  [UserRole.ApiClient]: [
+  'api-client': [
     'read:courses',
     'read:bookings',
     'read:participations',
     'write:participation-results',
-    // Allow limited user lookup for correlation without broader user management
-    'read:users',
   ],
+  instructor: [
+    'read:courses',
+    'read:participations',
+  ],
+  participant: [],
 };
 
-export function hasPermission(role: UserRole | string, permission: Permission): boolean {
-  const perms = rolePermissions[role as UserRole] || [];
-  return perms.includes(permission) || false;
+/**
+ * Check if a role has a specific permission.
+ */
+export function hasPermission(role: Role | null | undefined, permission: Permission): boolean {
+  return !!role && rolePermissions[role]?.includes(permission) === true;
 }
-
-export default {
-  UserRole,
-  rolePermissions,
-  hasPermission,
-};

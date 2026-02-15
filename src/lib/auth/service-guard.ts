@@ -5,43 +5,9 @@
 
 import { auth } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
-import type { Permission } from './permissions';
-
-// Fixed, centralized RBAC map
-export type Role = 'admin' | 'api-client' | 'instructor' | 'participant';
-
-const rolePermissions: Record<Role, Permission[]> = {
-  admin: [
-    'read:courses',
-    'read:bookings',
-    'read:participations',
-    'write:participation-results',
-    'manage:courses',
-    'manage:users',
-  ],
-  'api-client': [
-    'read:courses',
-    'read:bookings',
-    'read:participations',
-    'write:participation-results',
-  ],
-  instructor: ['read:courses', 'read:participations'],
-  participant: [],
-};
-
-/**
- * Check if a role has a specific permission.
- */
-function hasPermission(role: Role | null | undefined, permission: Permission): boolean {
-  return !!role && rolePermissions[role]?.includes(permission) === true;
-}
-
-/**
- * Helper to create consistent error responses.
- */
-function error(status: number, error: string, message?: string) {
-  return NextResponse.json({ error, message }, { status });
-}
+import type { Permission, Role } from './permissions';
+import { hasPermission } from './permissions';
+import { createErrorResponse } from '../utils/api-error';
 
 /**
  * Get the user's role from Clerk session claims.
@@ -82,13 +48,13 @@ export async function requireServiceAuth(requiredPermission: Permission): Promis
   const { userId } = await auth();
 
   if (!userId) {
-    return error(401, 'Unauthorized', 'Authentication required');
+    return createErrorResponse(401, 'Unauthorized', 'Authentication required');
   }
 
   const role = await getUserRole(userId);
 
   if (!hasPermission(role, requiredPermission)) {
-    return error(403, 'Forbidden', 'Insufficient permissions');
+    return createErrorResponse(403, 'Forbidden', 'Insufficient permissions');
   }
 
   return null; // Auth successful

@@ -60,22 +60,15 @@ export async function getServiceToken(): Promise<string> {
  */
 async function obtainTokenFromClerk(userId: string): Promise<string> {
   try {
-    // Get user session token from Clerk
-    const user = await clerkClient.users.getUser(userId);
-    
-    // Generate a session token for the service user
-    // Note: This requires Clerk Backend SDK and appropriate permissions
-    const session = await clerkClient.sessions.createSession({
-      userId: user.id,
-      // Add any additional session configuration here
+    // Mint a short‑lived JWT using a Clerk JWT Template configured as 'hemera-api'
+    // This avoids creating persistent sessions and follows least-privilege
+    const minted = await clerkClient.users.createToken(userId, {
+      template: 'hemera-api',
+      expiresInSeconds: 15 * 60, // 15 minutes
     });
-    
-    // Get the JWT token from the session
-    const token = await clerkClient.sessions.getToken(session.id, 'hemera-api');
-    
-    return token;
+    return minted.jwt;
   } catch (error) {
-    console.error('Failed to obtain service token from Clerk:', error);
+    console.error('Failed to mint service JWT from Clerk:', error);
     throw new Error('Service token generation failed');
   }
 }
@@ -213,6 +206,11 @@ HEMERA_API_BASE_URL=https://api.hemera.academy
 # Clerk Authentication
 NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_xxxxxxxxxxxxxxxxxxxxx
 CLERK_SECRET_KEY=sk_test_xxxxxxxxxxxxxxxxxxxxx
+
+# Upstash Redis (used for rate limiting)
+# Get these from your Upstash console and keep secrets in your environment manager
+UPSTASH_REDIS_REST_URL=https://<your-upstash-id>.upstash.io
+UPSTASH_REDIS_REST_TOKEN=<upstash-rest-token>
 ```
 
 ---
@@ -286,35 +284,154 @@ export function hasPermission(role: UserRole, permission: Permission): boolean {
 }
 ```
 
-### Step 3: Create Auth Guard
+### Step 3: Update Permissions Module
+
+Update `lib/auth/permissions.ts` to consolidate RBAC definitions:
+
+```typescript
+// ---------------------------------------------------------------------------
+// Permission Definitions and RBAC Logic
+// Centralized role-based access control for service endpoints
+// ---------------------------------------------------------------------------
+
+export type Permission =
+  | 'read:courses'
+  | 'read:bookings'
+  | 'read:participations'
+  | 'write:participation-results'
+  | 'read:users'
+  | 'manage:courses'
+  | 'manage:users'
+  | string;
+
+// Consolidated role type - single source of truth
+export type Role = 'admin' | 'api-client' | 'instructor' | 'participant';
+
+// Centralized RBAC map
+export const rolePermissions: Record<Role, Permission[]> = {
+  admin: [
+    'read:courses',
+    'read:bookings',
+    'read:participations',
+    'write:participation-results',
+    'read:users',
+    'manage:courses',
+    'manage:users',
+  ],
+  'api-client': [
+    'read:courses',
+    'read:bookings',
+    'read:participations',
+    'write:participation-results',
+  ],
+  instructor: [
+    'read:courses',
+    'read:participations',
+  ],
+  participant: [],
+};
+
+/**
+ * Check if a role has a specific permission.
+ */
+export function hasPermission(role: Role | null | undefined, permission: Permission): boolean {
+  return !!role && rolePermissions[role]?.includes(permission) === true;
+}
+```
+
+### Step 4: Create Error Utilities
+
+Create `lib/utils/api-error.ts`:
+
+```typescript
+// ---------------------------------------------------------------------------
+// API Error Response Utilities
+// Provides consistent error response formatting across all API endpoints
+// ---------------------------------------------------------------------------
+
+import { NextResponse } from 'next/server';
+
+/**
+ * Create a consistent error response for API endpoints.
+ * 
+ * @param status - HTTP status code
+ * @param errorCode - Machine-readable error code (e.g., 'Unauthorized', 'Not Found')
+ * @param message - Optional human-readable error message
+ * @returns NextResponse with standardized error format
+ */
+export function createErrorResponse(
+  status: number,
+  errorCode: string,
+  message?: string
+): NextResponse {
+  return NextResponse.json({ error: errorCode, message }, { status });
+}
+```
+
+### Step 5: Create Auth Guard
 
 Create `lib/auth/service-guard.ts`:
 
 ```typescript
+// ---------------------------------------------------------------------------
+// Service API Authorization Guard
+// Provides consolidated RBAC logic for service endpoints
+// ---------------------------------------------------------------------------
+
 import { auth } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
-import { getUserRole } from './user-role';
-import { UserRole, Permission, hasPermission } from './permissions';
+import type { Permission, Role } from './permissions';
+import { hasPermission } from './permissions';
+import { createErrorResponse } from '../utils/api-error';
 
-export async function requireServiceAuth(requiredPermission: Permission) {
+/**
+ * Get the user's role from Clerk session claims.
+ */
+async function getUserRole(userId: string): Promise<Role | null> {
+  try {
+    const { sessionClaims } = await auth();
+    
+    // Extract role from public metadata in session claims
+    // Clerk stores custom data in publicMetadata
+    const metadata = sessionClaims?.publicMetadata as { role?: string } | undefined;
+    const role = metadata?.role;
+    
+    if (!role || typeof role !== 'string') {
+      return null;
+    }
+    
+    // Validate that the role is one of our known roles
+    if (['admin', 'api-client', 'instructor', 'participant'].includes(role)) {
+      return role as Role;
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('Failed to get user role:', error);
+    return null;
+  }
+}
+
+/**
+ * Require service authentication and authorization for an API endpoint.
+ * Returns null if authorized, or a NextResponse with error if not.
+ * 
+ * @param requiredPermission - The permission required to access the endpoint
+ * @returns null if authorized, NextResponse with error otherwise
+ */
+export async function requireServiceAuth(requiredPermission: Permission): Promise<NextResponse | null> {
   const { userId } = await auth();
-  
+
   if (!userId) {
-    return NextResponse.json(
-      { error: 'Unauthorized', message: 'Authentication required' },
-      { status: 401 }
-    );
+    return createErrorResponse(401, 'Unauthorized', 'Authentication required');
   }
-  
+
   const role = await getUserRole(userId);
-  
-  if (!role || !hasPermission(role as UserRole, requiredPermission)) {
-    return NextResponse.json(
-      { error: 'Forbidden', message: 'Insufficient permissions' },
-      { status: 403 }
-    );
+
+  if (!hasPermission(role, requiredPermission)) {
+    return createErrorResponse(403, 'Forbidden', 'Insufficient permissions');
   }
-  
+
   return null; // Auth successful
 }
 ```
@@ -361,6 +478,7 @@ Create `app/api/service/courses/[id]/route.ts`:
 import { NextResponse } from 'next/server';
 import { requireServiceAuth } from '@/lib/auth/service-guard';
 import { Permission } from '@/lib/auth/permissions';
+import { createErrorResponse } from '@/lib/utils/api-error';
 import { prisma } from '@/lib/prisma';
 
 export async function GET(
@@ -374,33 +492,26 @@ export async function GET(
     const course = await prisma.course.findUnique({
       where: { id: params.id },
       include: {
-        participations: {
-          include: {
-            user: {
-              select: {
-                id: true,
-                // PII (name, email) excluded per clarify.md requirements
-              },
-            },
-          },
-        },
+      participations: {
+      select: {
+      id: true,
+      courseId: true,
+      userId: true, // Pseudonymous identifier only; no name/email
+      resultOutcome: true,
+      resultNotes: true,
+      },
+      },
       },
     });
     
     if (!course) {
-      return NextResponse.json(
-        { error: 'NotFound', message: 'Course not found' },
-        { status: 404 }
-      );
+      return createErrorResponse(404, 'Not Found', 'Course not found');
     }
     
     return NextResponse.json(course);
-  } catch (error) {
-    console.error('Failed to fetch course:', error);
-    return NextResponse.json(
-      { error: 'InternalServerError', message: 'Failed to fetch course' },
-      { status: 500 }
-    );
+  } catch (err) {
+    console.error('Failed to fetch course:', err);
+    return createErrorResponse(500, 'Server Error', 'Failed to fetch course');
   }
 }
 ```
@@ -411,6 +522,7 @@ Create `app/api/service/participations/[id]/route.ts`:
 import { NextResponse } from 'next/server';
 import { requireServiceAuth } from '@/lib/auth/service-guard';
 import { Permission } from '@/lib/auth/permissions';
+import { createErrorResponse } from '@/lib/utils/api-error';
 import { prisma } from '@/lib/prisma';
 
 export async function GET(
@@ -423,31 +535,23 @@ export async function GET(
   try {
     const participation = await prisma.courseParticipation.findUnique({
       where: { id: params.id },
-      include: {
-        course: true,
-        user: {
-          select: {
-            id: true,
-            // PII (name, email) excluded per clarify.md requirements
-          },
-        },
+      select: {
+        id: true,
+        courseId: true,
+        userId: true, // Pseudonymous identifier only; no name/email
+        resultOutcome: true,
+        resultNotes: true,
       },
     });
     
     if (!participation) {
-      return NextResponse.json(
-        { error: 'NotFound', message: 'Participation not found' },
-        { status: 404 }
-      );
+      return createErrorResponse(404, 'Not Found', 'Participation not found');
     }
     
     return NextResponse.json(participation);
-  } catch (error) {
-    console.error('Failed to fetch participation:', error);
-    return NextResponse.json(
-      { error: 'InternalServerError', message: 'Failed to fetch participation' },
-      { status: 500 }
-    );
+  } catch (err) {
+    console.error('Failed to fetch participation:', err);
+    return createErrorResponse(500, 'Server Error', 'Failed to fetch participation');
   }
 }
 ```
@@ -458,6 +562,7 @@ Create `app/api/service/participations/[id]/result/route.ts`:
 import { NextResponse } from 'next/server';
 import { requireServiceAuth } from '@/lib/auth/service-guard';
 import { Permission } from '@/lib/auth/permissions';
+import { createErrorResponse } from '@/lib/utils/api-error';
 import { prisma } from '@/lib/prisma';
 import { z } from 'zod';
 
@@ -488,17 +593,11 @@ export async function PUT(
     return NextResponse.json(participation);
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return NextResponse.json(
-        { error: 'BadRequest', message: 'Invalid request data', details: error.errors },
-        { status: 400 }
-      );
+      return createErrorResponse(400, 'Bad Request', 'Invalid request data');
     }
     
     console.error('Failed to update participation result:', error);
-    return NextResponse.json(
-      { error: 'InternalServerError', message: 'Failed to update participation result' },
-      { status: 500 }
-    );
+    return createErrorResponse(500, 'Server Error', 'Failed to update participation result');
   }
 }
 ```
