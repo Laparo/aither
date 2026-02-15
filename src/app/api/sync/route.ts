@@ -4,9 +4,8 @@
 // ---------------------------------------------------------------------------
 
 import { requireAdmin } from "@/lib/auth/role-check";
-import { getServiceToken } from "@/lib/auth/service-token";
 import { loadConfig } from "@/lib/config";
-import { HemeraClient } from "@/lib/hemera/client";
+import { createHemeraClient } from "@/lib/hemera/factory";
 import { SyncOrchestrator } from "@/lib/sync/orchestrator";
 import type { SyncJob } from "@/lib/sync/types";
 import { type NextRequest, NextResponse } from "next/server";
@@ -98,10 +97,9 @@ export async function POST(req: NextRequest) {
 
 	// Fire-and-forget: start orchestrator async
 	const cfg = loadConfig();
-	const baseUrl = cfg.HEMERA_API_BASE_URL;
 	const outputDir = cfg.HTML_OUTPUT_DIR;
 
-	const client = new HemeraClient({ baseUrl, getToken: getServiceToken });
+	const client = createHemeraClient();
 	const orchestrator = new SyncOrchestrator({
 		client,
 		outputDir,

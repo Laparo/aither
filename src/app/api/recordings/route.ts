@@ -4,10 +4,9 @@
 // ---------------------------------------------------------------------------
 
 import { requireAdmin } from "@/lib/auth/role-check";
-import { getServiceToken } from "@/lib/auth/service-token";
-import { loadConfig } from "@/lib/config";
-import { HemeraClient } from "@/lib/hemera/client";
+import { createHemeraClient } from "@/lib/hemera/factory";
 import { transmitRecording } from "@/lib/sync/recording-transmitter";
+import type { TransmitResult } from "@/lib/sync/recording-transmitter";
 import { RecordingTransmitRequestSchema } from "@/lib/sync/schemas";
 import { NextResponse } from "next/server";
 
@@ -19,7 +18,7 @@ import { NextResponse } from "next/server";
  * Response: 200 on success, 400 on validation error, 502 on Hemera API failure
  */
 export async function POST(request: Request): Promise<NextResponse> {
-	const auth = (request as any).auth ?? null;
+	const auth = (request as unknown as { auth?: unknown }).auth ?? null;
 	const authResult = requireAdmin(auth);
 	if (authResult.status !== 200) {
 		return NextResponse.json(authResult.body, { status: authResult.status });
@@ -52,14 +51,30 @@ export async function POST(request: Request): Promise<NextResponse> {
 	}
 
 	// Create Hemera client
-	const config = loadConfig();
-	const client = new HemeraClient({
-		baseUrl: config.HEMERA_API_BASE_URL,
-		getToken: getServiceToken,
-	});
+	const client = createHemeraClient();
 
-	// Transmit to hemera.academy
-	const result = await transmitRecording(client, parsed.data);
+	// Transmit to hemera.academy — catch and handle unexpected errors
+	let result: TransmitResult;
+	try {
+		result = await transmitRecording(client, parsed.data);
+	} catch (err) {
+		// Mask sensitive fields before logging to avoid leaking PII/URLs
+		const masked = {
+			...parsed.data,
+			seminarSourceId: parsed.data?.seminarSourceId ? "***" : undefined,
+			muxAssetId: parsed.data?.muxAssetId ? "***" : undefined,
+			muxPlaybackUrl: parsed.data?.muxPlaybackUrl ? "***" : undefined,
+		};
+		console.error("transmitRecording failed", { err, parsedData: masked });
+		// Return a controlled error response rather than letting the exception bubble
+		return NextResponse.json(
+			{
+				error: "Internal Server Error",
+				message: "Failed to transmit recording to Hemera API",
+			},
+			{ status: 500 },
+		);
+	}
 
 	if (result.success) {
 		return NextResponse.json(result, { status: 200 });

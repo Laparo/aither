@@ -14,19 +14,22 @@ describe("requireAdmin", () => {
 	it("returns 401 for unauthenticated requests", () => {
 		const res = requireAdmin(null);
 		expect(res.status).toBe(401);
-		expect(res.body.error).toBe("UNAUTHENTICATED");
+		const body1 = res.body as unknown as { error?: string };
+		expect(body1.error).toBe("UNAUTHENTICATED");
 	});
 
 	it("returns 403 for non-admin users", () => {
 		const res = requireAdmin(mockAuth("participant"));
 		expect(res.status).toBe(403);
-		expect(res.body.error).toBe("FORBIDDEN");
+		const body2 = res.body as unknown as { error?: string };
+		expect(body2.error).toBe("FORBIDDEN");
 	});
 
 	it("returns 200 for admin users", () => {
 		const res = requireAdmin(mockAuth("admin"));
 		expect(res.status).toBe(200);
 		// Should include claims for downstream use
-		expect(res.body.sessionClaims.metadata.role).toBe("admin");
+		const body3 = res.body as unknown as { sessionClaims?: { metadata?: { role?: string } } };
+		expect(body3.sessionClaims?.metadata.role).toBe("admin");
 	});
 });

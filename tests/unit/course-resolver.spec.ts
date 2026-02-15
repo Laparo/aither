@@ -3,6 +3,7 @@
 // Task: T003 [US1] — next-course selection logic
 // ---------------------------------------------------------------------------
 
+import type { HemeraClient } from "@/lib/hemera/client";
 import type { Seminar } from "@/lib/hemera/types";
 import { getNextCourse } from "@/lib/slides/course-resolver";
 import { describe, expect, it, vi } from "vitest";
@@ -12,7 +13,7 @@ function mockClient(seminars: Seminar[]) {
 	return {
 		get: vi.fn().mockResolvedValue(seminars),
 		put: vi.fn(),
-	} as any;
+	} as unknown as HemeraClient;
 }
 
 /** Helper to create a seminar with dates */

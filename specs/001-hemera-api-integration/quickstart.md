@@ -28,7 +28,7 @@
    ```env
   # Hemera Academy API
   HEMERA_API_BASE_URL=https://api.hemera.academy
-  HEMERA_API_KEY=your-api-key-here
+  HEMERA_SERVICE_TOKEN=your-service-token-here
 
    # Clerk Authentication
    NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_...

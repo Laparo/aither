@@ -169,7 +169,7 @@ components:
     clerkAuth:
       type: http
       scheme: bearer
-      description: Clerk session token or API key
+      description: Service token (prefer long-lived service credential) or API key
 
   schemas:
     SyncJobResponse:

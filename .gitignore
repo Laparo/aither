@@ -15,6 +15,18 @@ out/
 .env.backup
 .env.local.backup
 
+# Python
+/.venv
+venv/
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+python-env/
+.pytest_cache/
+
+
 # IDE
 .vscode/
 .idea/

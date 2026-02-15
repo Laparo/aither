@@ -213,7 +213,7 @@ export class SyncOrchestrator {
 
 		for (const { key, path, schema } of fetches) {
 			try {
-				// eslint-disable-next-line @typescript-eslint/no-explicit-any
+				// biome-ignore lint/suspicious/noExplicitAny: bridge for dynamic fetched data
 				(data as any)[key] = await this.client.get(path, schema as any);
 			} catch (err) {
 				job.errors.push({

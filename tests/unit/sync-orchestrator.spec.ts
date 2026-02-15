@@ -5,7 +5,6 @@
 
 import type { HemeraClient } from "@/lib/hemera/client";
 import { SyncOrchestrator } from "@/lib/sync/orchestrator";
-import type { SyncManifest } from "@/lib/sync/types";
 import { describe, expect, it, vi } from "vitest";
 
 // Mock implementations
@@ -62,10 +61,6 @@ function createMockClient(overrides?: Partial<Record<string, unknown>>): HemeraC
 		put: vi.fn(),
 		...overrides,
 	} as unknown as HemeraClient;
-}
-
-function createMockManifest(): SyncManifest {
-	return { lastSyncTime: "", hashes: {} };
 }
 
 describe("SyncOrchestrator", () => {
