@@ -301,7 +301,7 @@ export async function requireServiceAuth(requiredPermission: Permission) {
   
   if (!userId) {
     return NextResponse.json(
-      { error: 'Unauthorized' },
+      { error: 'Unauthorized', message: 'Authentication required' },
       { status: 401 }
     );
   }
@@ -310,7 +310,7 @@ export async function requireServiceAuth(requiredPermission: Permission) {
   
   if (!role || !hasPermission(role as UserRole, requiredPermission)) {
     return NextResponse.json(
-      { error: 'Forbidden' },
+      { error: 'Forbidden', message: 'Insufficient permissions' },
       { status: 403 }
     );
   }
@@ -348,7 +348,7 @@ export async function GET(request: Request) {
   } catch (error) {
     console.error('Failed to fetch courses:', error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: 'InternalServerError', message: 'Failed to fetch courses' },
       { status: 500 }
     );
   }
@@ -389,7 +389,7 @@ export async function GET(
     
     if (!course) {
       return NextResponse.json(
-        { error: 'Course not found' },
+        { error: 'NotFound', message: 'Course not found' },
         { status: 404 }
       );
     }
@@ -398,7 +398,7 @@ export async function GET(
   } catch (error) {
     console.error('Failed to fetch course:', error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: 'InternalServerError', message: 'Failed to fetch course' },
       { status: 500 }
     );
   }
@@ -436,7 +436,7 @@ export async function GET(
     
     if (!participation) {
       return NextResponse.json(
-        { error: 'Participation not found' },
+        { error: 'NotFound', message: 'Participation not found' },
         { status: 404 }
       );
     }
@@ -445,7 +445,7 @@ export async function GET(
   } catch (error) {
     console.error('Failed to fetch participation:', error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: 'InternalServerError', message: 'Failed to fetch participation' },
       { status: 500 }
     );
   }
@@ -489,14 +489,14 @@ export async function PUT(
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
-        { error: 'Invalid request data', details: error.errors },
+        { error: 'BadRequest', message: 'Invalid request data', details: error.errors },
         { status: 400 }
       );
     }
     
     console.error('Failed to update participation result:', error);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: 'InternalServerError', message: 'Failed to update participation result' },
       { status: 500 }
     );
   }
@@ -566,8 +566,8 @@ export async function GET(request: Request) {
   const rateLimit = await checkRateLimit(`service:${userId}`);
   if (!rateLimit.success) {
     return NextResponse.json(
-      { error: 'Rate limit exceeded' },
-      { 
+      { error: 'TooManyRequests', message: 'Rate limit exceeded' },
+      {
         status: 429,
         headers: {
           'X-RateLimit-Limit': rateLimit.limit.toString(),
