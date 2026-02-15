@@ -33,6 +33,7 @@ export const rolePermissions: Record<UserRole, Permission[]> = {
   ],
   [UserRole.ApiClient]: [
     'read:courses',
+    'read:bookings',
     'read:participations',
     'write:participation-results',
     // Allow limited user lookup for correlation without broader user management

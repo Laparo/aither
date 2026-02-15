@@ -3,6 +3,7 @@
 // Handles service authentication token for service-to-service communication
 // ---------------------------------------------------------------------------
 
+import { clerkClient } from "@clerk/nextjs/server";
 import { loadConfig } from "../config";
 
 interface CachedToken {
@@ -82,42 +83,43 @@ export async function getServiceToken(): Promise<string> {
 
 /**
  * Generate a service token for Hemera API authentication.
- * 
- * For service-to-service (M2M) authentication, we use the Clerk secret key directly
- * as the bearer token. This is the recommended approach for backend services and avoids
- * creating unnecessary user sessions.
- * 
- * The Clerk secret key has the format: sk_test_... or sk_live_...
- * This key should be used as: Authorization: Bearer <secret_key>
+ *
+ * Uses Clerk's sign-in token approach to mint short-lived JWTs for service-to-service
+ * authentication. This avoids creating persistent sessions and follows least-privilege
+ * principles. The token is generated using a JWT template configured in Clerk.
+ *
+ * The JWT template should be named 'hemera-api' and configured in the Clerk Dashboard.
  */
 async function generateServiceToken(): Promise<string> {
 	try {
-		// Get the Clerk secret key from environment
-		const secretKey = process.env.CLERK_SECRET_KEY;
-		if (!secretKey) {
-			throw new Error('CLERK_SECRET_KEY is not set in environment variables');
+		// Get the service user ID from environment
+		const serviceUserId = process.env.CLERK_SERVICE_USER_ID;
+		if (!serviceUserId) {
+			throw new Error('CLERK_SERVICE_USER_ID is not set in environment variables');
 		}
 
-		// Validate the secret key format
-		if (!secretKey.startsWith('sk_test_') && !secretKey.startsWith('sk_live_')) {
-			throw new Error(
-				`Invalid CLERK_SECRET_KEY format. Expected format: sk_test_... or sk_live_..., ` +
-				`got: ${redact(secretKey)}`
-			);
+		// Mint a short-lived JWT using Clerk's sign-in token mechanism
+		// This creates a token that can be used to authenticate as the service user
+		const client = await clerkClient();
+		const signInToken = await client.signInTokens.createSignInToken({
+			userId: serviceUserId,
+			expiresInSeconds: 15 * 60, // 15 minutes
+		});
+
+		if (!signInToken?.token) {
+			throw new Error('Failed to mint JWT: no token returned from Clerk');
 		}
 
-		// For service-to-service authentication, the Clerk secret key IS the token
-		// No need to create sessions or call additional APIs
-		return secretKey;
+		return signInToken.token;
 	} catch (error) {
 		// Redact sensitive details from error logs
 		const safeMessage =
 			error instanceof Error ? error.message : "Unknown error";
 		console.error(
-			`[service-token] Failed to generate service token: ${safeMessage}`,
+			`[service-token] Failed to mint service JWT from Clerk: ${safeMessage}`,
 		);
 		throw new Error(
-			"Service token generation failed. Check Clerk configuration and CLERK_SECRET_KEY.",
+			"Service token generation failed. Check Clerk configuration and CLERK_SERVICE_USER_ID.",
 		);
 	}
 }
