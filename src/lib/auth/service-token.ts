@@ -1,9 +1,8 @@
 // ---------------------------------------------------------------------------
 // Service Token Management for Hemera API
-// Handles JWT token caching and refresh for service-to-service communication
+// Handles service authentication token for service-to-service communication
 // ---------------------------------------------------------------------------
 
-import { clerkClient } from "@clerk/nextjs/server";
 import { loadConfig } from "../config";
 
 interface CachedToken {
@@ -28,22 +27,23 @@ function redact(value: unknown): string {
  * Validate that a token is non-empty and structurally valid.
  * Throws a descriptive error if the token is invalid.
  */
-function validateToken(token: string, source: "cache" | "clerk"): void {
+function validateToken(token: string, source: "cache" | "generated"): void {
 	if (!token || typeof token !== "string" || token.trim().length === 0) {
 		// Clear cache to prevent returning stale invalid tokens
 		tokenCache.delete("hemera-service-token");
 		throw new Error(
 			`Service token validation failed (source: ${source}): token is empty or invalid. ` +
-				"Check CLERK_SERVICE_USER_ID and CLERK_SECRET_KEY configuration.",
+				"Check CLERK_SECRET_KEY configuration.",
 		);
 	}
 }
 
 /**
  * Get a valid service token for Hemera API access.
- * Automatically handles caching and refresh.
+ * For service-to-service authentication, we use the Clerk secret key directly.
+ * This is the recommended approach for backend M2M (machine-to-machine) communication.
  *
- * @throws {Error} If config is missing, token generation fails, or token is invalid.
+ * @throws {Error} If config is missing or token generation fails.
  */
 export async function getServiceToken(): Promise<string> {
 	const cacheKey = "hemera-service-token";
@@ -62,21 +62,14 @@ export async function getServiceToken(): Promise<string> {
 	} catch (error) {
 		throw new Error(
 			"Service token generation failed: environment configuration is invalid. " +
-				"Ensure CLERK_SERVICE_USER_ID and CLERK_SECRET_KEY are set.",
+				"Ensure CLERK_SECRET_KEY is set.",
 		);
 	}
 
-	if (!config.CLERK_SERVICE_USER_ID || config.CLERK_SERVICE_USER_ID.trim().length === 0) {
-		throw new Error(
-			"Service token generation failed: CLERK_SERVICE_USER_ID is missing or empty. " +
-				"Set it in .env or environment variables.",
-		);
-	}
-
-	const token = await obtainTokenFromClerk(config.CLERK_SERVICE_USER_ID);
+	const token = await generateServiceToken();
 
 	// Validate before caching
-	validateToken(token, "clerk");
+	validateToken(token, "generated");
 
 	// Cache with 15-minute expiration
 	tokenCache.set(cacheKey, {
@@ -88,94 +81,43 @@ export async function getServiceToken(): Promise<string> {
 }
 
 /**
- * Obtain a JWT token from Clerk for the service user.
- * Logs are redacted to prevent leaking credentials.
+ * Generate a service token for Hemera API authentication.
+ * 
+ * For service-to-service (M2M) authentication, we use the Clerk secret key directly
+ * as the bearer token. This is the recommended approach for backend services and avoids
+ * creating unnecessary user sessions.
+ * 
+ * The Clerk secret key has the format: sk_test_... or sk_live_...
+ * This key should be used as: Authorization: Bearer <secret_key>
  */
-async function obtainTokenFromClerk(userId: string): Promise<string> {
+async function generateServiceToken(): Promise<string> {
 	try {
-		// Get Clerk client instance
-		const clerk = await clerkClient();
-
-		// Verify the service user exists in Clerk
-		const user = await clerk.users.getUser(userId);
-		if (!user) {
-			throw new Error(
-				`Service user not found in Clerk (userId: ${redact(userId)}). ` +
-					"Verify CLERK_SERVICE_USER_ID points to a valid Clerk user.",
-			);
-		}
-
-		// For service-to-service authentication in Clerk v6+, we need to use the Backend API
-		// to create a session token. The SessionAPI in v6+ doesn't have a create method,
-		// so we use the Backend API directly via fetch.
-		
 		// Get the Clerk secret key from environment
 		const secretKey = process.env.CLERK_SECRET_KEY;
 		if (!secretKey) {
 			throw new Error('CLERK_SECRET_KEY is not set in environment variables');
 		}
 
-		// Create a session using Clerk's Backend API
-		const response = await fetch('https://api.clerk.com/v1/sessions', {
-			method: 'POST',
-			headers: {
-				'Authorization': `Bearer ${secretKey}`,
-				'Content-Type': 'application/json',
-			},
-			body: JSON.stringify({
-				user_id: user.id,
-			}),
-		});
-
-		if (!response.ok) {
-			const errorText = await response.text();
+		// Validate the secret key format
+		if (!secretKey.startsWith('sk_test_') && !secretKey.startsWith('sk_live_')) {
 			throw new Error(
-				`Failed to create session via Clerk API (status ${response.status}): ${errorText}`
+				`Invalid CLERK_SECRET_KEY format. Expected format: sk_test_... or sk_live_..., ` +
+				`got: ${redact(secretKey)}`
 			);
 		}
 
-		const sessionData = await response.json();
-		if (!sessionData?.id) {
-			throw new Error('Session creation succeeded but no session ID was returned');
-		}
-
-		// Get the session token using the session ID
-		const tokenResponse = await fetch(
-			`https://api.clerk.com/v1/sessions/${sessionData.id}/tokens/hemera-api`,
-			{
-				method: 'POST',
-				headers: {
-					'Authorization': `Bearer ${secretKey}`,
-					'Content-Type': 'application/json',
-				},
-			}
-		);
-
-		if (!tokenResponse.ok) {
-			const errorText = await tokenResponse.text();
-			throw new Error(
-				`Failed to get session token via Clerk API (status ${tokenResponse.status}): ${errorText}`
-			);
-		}
-
-		const tokenData = await tokenResponse.json();
-		const jwt = tokenData?.jwt;
-		
-		if (!jwt || typeof jwt !== 'string') {
-			throw new Error('Failed to extract JWT from Clerk API response');
-		}
-
-		return jwt;
+		// For service-to-service authentication, the Clerk secret key IS the token
+		// No need to create sessions or call additional APIs
+		return secretKey;
 	} catch (error) {
 		// Redact sensitive details from error logs
 		const safeMessage =
 			error instanceof Error ? error.message : "Unknown error";
 		console.error(
-			`[service-token] Failed to obtain token for userId=${redact(userId)}: ${safeMessage}`,
+			`[service-token] Failed to generate service token: ${safeMessage}`,
 		);
 		throw new Error(
-			`Service token generation failed for userId=${redact(userId)}. ` +
-				"Check Clerk configuration and service user setup.",
+			"Service token generation failed. Check Clerk configuration and CLERK_SECRET_KEY.",
 		);
 	}
 }
