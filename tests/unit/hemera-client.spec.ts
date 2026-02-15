@@ -214,7 +214,7 @@ describe("HemeraClient", () => {
 	describe("authentication", () => {
 		it("sends Authorization Bearer header with token from getToken", async () => {
 			const mockFetch = createMockFetch([{ status: 200, body: [{ id: "1", name: "Test" }] }]);
-			const mockGetToken = vi.fn(async () => "mock-token-123");
+			const mockGetToken = vi.fn(async () => VALID_TEST_TOKEN);
 			const client = createClient(mockFetch, { getToken: mockGetToken });
 
 			await client.get("/seminars", TestArraySchema);
@@ -224,7 +224,7 @@ describe("HemeraClient", () => {
 			const callArgs = mockFetch.mock.calls[0];
 			expect(callArgs[0]).toBe("https://api.hemera.academy/seminars");
 			expect(callArgs[1]?.headers).toMatchObject({
-				Authorization: "Bearer mock-token-123",
+				Authorization: `Bearer ${VALID_TEST_TOKEN}`,
 			});
 		});
 
