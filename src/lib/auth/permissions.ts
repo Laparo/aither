@@ -10,8 +10,7 @@ export type Permission =
 	| "write:participation-results"
 	| "read:users"
 	| "manage:courses"
-	| "manage:users"
-	| string;
+	| "manage:users";
 
 // Consolidated role type - single source of truth
 export type Role = "admin" | "api-client" | "instructor" | "participant";

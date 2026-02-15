@@ -51,7 +51,7 @@ If the token expires, Aither automatically refreshes it and retries the request.
 
 ### Q4: How is token caching implemented?
 
-Answer: Token caching follows a safe pattern with retry-on-expiry. Example (in-memory for single-instance; use Redis/Vercel KV in production):
+**Answer**: Token caching follows a safe pattern with retry-on-expiry. Example (in-memory for single-instance; use Redis/Vercel KV in production):
 
 ```typescript
 const tokenCache = new Map<string, { token: string; expiresAt: number }>();

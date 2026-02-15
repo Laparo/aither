@@ -18,13 +18,19 @@ $ARGUMENTS
 
 You **MUST** consider the user input before proceeding (if not empty).
 
+Note: The text the user typed after `/speckit.specify` is the feature description and is always available to the workflow.
+
+- `$ARGUMENTS` behaviour: `$ARGUMENTS` is a template placeholder that will be substituted with the exact description the user provided. When rendering templates or invoking helper scripts, substitute `$ARGUMENTS` with the user's description value.
+- Empty-invocation rule: If the user invoked `/speckit.specify` with no arguments, `$ARGUMENTS` will be empty; treat this as "no description provided" and follow the error behavior defined below. `$ARGUMENTS` should remain the literal empty string only in that case — it must not be treated as a literal placeholder when a description exists.
+- Substitution guarantee: Consumers of this workflow may assume the feature description is available (either as a non-empty string in `$ARGUMENTS` or empty when omitted). Do not ask the user to repeat the description unless `$ARGUMENTS` is empty.
+
 ## Outline
 
 The text the user typed after `/speckit.specify` in the triggering message **is** the feature description. Assume you always have it available in this conversation even if `$ARGUMENTS` appears literally below. Do not ask the user to repeat it unless they provided an empty command.
 
 Given that feature description, do this:
 
-1. **Generate a concise short name** (2-4 words) for the branch:
+   1. **Generate a concise short name** (2-4 words) for the branch:
    - Analyze the feature description and extract the most meaningful keywords
    - Create a 2-4 word short name that captures the essence of the feature
    - Use action-noun format when possible (e.g., "add-user-auth", "fix-payment-bug")
@@ -49,15 +55,28 @@ Given that feature description, do this:
       - Local branches: `git branch | grep -E '^[* ]*[0-9]+-<short-name>$'`
       - Specs directories: Check for directories matching `specs/[0-9]+-<short-name>`
 
+      Note: Replace the `<short-name>` placeholder with the actual short name (e.g., `user-auth`). Example shell pattern using a variable:
+
+      ```bash
+      SHORT=user-auth
+      git ls-remote --heads origin | grep -E "refs/heads/[0-9]+-${SHORT}$"
+      git branch | grep -E "^[* ]*[0-9]+-${SHORT}$"
+      ls -d specs/[0-9]+-${SHORT}
+      ```
+
+      Guidance: `<short-name>` is a placeholder you must replace with the generated short name. If you need a more permissive match use a concrete regex that restricts allowed characters (for example: `^[0-9]+-[a-z0-9-]+$`), or set the short name in a shell variable as shown above (`SHORT=feature-x`) and reuse it to avoid manual substitution mistakes.
+
    c. Determine the next available number:
       - Extract all numbers from all three sources
       - Find the highest number N
       - Use N+1 for the new branch number
 
-   d. Run the script `.specify/scripts/bash/create-new-feature.sh --json "$ARGUMENTS"` with the calculated number and short-name:
-      - Pass `--number N+1` and `--short-name "your-short-name"` along with the feature description
-      - Bash example: `.specify/scripts/bash/create-new-feature.sh --json "$ARGUMENTS" --number 5 --short-name "user-auth" "Add user authentication"`
-      - PowerShell example (invoke via WSL/Git Bash): `bash -lc '.specify/scripts/bash/create-new-feature.sh --json "$ARGUMENTS" --number 5 --short-name "user-auth" "Add user authentication"'`
+   d. Run the script `.specify/scripts/bash/create-new-feature.sh --json "$ARGUMENTS"` with the calculated number and short-name.
+      - Parameter rule: `$ARGUMENTS` must include the feature description (and any JSON flags). Do NOT pass the description again as a separate trailing positional argument. The script invocation must use `--json "$ARGUMENTS" --number <N> --short-name "<short-name>"` so that the description is consumed from the JSON payload consistently.
+      - Pass `--number N+1` and `--short-name "your-short-name"` and include the feature description inside `$ARGUMENTS` (do not repeat it as a separate trailing positional argument).
+      - Bash example: `.specify/scripts/bash/create-new-feature.sh --json "$ARGUMENTS" --number 5 --short-name "user-auth"`
+      - PowerShell example (invoke via WSL/Git Bash): `bash -lc '.specify/scripts/bash/create-new-feature.sh --json "$ARGUMENTS" --number 5 --short-name "user-auth"'`
+      - Example (wrong): `.specify/scripts/bash/create-new-feature.sh --number 5 --short-name "user-auth" "Add user authentication"` ← do not do this. The description must be inside `$ARGUMENTS`.
 
    **IMPORTANT**:
    - Check all three sources (remote branches, local branches, specs directories) to find the highest number
@@ -73,7 +92,7 @@ Given that feature description, do this:
 4. Follow this execution flow:
 
     1. Parse user description from Input
-       If empty: ERROR "No feature description provided"
+       If empty: write an explicit error to logs/output ("No feature description provided"), log the invocation context (user, timestamp, command), set a non-zero exit code, and abort the workflow immediately (throw/exit). Present a clear message asking the user to re-run the command with a description. Do NOT proceed or attempt recovery automatically.
     2. Extract key concepts from description
        Identify: actors, actions, data, constraints
     3. For unclear aspects:
@@ -85,7 +104,7 @@ Given that feature description, do this:
        - **LIMIT: Maximum 3 [NEEDS CLARIFICATION] markers total**
        - Prioritize clarifications by impact: scope > security/privacy > user experience > technical details
     4. Fill User Scenarios & Testing section
-       If no clear user flow: ERROR "Cannot determine user scenarios"
+       If no clear user flow: write an explicit error to logs/output ("Cannot determine user scenarios"), log context (spec path, feature description), set a non-zero exit code and abort the workflow immediately. Do not auto-guess user flows; instead mark the spec as failed and prompt the user for clarification.
     5. Generate Functional Requirements
        Each requirement must be testable
        Use reasonable defaults for unspecified details (document assumptions in Assumptions section)
@@ -145,7 +164,7 @@ Given that feature description, do this:
 
    c. **Handle Validation Results**:
 
-      - **If all items pass**: Mark checklist complete and proceed to step 6
+      - **If all items pass**: Mark checklist complete and proceed to step 7
 
       - **If items fail (excluding [NEEDS CLARIFICATION])**:
         1. List the failing items and specific issues

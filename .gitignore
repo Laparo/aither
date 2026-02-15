@@ -15,8 +15,9 @@ out/
 .env.backup
 .env.local.backup
 
-# Python
-/.venv
+# Python (consolidated)
+# Prefer relative .venv/ for local virtual environments; include common build/test artifacts
+.venv/
 venv/
 __pycache__/
 *.py[cod]
@@ -24,8 +25,9 @@ __pycache__/
 *.pyd
 .Python
 python-env/
+*.egg-info/
+.eggs/
 .pytest_cache/
-
 
 # IDE
 .vscode/
@@ -58,17 +60,7 @@ next-env.d.ts
 # Generated HTML output
 output/
 
-# Python
-.venv/
-__pycache__/
-*.py[cod]
-*.pyo
-*.pyd
-.Python
-python-env/
-*.egg-info/
-.eggs/
-.pytest_cache/
+// (duplicate Python block removed — consolidated above)
 
 # Misc
 .qodo/

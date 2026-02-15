@@ -1,13 +1,13 @@
----
 description: Execute the implementation planning workflow using the plan template to generate design artifacts.
-handoffs: 
-  - label: Create Tasks
-    agent: speckit.tasks
-    prompt: Break the plan into tasks
-    send: true
-  - label: Create Checklist
-    agent: speckit.checklist
-    prompt: Create a checklist for the following domain...
+handoffs:
+   - label: Create Tasks
+      agent: speckit.tasks
+      prompt: "Break the plan into discrete, testable tasks suitable for issue creation. Include task title, short description, estimated effort (S/M/L), and acceptance criteria."
+      send: true
+   - label: Create Checklist
+      agent: speckit.checklist
+      prompt: "Create a checklist for the following domain <DOMAIN>. Produce 8-12 checklist items divided into three sections: 'tasks', 'prerequisites', and 'verification steps'. For each checklist item include a one-line description, any input required, and an example where helpful. Constrain items to be actionable and unambiguous."
+      send: true
 ---
 
 ## User Input
@@ -104,4 +104,4 @@ You **MUST** consider the user input before proceeding (if not empty).
 ## Key rules
 
 - Use absolute paths
-- ERROR on gate failures or unresolved clarifications
+- ERROR on gate failures or unresolved clarifications ~

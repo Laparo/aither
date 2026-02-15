@@ -21,12 +21,57 @@ You **MUST** consider the user input before proceeding (if not empty).
 
 ## Outline
 
-1. **Setup**: Run `.specify/scripts/bash/check-prerequisites.sh --json` from repo root and parse FEATURE_DIR and AVAILABLE_DOCS list. All paths must be absolute. For single quotes in args like "I'm Groot", use escape syntax: e.g 'I'\''m Groot' (or double-quote if possible: "I'm Groot").
+1. **Setup**: Run `.specify/scripts/bash/check-prerequisites.sh --json` from repo root and parse `FEATURE_DIR` and `AVAILABLE_DOCS` list. All paths must be absolute.
 
-2. **Load design documents**: Read from FEATURE_DIR:
-   - **Required**: plan.md (tech stack, libraries, structure), spec.md (user stories with priorities)
-   - **Optional**: data-model.md (entities), contracts/ (API endpoints), research.md (decisions), quickstart.md (test scenarios)
-   - Note: Not all projects have all documents. Generate tasks based on what's available.
+    - Script invocation rules (robust handling):
+       - Verify the script exists and is executable before running. Example check:
+
+          ```bash
+          SCRIPT=.specify/scripts/bash/check-prerequisites.sh
+          if [ ! -f "$SCRIPT" ] || [ ! -x "$SCRIPT" ]; then
+             echo "ERROR: prerequisite script not found or not executable: $SCRIPT" >&2
+             exit 2
+          fi
+          ```
+
+       - Capture stdout/stderr and exit code when invoking the script and include them in logs. Example:
+
+          ```bash
+          OUT=$(mktemp)
+          ERR=$(mktemp)
+          "$SCRIPT" --json >"$OUT" 2>"$ERR" || EXIT=$?
+          EXIT=${EXIT:-0}
+          if [ $EXIT -ne 0 ]; then
+             echo "ERROR: $SCRIPT failed (exit=$EXIT). stderr:" >&2
+             cat "$ERR" >&2
+             exit $EXIT
+          fi
+          ```
+
+       - Validate the returned JSON before parsing. Prefer using `jq` or a simple Node/JS JSON parse to fail fast. Example (jq):
+
+          ```bash
+          if ! jq empty "$OUT" >/dev/null 2>&1; then
+             echo "ERROR: Invalid JSON returned by $SCRIPT" >&2
+             echo "Stdout:" >&2; cat "$OUT" >&2
+             echo "Stderr:" >&2; cat "$ERR" >&2
+             exit 3
+          fi
+          ```
+
+       - When parsing, always check required keys exist (`FEATURE_DIR`, `AVAILABLE_DOCS`) and are of the expected type (string/array). If keys are missing or invalid, fail fast with a clear message that includes the script path, exit code (if non-zero), and stderr contents for diagnostics.
+
+    - Quoting recommendation: Prefer double quotes for user-provided descriptions when safe: `"I'm Groot"`. Use single-quote escaping (`'I'\''m Groot'`) only as a last-resort when double quotes cannot be used.
+
+2. **Load design documents**: Read from `FEATURE_DIR`:
+   - **Required**: `plan.md` (tech stack, libraries, structure), `spec.md` (user stories with priorities)
+   - **Optional**: `data-model.md` (entities), `contracts/` (API endpoints), `research.md` (decisions), `quickstart.md` (test scenarios)
+   - Validation: After `check-prerequisites.sh` reports `FEATURE_DIR`, ensure required files exist. If `plan.md` or `spec.md` is missing, abort generation or create a clear blocking task in `tasks.md` that lists the missing files and instructions to add them. Example behavior:
+
+     - If both `plan.md` and `spec.md` exist: continue normally.
+     - If one or both are missing: create `tasks.md` with a top-level blocking task (T000) that enumerates the missing files and provides exact instructions (paths and templates) to produce them, then stop further task generation until the missing artifacts are provided.
+
+   - When reporting missing files, reference `FEATURE_DIR`, `plan.md`, `spec.md`, and `tasks.md` explicitly so reviewers can locate and remediate the gap.
 
 3. **Execute task generation workflow**:
    - Load plan.md and extract tech stack, libraries, project structure

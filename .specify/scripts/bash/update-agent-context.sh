@@ -109,6 +109,17 @@ log_warning() {
     echo "WARNING: $1" >&2
 }
 
+# Print valid agents derived from VALID_AGENTS variable
+print_valid_agents() {
+    # Replace pipe separators with commas for human-readable display
+    echo "Valid agents: ${VALID_AGENTS//|/, }"
+}
+
+print_usage() {
+    echo "Usage: $0 [agent_type]"
+    print_valid_agents
+}
+
 # Cleanup function for temporary files
 cleanup() {
     local exit_code=$?
@@ -642,7 +653,7 @@ update_specific_agent() {
             ;;
         *)
             log_error "Unknown agent type '$agent_type'"
-            log_error "Expected: ${VALID_AGENTS}"
+            print_usage
             exit 1
             ;;
     esac
