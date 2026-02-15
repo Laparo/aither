@@ -30,6 +30,6 @@ describe("requireAdmin", () => {
 		expect(res.status).toBe(200);
 		// Should include claims for downstream use
 		const body3 = res.body as unknown as { sessionClaims?: { metadata?: { role?: string } } };
-		expect(body3.sessionClaims?.metadata.role).toBe("admin");
+		expect(body3.sessionClaims?.metadata?.role).toBe("admin");
 	});
 });

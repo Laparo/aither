@@ -19,6 +19,9 @@ components:
           type: string
         message:
           type: string
+      required:
+        - error
+        - message
     CourseSummary:
       type: object
       properties:
@@ -33,6 +36,10 @@ components:
             format: date-time
         participantCount:
           type: integer
+      required:
+        - courseId
+        - title
+        - dates
     CourseDetail:
       type: object
       properties:
@@ -49,6 +56,11 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/ParticipationDetail'
+      required:
+        - courseId
+        - title
+        - dates
+        - participations
     ParticipationDetail:
       type: object
       description: "PII excluded by policy; only pseudonymous identifiers."
@@ -68,6 +80,10 @@ components:
           type: string
           nullable: true
           maxLength: 2048
+      required:
+        - id
+        - courseId
+        - userId
     CourseListResponse:
       type: object
       properties:
@@ -81,6 +97,11 @@ components:
           type: integer
         total:
           type: integer
+      required:
+        - items
+        - page
+        - pageSize
+        - total
     UpdateResultRequest:
       type: object
       properties:
@@ -89,7 +110,9 @@ components:
           enum: [passed, failed, incomplete, pending]
         resultNotes:
           type: string
-      required: []
+          maxLength: 2048
+      required:
+        - resultOutcome
 paths:
   /api/service/courses:
     get:

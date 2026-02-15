@@ -26,7 +26,10 @@ interface CachedToken {
   expiresAt: Date;
 }
 
-// In-memory token cache (use Redis/Vercel KV for horizontal scaling)
+// In-memory token cache (DEV-ONLY).
+// For production, replace this with a shared store such as Vercel KV, Upstash Redis, or similar.
+// The in-memory `Map` works for local development and CI tests but will not work across
+// multiple instances or serverless cold starts.
 const tokenCache = new Map<string, CachedToken>();
 
 /**
@@ -69,6 +72,9 @@ async function obtainTokenFromClerk(userId: string): Promise<string> {
     return minted.jwt;
   } catch (error) {
     console.error('Failed to mint service JWT from Clerk:', error);
+    // Surface network/5xx errors to callers so they can be retried/monitored.
+    const status = (error as any)?.status;
+    if (!status || status >= 500) throw error;
     throw new Error('Service token generation failed');
   }
 }
@@ -156,10 +162,10 @@ function createMockFetch(responses: Array<{ status: number; body: unknown }>) {
       ok: response.status >= 200 && response.status < 300,
       status: response.status,
       statusText: 'OK',
-      headers: new Map(),
+      headers: new Headers(),
       json: async () => response.body,
       text: async () => JSON.stringify(response.body),
-    };
+    } as unknown as Response;
   });
 }
 
@@ -175,16 +181,13 @@ describe('HemeraClient', () => {
     });
     
     await client.getServiceCourses();
-    
+
     expect(mockGetToken).toHaveBeenCalled();
-    expect(mockFetch).toHaveBeenCalledWith(
-      expect.any(String),
-      expect.objectContaining({
-        headers: expect.objectContaining({
-          Authorization: 'Bearer mock-token',
-        }),
-      })
-    );
+    // Verify the Authorization header was passed to fetch
+    const firstCall = mockFetch.mock.calls[0];
+    const options = firstCall[1];
+    const hdrs = options?.headers as Headers | undefined;
+    expect(hdrs.get('Authorization')).toBe('Bearer mock-token');
   });
   
   // Add more tests...
@@ -192,6 +195,8 @@ describe('HemeraClient', () => {
 ```
 
 ### Step 4: Environment Configuration
+
+Security note: Never commit `.env.local` or other secret-containing files to version control. Use your cloud provider's secret manager, Vercel environment variables, or another secure store for production secrets. The examples below are for local development only.
 
 Update `.env.local` (create if it doesn't exist):
 
@@ -224,69 +229,30 @@ Create `lib/auth/user-role.ts`:
 ```typescript
 import { clerkClient } from '@clerk/nextjs/server';
 
-export async function getUserRole(userId: string): Promise<string | null> {
+// Return the canonical `Role` string or `null` if the user has no role set.
+export async function getUserRole(userId: string): Promise<'admin' | 'api-client' | 'instructor' | 'participant' | null> {
   if (!userId) return null;
-  
+
   try {
     const user = await clerkClient.users.getUser(userId);
-    return (user?.publicMetadata?.role as string) || null;
+    const role = (user?.publicMetadata?.role as string) || null;
+    if (!role) return null;
+    if (['admin', 'api-client', 'instructor', 'participant'].includes(role)) return role as any;
+    return null;
   } catch (error) {
     console.error('Failed to get user role:', error);
+    // If Clerk returned a server error or network error, rethrow so callers can handle/monitor it.
+    const status = (error as any)?.status;
+    if (!status || status >= 500) throw error;
+    // Otherwise treat as missing role (non-fatal)
     return null;
   }
 }
 ```
 
-### Step 2: Extend Permission System
+### Permissions (single canonical definition)
 
-Update `lib/auth/permissions.ts`:
-
-```typescript
-export enum UserRole {
-  ADMIN = 'admin',
-  INSTRUCTOR = 'instructor',
-  PARTICIPANT = 'participant',
-  API_CLIENT = 'api-client', // New role
-}
-
-export enum Permission {
-  // Existing permissions...
-  READ_COURSES = 'read:courses',
-  READ_BOOKINGS = 'read:bookings',
-  READ_PARTICIPATIONS = 'read:participations',
-  WRITE_PARTICIPATION_RESULTS = 'write:participation-results',
-  MANAGE_COURSES = 'manage:courses',
-  MANAGE_USERS = 'manage:users',
-}
-
-export const rolePermissions: Record<UserRole, Permission[]> = {
-  [UserRole.ADMIN]: [
-    // All permissions
-    Permission.READ_COURSES,
-    Permission.READ_BOOKINGS,
-    Permission.READ_PARTICIPATIONS,
-    Permission.WRITE_PARTICIPATION_RESULTS,
-    Permission.MANAGE_COURSES,
-    Permission.MANAGE_USERS,
-  ],
-  [UserRole.API_CLIENT]: [
-    // Limited permissions for service user
-    Permission.READ_COURSES,
-    Permission.READ_BOOKINGS,
-    Permission.READ_PARTICIPATIONS,
-    Permission.WRITE_PARTICIPATION_RESULTS,
-  ],
-  // ... other roles
-};
-
-export function hasPermission(role: UserRole, permission: Permission): boolean {
-  return rolePermissions[role]?.includes(permission) ?? false;
-}
-```
-
-### Step 3: Update Permissions Module
-
-Update `lib/auth/permissions.ts` to consolidate RBAC definitions:
+Update `lib/auth/permissions.ts` to provide a single canonical RBAC definition used throughout the codebase:
 
 ```typescript
 // ---------------------------------------------------------------------------
@@ -301,8 +267,7 @@ export type Permission =
   | 'write:participation-results'
   | 'read:users'
   | 'manage:courses'
-  | 'manage:users'
-  | string;
+  | 'manage:users';
 
 // Consolidated role type - single source of truth
 export type Role = 'admin' | 'api-client' | 'instructor' | 'participant';
@@ -582,6 +547,12 @@ export async function PUT(
     const body = await request.json();
     const data = UpdateResultSchema.parse(body);
     
+    // Ensure the participation exists before updating to provide a clear 404.
+    const existing = await prisma.courseParticipation.findUnique({ where: { id: params.id } });
+    if (!existing) {
+      return createErrorResponse(404, 'Not Found', 'Participation not found');
+    }
+
     const participation = await prisma.courseParticipation.update({
       where: { id: params.id },
       data: {
@@ -657,6 +628,8 @@ Update service endpoints to use rate limiting:
 
 ```typescript
 import { checkRateLimit } from '@/lib/rate-limit';
+import { auth } from '@clerk/nextjs/server';
+import { NextResponse } from 'next/server';
 
 export async function GET(request: Request) {
   const { userId } = await auth();
