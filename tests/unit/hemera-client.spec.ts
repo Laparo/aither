@@ -34,11 +34,11 @@ const VALID_TEST_TOKEN =
 
 function createClient(
 	fetchFn: ReturnType<typeof createMockFetch>,
-	overrides?: Partial<{ maxRetries: number; rateLimit: number }>,
+	overrides?: Partial<{ maxRetries: number; rateLimit: number; getToken?: () => Promise<string> }>,
 ) {
 	return new HemeraClient({
 		baseUrl: "https://api.hemera.academy",
-		getToken: async () => VALID_TEST_TOKEN,
+		getToken: overrides?.getToken ?? (async () => VALID_TEST_TOKEN),
 		allowedPathPrefix: "/",
 		requiredRole: undefined,
 		maxRetries: overrides?.maxRetries ?? 1,
@@ -212,12 +212,14 @@ describe("HemeraClient", () => {
 	// ── Auth Header ──────────────────────────────────────────────────────
 
 	describe("authentication", () => {
-		it("sends Authorization Bearer header with API key", async () => {
+		it("sends Authorization Bearer header with token from getToken", async () => {
 			const mockFetch = createMockFetch([{ status: 200, body: [{ id: "1", name: "Test" }] }]);
-			const client = createClient(mockFetch);
+			const mockGetToken = vi.fn(async () => VALID_TEST_TOKEN);
+			const client = createClient(mockFetch, { getToken: mockGetToken });
 
 			await client.get("/seminars", TestArraySchema);
 
+			expect(mockGetToken).toHaveBeenCalledTimes(1);
 			expect(mockFetch).toHaveBeenCalledTimes(1);
 			const callArgs = mockFetch.mock.calls[0];
 			expect(callArgs[0]).toBe("https://api.hemera.academy/seminars");

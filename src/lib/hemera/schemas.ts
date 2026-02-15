@@ -95,3 +95,31 @@ export const UserProfilesResponseSchema = z.array(UserProfileSchema);
 export const TextContentsResponseSchema = z.array(TextContentSchema);
 export const MediaAssetsResponseSchema = z.array(MediaAssetSchema);
 export const HtmlTemplatesResponseSchema = z.array(HtmlTemplateSchema);
+
+// --- Service API schemas ---
+
+/** Allowed values for participation result outcomes */
+export const ResultOutcomeEnum = z.enum(["passed", "failed", "incomplete", "pending"]);
+
+export type ResultOutcome = z.infer<typeof ResultOutcomeEnum>;
+
+export const ParticipationSchema = z.object({
+	id: z.string().min(1),
+	courseId: z.string().min(1),
+	userId: z.string().min(1),
+	resultOutcome: ResultOutcomeEnum.nullable(),
+	resultNotes: z.string().max(2000).nullable(),
+});
+
+export const CourseWithParticipantsSchema = SeminarSchema.extend({
+	participations: z.array(ParticipationSchema),
+});
+
+export const CoursesResponseSchema = z.array(CourseWithParticipantsSchema);
+export const ParticipationResponseSchema = ParticipationSchema;
+
+// --- Inferred types for service API ---
+
+export type Participation = z.infer<typeof ParticipationSchema>;
+export type CourseWithParticipants = z.infer<typeof CourseWithParticipantsSchema>;
+export type CoursesResponse = z.infer<typeof CoursesResponseSchema>;

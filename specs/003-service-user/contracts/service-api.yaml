@@ -1,0 +1,255 @@
+openapi: 3.0.3
+info:
+  title: Hemera Service API (Aither integration)
+  version: 1.0.0
+  description: OpenAPI contract for /api/service/* endpoints used by Aither service user
+servers:
+  - url: https://api.hemera.academy
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+    CourseSummary:
+      type: object
+      properties:
+        courseId:
+          type: string
+        title:
+          type: string
+        dates:
+          type: array
+          items:
+            type: string
+            format: date-time
+        participantCount:
+          type: integer
+    CourseDetail:
+      type: object
+      properties:
+        courseId:
+          type: string
+        title:
+          type: string
+        dates:
+          type: array
+          items:
+            type: string
+            format: date-time
+        participations:
+          type: array
+          items:
+            $ref: '#/components/schemas/ParticipationDetail'
+    ParticipationDetail:
+      type: object
+      description: "PII excluded by policy; only pseudonymous identifiers."
+      properties:
+        id:
+          type: string
+        courseId:
+          type: string
+        userId:
+          type: string
+          description: "Pseudonymous identifier; no name/email returned."
+        resultOutcome:
+          type: string
+          nullable: true
+          enum: [passed, failed, incomplete, pending]
+        resultNotes:
+          type: string
+          nullable: true
+          maxLength: 2048
+    CourseListResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CourseSummary'
+        page:
+          type: integer
+        pageSize:
+          type: integer
+        total:
+          type: integer
+    UpdateResultRequest:
+      type: object
+      properties:
+        resultOutcome:
+          type: string
+          enum: [passed, failed, incomplete, pending]
+        resultNotes:
+          type: string
+      required: []
+paths:
+  /api/service/courses:
+    get:
+      summary: List courses (service)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+        - in: query
+          name: pageSize
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CourseListResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/service/courses/{id}:
+    get:
+      summary: Get course detail
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CourseDetail'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/service/participations/{id}:
+    get:
+      summary: Get participation detail
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ParticipationDetail'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /api/service/participations/{id}/result:
+    put:
+      summary: Update participation result
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateResultRequest'
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ParticipationDetail'
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'

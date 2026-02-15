@@ -30,12 +30,12 @@
 #
 # 5. Multi-Agent Support
 #    - Handles agent-specific file paths and naming conventions
-#    - Supports: Claude, Gemini, Copilot, Cursor, Qwen, opencode, Codex, Windsurf, Kilo Code, Auggie CLI, Roo Code, CodeBuddy CLI, Qoder CLI, Amp, SHAI, or Amazon Q Developer CLI
+#    - Supports: Claude, Gemini, Copilot, Cursor, Qwen, opencode, Codex, Windsurf, Kilo Code, Auggie CLI, Roo Code, CodeBuddy CLI, Qoder CLI, Amp, SHAI, Amazon Q Developer CLI, or Antigravity
 #    - Can update single agents or all existing agent files
 #    - Creates default Claude file if no agent files exist
 #
 # Usage: ./update-agent-context.sh [agent_type]
-# Agent types: claude|gemini|copilot|cursor-agent|qwen|opencode|codex|windsurf|kilocode|auggie|shai|q|bob|qoder
+# Agent types: claude|gemini|copilot|cursor-agent|qwen|opencode|codex|windsurf|kilocode|auggie|shai|q|agy|bob|qoder
 # Leave empty to update all existing agent files
 
 set -e
@@ -58,6 +58,9 @@ eval $(get_feature_paths)
 NEW_PLAN="$IMPL_PLAN"  # Alias for compatibility with existing code
 AGENT_TYPE="${1:-}"
 
+# Centralized list of valid agent identifiers (used for usage/help and validation)
+VALID_AGENTS="claude|gemini|copilot|cursor-agent|qwen|opencode|codex|windsurf|kilocode|auggie|roo|codebuddy|qoder|amp|shai|q|agy|bob"
+
 # Agent-specific file paths  
 CLAUDE_FILE="$REPO_ROOT/CLAUDE.md"
 GEMINI_FILE="$REPO_ROOT/GEMINI.md"
@@ -74,6 +77,7 @@ QODER_FILE="$REPO_ROOT/QODER.md"
 AMP_FILE="$REPO_ROOT/AGENTS.md"
 SHAI_FILE="$REPO_ROOT/SHAI.md"
 Q_FILE="$REPO_ROOT/AGENTS.md"
+AGY_FILE="$REPO_ROOT/.agent/rules/specify-rules.md"
 BOB_FILE="$REPO_ROOT/AGENTS.md"
 
 # Template file
@@ -103,6 +107,17 @@ log_error() {
 
 log_warning() {
     echo "WARNING: $1" >&2
+}
+
+# Print valid agents derived from VALID_AGENTS variable
+print_valid_agents() {
+    # Replace pipe separators with commas for human-readable display
+    echo "Valid agents: ${VALID_AGENTS//|/, }"
+}
+
+print_usage() {
+    echo "Usage: $0 [agent_type]"
+    print_valid_agents
 }
 
 # Cleanup function for temporary files
@@ -630,12 +645,15 @@ update_specific_agent() {
         q)
             update_agent_file "$Q_FILE" "Amazon Q Developer CLI"
             ;;
+        agy)
+            update_agent_file "$AGY_FILE" "Antigravity"
+            ;;
         bob)
             update_agent_file "$BOB_FILE" "IBM Bob"
             ;;
         *)
             log_error "Unknown agent type '$agent_type'"
-            log_error "Expected: claude|gemini|copilot|cursor-agent|qwen|opencode|codex|windsurf|kilocode|auggie|roo|amp|shai|q|bob|qoder"
+            print_usage
             exit 1
             ;;
     esac
@@ -714,6 +732,11 @@ update_all_existing_agents() {
         update_agent_file "$Q_FILE" "Amazon Q Developer CLI"
         found_agent=true
     fi
+
+    if [[ -f "$AGY_FILE" ]]; then
+        update_agent_file "$AGY_FILE" "Antigravity"
+        found_agent=true
+    fi
     
     if [[ -f "$BOB_FILE" ]]; then
         update_agent_file "$BOB_FILE" "IBM Bob"
@@ -744,7 +767,7 @@ print_summary() {
     
     echo
 
-    log_info "Usage: $0 [claude|gemini|copilot|cursor-agent|qwen|opencode|codex|windsurf|kilocode|auggie|codebuddy|shai|q|bob|qoder]"
+    log_info "Usage: $0 [${VALID_AGENTS}]"
 }
 
 #==============================================================================

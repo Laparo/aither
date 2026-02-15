@@ -93,6 +93,8 @@ const EnvSchema = z
 		// Clerk Authentication
 		NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: z.string().min(1),
 		CLERK_SECRET_KEY: z.string().min(1),
+		CLERK_SERVICE_USER_ID: z.string().min(1),
+		CLERK_SERVICE_USER_EMAIL: z.string().email().optional(),
 
 		// SMTP Notifications
 		SMTP_HOST: z.string().min(1),

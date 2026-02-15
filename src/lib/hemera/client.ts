@@ -7,6 +7,15 @@
 import pRetry, { AbortError } from "p-retry";
 import pThrottle from "p-throttle";
 import type { z } from "zod";
+import {
+	type CourseWithParticipants,
+	CourseWithParticipantsSchema,
+	type CoursesResponse,
+	CoursesResponseSchema,
+	type Participation,
+	ParticipationResponseSchema,
+	type ResultOutcome,
+} from "./schemas";
 
 export interface HemeraClientOptions {
 	baseUrl: string;
@@ -109,6 +118,24 @@ export class HemeraClient {
 	 * @param schema Zod schema for validation
 	 * @returns      Validated result
 	 */
+	/**
+	 * Resolve and validate the auth token. Throws HemeraApiError if invalid.
+	 */
+	private async resolveToken(url: string): Promise<string> {
+		const token = await this.getToken();
+		if (!token || typeof token !== "string" || token.trim().length === 0) {
+			throw new AbortError(
+				new HemeraApiError(
+					401,
+					"Unauthorized",
+					"Service token is empty or invalid — check getToken() implementation and credentials",
+					url,
+				),
+			);
+		}
+		return token;
+	}
+
 	async get<T>(path: string, schema: z.ZodType<T>): Promise<T> {
 		await this.ensurePathAllowed(path);
 		const url = `${this.baseUrl}${path}`;
@@ -224,6 +251,33 @@ export class HemeraClient {
 			return schema.parse(json);
 		}
 		return json;
+	}
+
+	// Service API methods
+	async getServiceCourses(): Promise<CoursesResponse> {
+		return this.get("/api/service/courses", CoursesResponseSchema);
+	}
+
+	async getServiceCourse(id: string): Promise<CourseWithParticipants> {
+		return this.get(`/api/service/courses/${encodeURIComponent(id)}`, CourseWithParticipantsSchema);
+	}
+
+	async getServiceParticipation(id: string): Promise<Participation> {
+		return this.get(
+			`/api/service/participations/${encodeURIComponent(id)}`,
+			ParticipationResponseSchema,
+		);
+	}
+
+	async updateServiceParticipationResult(
+		id: string,
+		data: { resultOutcome?: ResultOutcome | null; resultNotes?: string | null },
+	): Promise<Participation> {
+		return this.put(
+			`/api/service/participations/${encodeURIComponent(id)}/result`,
+			data,
+			ParticipationResponseSchema,
+		);
 	}
 
 	/**
