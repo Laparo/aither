@@ -9,6 +9,7 @@ const isProtectedRoute = createRouteMatcher([
 	"/api/sync(.*)",
 	"/api/recordings(.*)",
 	"/sync(.*)",
+	"/api/service/(.*)",
 	"/(dashboard)(.*)",
 ]);
 
