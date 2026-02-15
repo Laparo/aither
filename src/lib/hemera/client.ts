@@ -8,12 +8,12 @@ import pRetry, { AbortError } from "p-retry";
 import pThrottle from "p-throttle";
 import type { z } from "zod";
 import {
-	CoursesResponseSchema,
-	CourseWithParticipantsSchema,
-	ParticipationResponseSchema,
-	type CoursesResponse,
 	type CourseWithParticipants,
+	CourseWithParticipantsSchema,
+	type CoursesResponse,
+	CoursesResponseSchema,
 	type Participation,
+	ParticipationResponseSchema,
 	type ResultOutcome,
 } from "./schemas";
 
@@ -255,7 +255,7 @@ export class HemeraClient {
 
 	// Service API methods
 	async getServiceCourses(): Promise<CoursesResponse> {
-		return this.get('/api/service/courses', CoursesResponseSchema);
+		return this.get("/api/service/courses", CoursesResponseSchema);
 	}
 
 	async getServiceCourse(id: string): Promise<CourseWithParticipants> {
@@ -263,11 +263,21 @@ export class HemeraClient {
 	}
 
 	async getServiceParticipation(id: string): Promise<Participation> {
-		return this.get(`/api/service/participations/${encodeURIComponent(id)}`, ParticipationResponseSchema);
+		return this.get(
+			`/api/service/participations/${encodeURIComponent(id)}`,
+			ParticipationResponseSchema,
+		);
 	}
 
-	async updateServiceParticipationResult(id: string, data: { resultOutcome?: ResultOutcome | null; resultNotes?: string | null }): Promise<Participation> {
-		return this.put(`/api/service/participations/${encodeURIComponent(id)}/result`, data, ParticipationResponseSchema);
+	async updateServiceParticipationResult(
+		id: string,
+		data: { resultOutcome?: ResultOutcome | null; resultNotes?: string | null },
+	): Promise<Participation> {
+		return this.put(
+			`/api/service/participations/${encodeURIComponent(id)}/result`,
+			data,
+			ParticipationResponseSchema,
+		);
 	}
 
 	/**

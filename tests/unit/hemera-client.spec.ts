@@ -216,9 +216,9 @@ describe("HemeraClient", () => {
 			const mockFetch = createMockFetch([{ status: 200, body: [{ id: "1", name: "Test" }] }]);
 			const mockGetToken = vi.fn(async () => "mock-token-123");
 			const client = createClient(mockFetch, { getToken: mockGetToken });
-	
+
 			await client.get("/seminars", TestArraySchema);
-	
+
 			expect(mockGetToken).toHaveBeenCalledTimes(1);
 			expect(mockFetch).toHaveBeenCalledTimes(1);
 			const callArgs = mockFetch.mock.calls[0];
@@ -239,7 +239,7 @@ describe("HemeraClient", () => {
 				rateLimit: 100,
 				fetchFn: mockFetch as unknown as typeof fetch,
 			});
-	
+
 			await client.get("/seminars", TestArraySchema);
 			expect(mockFetch.mock.calls[0][0]).toBe("https://api.hemera.academy/seminars");
 		});
@@ -429,10 +429,10 @@ describe("HemeraClient", () => {
 		it("sends PUT with JSON body and auth header", async () => {
 			const mockFetch = createMockFetch([{ status: 200, body: { id: "1", name: "Updated" } }]);
 			const client = createClient(mockFetch);
-		
+
 			const result = await client.put("/item/1", { name: "Updated" }, TestSchema);
 			expect(result).toEqual({ id: "1", name: "Updated" });
-		
+
 			const callArgs = mockFetch.mock.calls[0];
 			expect(callArgs[1]?.method).toBe("PUT");
 			expect(callArgs[1]?.headers).toMatchObject({

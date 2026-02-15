@@ -15,16 +15,6 @@ interface CachedToken {
 const tokenCache = new Map<string, CachedToken>();
 
 /**
- * Redact sensitive values for safe logging.
- * Shows first 4 chars + "…" for strings longer than 8 chars, otherwise "***".
- */
-function redact(value: unknown): string {
-	if (typeof value !== "string" || value.length === 0) return "***";
-	if (value.length <= 8) return "***";
-	return `${value.slice(0, 4)}…[redacted]`;
-}
-
-/**
  * Validate that a token is non-empty and structurally valid.
  * Throws a descriptive error if the token is invalid.
  */
@@ -33,8 +23,7 @@ function validateToken(token: string, source: "cache" | "generated"): void {
 		// Clear cache to prevent returning stale invalid tokens
 		tokenCache.delete("hemera-service-token");
 		throw new Error(
-			`Service token validation failed (source: ${source}): token is empty or invalid. ` +
-				"Check CLERK_SECRET_KEY configuration.",
+			`Service token validation failed (source: ${source}): token is empty or invalid. Check CLERK_SECRET_KEY configuration.`,
 		);
 	}
 }
@@ -57,10 +46,10 @@ export async function getServiceToken(): Promise<string> {
 	}
 
 	// Load config — fail fast with clear message if env vars are missing
-	let config: ReturnType<typeof loadConfig>;
+	let _config: ReturnType<typeof loadConfig>;
 	try {
-		config = loadConfig();
-	} catch (error) {
+		_config = loadConfig();
+	} catch (_error) {
 		throw new Error(
 			"Service token generation failed: environment configuration is invalid. " +
 				"Ensure CLERK_SECRET_KEY is set.",
@@ -95,7 +84,7 @@ async function generateServiceToken(): Promise<string> {
 		// Get the service user ID from environment
 		const serviceUserId = process.env.CLERK_SERVICE_USER_ID;
 		if (!serviceUserId) {
-			throw new Error('CLERK_SERVICE_USER_ID is not set in environment variables');
+			throw new Error("CLERK_SERVICE_USER_ID is not set in environment variables");
 		}
 
 		// Mint a short-lived JWT using Clerk's sign-in token mechanism
@@ -107,17 +96,14 @@ async function generateServiceToken(): Promise<string> {
 		});
 
 		if (!signInToken?.token) {
-			throw new Error('Failed to mint JWT: no token returned from Clerk');
+			throw new Error("Failed to mint JWT: no token returned from Clerk");
 		}
 
 		return signInToken.token;
 	} catch (error) {
 		// Redact sensitive details from error logs
-		const safeMessage =
-			error instanceof Error ? error.message : "Unknown error";
-		console.error(
-			`[service-token] Failed to mint service JWT from Clerk: ${safeMessage}`,
-		);
+		const safeMessage = error instanceof Error ? error.message : "Unknown error";
+		console.error(`[service-token] Failed to mint service JWT from Clerk: ${safeMessage}`);
 		throw new Error(
 			"Service token generation failed. Check Clerk configuration and CLERK_SERVICE_USER_ID.",
 		);
