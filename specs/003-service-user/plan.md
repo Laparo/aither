@@ -95,8 +95,8 @@ This plan outlines the implementation steps for creating a dedicated service use
 ### Phase 3: Aither Implementation
 
 #### 3.1 Token Management
-- [x] Update `HemeraClient` to accept `getToken` callback
-- [x] Implement token caching mechanism with explicit shape and error handling:
+- [ ] Update `HemeraClient` to accept `getToken` callback
+- [ ] Implement token caching mechanism with explicit shape and error handling:
   ```typescript
   // Simple in-memory cache for dev; use Redis/Vercel KV in production
   const tokenCache = new Map<string, { token: string; expiresAt: number }>();
@@ -195,7 +195,7 @@ This plan outlines the implementation steps for creating a dedicated service use
 #### 4.4 Performance & Load Testing
 - [ ] Load-test service endpoints under expected concurrency (target: 100 req/min per service user) and verify 95th/99th latency bounds
 - [ ] Performance tests for token-caching and token-refresh logic (verify cache hit rate and refresh latency)
-- [ ] End-to-end latency measurements for representative workflows (success criteria: p95 < X ms — define X per environment)
+- [ ] End-to-end latency measurements for representative workflows (success criteria: p95 < 200 ms for internal services, p95 < 500 ms for public-facing endpoints — tune per environment)
 - [ ] Stress tests to validate rate-limiting and graceful degradation under peak load (verify 429 behavior and Retry-After handling)
 - [ ] Define pass/fail criteria for each test (e.g., max error rate, latency thresholds, recovery time)
 
@@ -258,6 +258,40 @@ If issues arise during deployment:
    - Apply fixes
    - Test in staging
    - Re-deploy to production
+
+### TokenStore abstraction (implementation plan)
+
+- Goal: provide a pluggable token storage implementation so token caches can be swapped between in-memory (dev), Vercel KV, Upstash Redis, or other backends without code changes.
+- Interface:
+  ```ts
+  export interface TokenStore {
+    get(key: string): Promise<{ token: string; expiresAt: number } | null>;
+    set(key: string, value: { token: string; expiresAt: number }): Promise<void>;
+    delete(key: string): Promise<void>;
+  }
+  ```
+- Provide a default `InMemoryTokenStore` for local development and tests.
+- Provide adapter examples for `VercelKV` and `Upstash Redis` in the repo as optional modules.
+- Migration: update `getServiceToken` to accept an optional `TokenStore` implementation (defaulting to `InMemoryTokenStore`) and document recommended production config in the README.
+
+### Circuit-Breaker and escalation process
+
+- Add a lightweight circuit-breaker around Hemera API calls to prevent cascading failures when Hemera is degraded.
+- Behavior:
+  - Track consecutive 5xx/429 failures per endpoint or host.
+  - After configurable threshold (e.g., 5 failures within 1 minute), open circuit for a cooling period (e.g., 1 minute).
+  - While open, immediately return a 503/429 fallback or a cached response where appropriate.
+  - Record metrics and send alert to on-call channel when circuit opens.
+- Escalation: if circuit remains open beyond a threshold, automatically create an incident and notify the SRE channel with context and recent logs.
+
+### isAuthError helper
+
+- Implement `isAuthError(err)` helper to detect authentication/authorization failures (401/403) vs transient server/network errors. This is used to decide whether to retry obtaining a token or fail-fast and alert.
+
+### obtainServiceTokenFromClerkBackend
+
+- Add `obtainServiceTokenFromClerkBackend(flow)` function (server-side) that centralizes Clerk calls to mint service tokens. This will be the single place to add retry/backoff, observability, and error classification. Document expected return shape: `{ token: string; expiresAt: number }`.
+
 
 ## Success Criteria
 
