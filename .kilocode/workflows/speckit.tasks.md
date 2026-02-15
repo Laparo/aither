@@ -39,6 +39,7 @@ You **MUST** consider the user input before proceeding (if not empty).
           ```bash
           OUT=$(mktemp)
           ERR=$(mktemp)
+          trap 'rm -f "$OUT" "$ERR"' EXIT
           "$SCRIPT" --json >"$OUT" 2>"$ERR" || EXIT=$?
           EXIT=${EXIT:-0}
           if [ $EXIT -ne 0 ]; then
@@ -66,10 +67,10 @@ You **MUST** consider the user input before proceeding (if not empty).
 2. **Load design documents**: Read from `FEATURE_DIR`:
    - **Required**: `plan.md` (tech stack, libraries, structure), `spec.md` (user stories with priorities)
    - **Optional**: `data-model.md` (entities), `contracts/` (API endpoints), `research.md` (decisions), `quickstart.md` (test scenarios)
-   - Validation: After `check-prerequisites.sh` reports `FEATURE_DIR`, ensure required files exist. If `plan.md` or `spec.md` is missing, abort generation or create a clear blocking task in `tasks.md` that lists the missing files and instructions to add them. Example behavior:
+   - Validation: After `check-prerequisites.sh` reports `FEATURE_DIR`, ensure required files exist. If `plan.md` or `spec.md` is missing, the generator MUST create `tasks.md` containing a top-level blocking task `T000` that enumerates the missing files and gives exact recreate instructions (paths and templates), and then cease further generation. Do NOT offer alternate behaviors or continue generation when required artifacts are absent.
 
      - If both `plan.md` and `spec.md` exist: continue normally.
-     - If one or both are missing: create `tasks.md` with a top-level blocking task (T000) that enumerates the missing files and provides exact instructions (paths and templates) to produce them, then stop further task generation until the missing artifacts are provided.
+     - If one or both are missing: create `tasks.md` with `T000` listing each missing file and the template/path to recreate it, then stop further task generation until remediation is provided.
 
    - When reporting missing files, reference `FEATURE_DIR`, `plan.md`, `spec.md`, and `tasks.md` explicitly so reviewers can locate and remediate the gap.
 

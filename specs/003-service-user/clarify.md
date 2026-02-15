@@ -63,29 +63,37 @@ async function getServiceToken() {
    // Return cached token if still valid (2-minute buffer)
    if (cached && cached.expiresAt > Date.now() + 120000) return cached.token;
 
-   // Try to obtain a fresh token, with one retry on 401-like failures
+   // Try to obtain a fresh token
    try {
       const tokenResp = await obtainServiceTokenFromClerkBackend({ scope: 'hemera-api' });
-      // Expect { token: string, expiresAt: number }
+      // Validate before caching to avoid storing invalid tokens
+      if (!tokenResp.token || tokenResp.token.trim().length === 0) {
+         throw new TokenObtainmentError('Received empty token from Clerk backend');
+      }
       tokenCache.set(cacheKey, { token: tokenResp.token, expiresAt: tokenResp.expiresAt });
       return tokenResp.token;
    } catch (err) {
-      // If the error indicates an authentication/401 issue, attempt one refresh and retry
+      // Auth errors (401/403) are not retryable — throw immediately
       if (isAuthError(err)) {
-         try {
-            const retryResp = await obtainServiceTokenFromClerkBackend({ scope: 'hemera-api' });
-            tokenCache.set(cacheKey, { token: retryResp.token, expiresAt: retryResp.expiresAt });
-            return retryResp.token;
-         } catch (retryErr) {
-            console.error('getServiceToken: retry failed', retryErr);
-            return null; // or throw depending on caller expectations
-         }
+         console.error('getServiceToken: auth error (not retryable)', err);
+         throw new TokenObtainmentError('Authentication failed: check service credentials', { cause: err });
       }
 
       console.error('getServiceToken: failed to obtain token', err);
-      return null; // avoid crashing; callers should handle null (and surface 5xx/401 as appropriate)
+      throw new TokenObtainmentError('Failed to obtain service token', { cause: err });
    }
 }
+
+export class TokenObtainmentError extends Error {
+   constructor(message: string, opts?: { cause?: unknown }) {
+      super(message);
+      if (opts?.cause) (this as any).cause = opts.cause;
+      this.name = 'TokenObtainmentError';
+   }
+}
+
+// Update function contract/docs:
+// Throws TokenObtainmentError on failure. Callers must catch or propagate. Recommended fallback: circuit breaker/retry/backoff.
 
 // For horizontal scaling (multiple Aither instances), use a shared cache like Redis or Vercel KV and store `{ token, expiresAt }`.
 
@@ -142,7 +150,7 @@ This ensures:
 **Answer**: Rate limiting is applied at multiple levels:
 
 1. **Client-Side** (Aither):
-   - `p-throttle`: ~1.67 requests/second (≈100 requests/minute) to Hemera API
+   - `p-throttle`: ~1.6 requests/second (100 requests/minute) to Hemera API — must not exceed the server-side limit of 100 req/min
    - Prevents overwhelming the API
 
 2. **Server-Side** (Hemera):
@@ -244,7 +252,7 @@ Rate limits can be adjusted based on actual usage patterns.
    - Use test service user in Clerk
    - Point to staging Hemera API
    - Verbose logging enabled
-   - No rate limiting
+   - Reduced rate limiting enabled for development: set `RATE_LIMIT_ENABLED=true` and use `DEV_RATE_LIMIT` or `RATE_LIMIT_REQUESTS_PER_MINUTE` to configure conservative limits (e.g., `DEV_RATE_LIMIT=60` for 60 req/min). Ensure the rate limiter middleware (`rateLimiter` / `RATE_LIMIT_*`) is active in dev to avoid unrealistic behavior.
 
 2. **Staging**:
    - Use staging service user

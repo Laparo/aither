@@ -4,6 +4,7 @@
 // ---------------------------------------------------------------------------
 
 // Fix: Move mock declarations to top-level scope, before any imports
+import { vi } from "vitest";
 const mockError = vi.fn();
 const mockWarning = vi.fn();
 const mockCritical = vi.fn();

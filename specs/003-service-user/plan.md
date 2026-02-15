@@ -24,7 +24,7 @@ This plan outlines the implementation steps for creating a dedicated service use
     "service": "aither"
   }
   ```
-- [ ] Use a machine-oriented credential (API token/service key) instead of a reusable plaintext password where possible. If a password is created, use a strong randomly generated secret.
+- [ ] Use a machine-oriented credential (M2M API token or Clerk sign-in token) instead of a reusable plaintext password. Clerk supports creating sign-in tokens via `clerkClient.signInTokens.createSignInToken()` for machine-to-machine flows; alternatively, provision a static API key and store it in the secrets manager.
 - [ ] Store the secret/API token in a corporate secrets manager (e.g., Vault, AWS Secrets Manager) and reference it via environment variables; do NOT commit credentials to the repo.
 - [ ] Disable interactive/password-based sign-in for the service user if the Clerk plan supports it; prefer token-based/M2M auth.
 - [ ] Document service user ID and the secret's secret-name/key location in your environment/CI documentation (do not include the secret value in plaintext).
@@ -57,9 +57,12 @@ This plan outlines the implementation steps for creating a dedicated service use
   export async function getUserRole(userId: string): Promise<string | null> {
     if (!userId) return null;
     try {
-      const user = await clerkClient.users.getUser(userId);
+      // clerkClient may be a factory function in newer SDK versions
+      const client = typeof clerkClient === 'function' ? await (clerkClient as unknown as () => Promise<typeof clerkClient>)() : clerkClient;
+      const user = await client.users.getUser(userId);
       if (!user) return null;
-      const role = user?.publicMetadata?.role;
+      const metadata = user?.publicMetadata as Record<string, unknown> | undefined;
+      const role = metadata?.role;
       return typeof role === 'string' && role.length > 0 ? role : null;
     } catch (error) {
       console.error(`getUserRole failed for userId=${userId}:`, error instanceof Error ? error.message : error);
@@ -98,53 +101,70 @@ This plan outlines the implementation steps for creating a dedicated service use
 - [ ] Update `HemeraClient` to accept `getToken` callback
 - [ ] Implement token caching mechanism with explicit shape and error handling:
   ```typescript
-  // Simple in-memory cache for dev; use Redis/Vercel KV in production
+  // Simple in-memory cache for dev; use Redis/Vercel KV in production.
+  // WARNING: in-memory Map is per-process — not shared across serverless invocations or horizontal replicas.
   const tokenCache = new Map<string, { token: string; expiresAt: number }>();
+  const refreshLocks = new Map<string, Promise<string>>();
 
-  async function getServiceToken(): Promise<string | null> {
+  async function getServiceToken(): Promise<string> {
     const cacheKey = 'hemera-service-token';
     const cached = tokenCache.get(cacheKey);
 
     // Return cached token if still valid (2-minute buffer)
     if (cached && cached.expiresAt > Date.now() + 120000) return cached.token;
 
-    // Attempt token acquisition with error handling and one retry-on-401
-    try {
-      const tokenResp = await obtainServiceTokenFromClerkBackend({ scope: 'hemera-api' });
-      // Expect tokenResp: { token: string, expiresAt: number }
-      tokenCache.set(cacheKey, { token: tokenResp.token, expiresAt: tokenResp.expiresAt });
-      return tokenResp.token;
-    } catch (err) {
-      // If auth-related (401), try once more; otherwise surface the error
-      if (isAuthError(err)) {
-        try {
-          const retryResp = await obtainServiceTokenFromClerkBackend({ scope: 'hemera-api' });
-          tokenCache.set(cacheKey, { token: retryResp.token, expiresAt: retryResp.expiresAt });
-          return retryResp.token;
-        } catch (retryErr) {
-          console.error('getServiceToken: retry failed', retryErr);
-          return null;
-        }
-      }
-      console.error('getServiceToken: failed to obtain token', err);
-      return null;
+    // Deduplicate concurrent refresh calls (promise-deduplication)
+    if (refreshLocks.has(cacheKey)) {
+      return refreshLocks.get(cacheKey)!;
     }
+
+    const refreshPromise = (async () => {
+      try {
+        const tokenResp = await refreshTokenWithBackoff({ scope: 'hemera-api' });
+        // Validate before caching
+        if (!tokenResp.token || tokenResp.token.trim().length === 0) {
+          throw new Error('Received empty token from Clerk backend');
+        }
+        tokenCache.set(cacheKey, { token: tokenResp.token, expiresAt: tokenResp.expiresAt });
+        return tokenResp.token;
+      } catch (err) {
+        console.error('getServiceToken: failed to obtain token', err);
+        throw err;
+      } finally {
+        refreshLocks.delete(cacheKey);
+      }
+    })();
+
+    refreshLocks.set(cacheKey, refreshPromise);
+    return refreshPromise;
   }
 
-  // Token structure: { token: string, expiresAt: number } and store keyed by 'hemera-service-token'
-
   // Constants and retry policy for refresh-on-expiry
-  const MAX_REFRESH_RETRIES = 2;
-  async function refreshTokenWithBackoff(flow) {
+  const MAX_REFRESH_RETRIES = 3;
+
+  /**
+   * Retry token acquisition with exponential backoff + jitter.
+   * Used by getServiceToken when the initial mint fails.
+   *
+   * @param flow - Options forwarded to obtainServiceTokenFromClerkBackend
+   * @returns { token: string; expiresAt: number }
+   * @throws After MAX_REFRESH_RETRIES consecutive failures
+   */
+  async function refreshTokenWithBackoff(
+    flow: { scope: string }
+  ): Promise<{ token: string; expiresAt: number }> {
     for (let attempt = 0; attempt < MAX_REFRESH_RETRIES; attempt++) {
       try {
         return await obtainServiceTokenFromClerkBackend(flow);
       } catch (err) {
         if (attempt + 1 >= MAX_REFRESH_RETRIES) throw err;
-        const backoffMs = 1000 * Math.pow(2, attempt) + Math.floor(Math.random() * 300);
+        const backoffMs = 1000 * Math.pow(2, attempt)
+          + Math.floor(Math.random() * 300);
         await new Promise((r) => setTimeout(r, backoffMs));
       }
     }
+    // Unreachable, but satisfies TS return type
+    throw new Error('refreshTokenWithBackoff: exhausted retries');
   }
 
   // Fallback: if token operations fail persistently, callers should fallback to re-auth/alerting
@@ -268,15 +288,33 @@ If issues arise during deployment:
     get(key: string): Promise<{ token: string; expiresAt: number } | null>;
     set(key: string, value: { token: string; expiresAt: number }): Promise<void>;
     delete(key: string): Promise<void>;
+    clear(): Promise<void>;
   }
   ```
 - Provide a default `InMemoryTokenStore` for local development and tests.
 - Provide adapter examples for `VercelKV` and `Upstash Redis` in the repo as optional modules.
 - Migration: update `getServiceToken` to accept an optional `TokenStore` implementation (defaulting to `InMemoryTokenStore`) and document recommended production config in the README.
+- **Error semantics**: `get()` returns `null` for missing/expired keys; `set()` and `delete()` throw on backend failures. Callers should catch store errors and fall back to re-mint rather than surfacing them to end-users.
+- **Health check**: provide an optional `ping(): Promise<boolean>` method on store adapters (returns `true` if the backend is reachable). Use in startup / readiness probes.
+
+### Encryption at rest
+
+- **Purpose**: protect cached tokens stored in external backends (Upstash, Vercel KV) against data-at-rest exposure.
+- **Algorithm**: AES-256-GCM with a 12-byte random IV per write; ciphertext prefixed with `enc:` for transparent detection.
+- **Implementation** (`src/lib/auth/encryption.ts`):
+  - `encryptString(plaintext): string` — returns `enc:<base64(iv ‖ authTag ‖ ciphertext)>`
+  - `decryptString(payload): string` — strips prefix, decrypts, returns plaintext
+  - `getKey(): Buffer | null` — reads `TOKEN_STORE_ENCRYPTION_KEY` (Base64 or Hex, must decode to 32 bytes)
+  - `isEncryptedString(value): boolean` — checks `enc:` prefix
+- **Config**: set `TOKEN_STORE_ENCRYPTION_KEY` env var (32-byte key, Base64 or Hex). When unset, encryption is silently skipped.
+- **Startup validation**: at application boot, call `getKey()` and verify the result. If `TOKEN_STORE_ENCRYPTION_KEY` is set but `getKey()` returns `null`, throw immediately to fail fast instead of silently falling through to plaintext storage.
+- **Store integration**: Upstash and InMemory adapters encrypt on `set()` and decrypt on `get()` automatically when key is present.
+- **Key rotation**: use `scripts/reencrypt-upstash.js --idempotent` to write re-encrypted values to `<key>.reenc`, then `--swap` to replace originals. See `docs/upstash-migration.md`.
+- **Tests**: `tests/unit/encryption.spec.ts` — 4 tests covering no-key pass-through, encrypt/decrypt round-trip, malformed payload error, and non-prefixed plaintext pass-through.
 
 ### Circuit-Breaker and escalation process
 
-- Add a lightweight circuit-breaker around Hemera API calls to prevent cascading failures when Hemera is degraded.
+- Add a lightweight circuit-breaker around Hemera API calls using the [`cockatiel`](https://github.com/connor4312/cockatiel) library (`CircuitBreakerPolicy`) to prevent cascading failures when Hemera is degraded.
 - Behavior:
   - Track consecutive 5xx/429 failures per endpoint or host.
   - After configurable threshold (e.g., 5 failures within 1 minute), open circuit for a cooling period (e.g., 1 minute).
@@ -332,7 +370,7 @@ If issues arise during deployment:
 | API endpoint vulnerabilities | High | Security audit, penetration testing |
 | Performance degradation | Medium | Load testing, optimize token caching |
 | Deployment issues | Medium | Staged rollout, comprehensive rollback plan |
-| Migration/Abwärtskompatibilität | Hoch | Parallelbetrieb beider Systeme während der Migration, Feature-Flags für kontrollierten Rollout, Canary-Deployments |
+| Migration/Backward Compatibility | High | Run both systems in parallel during migration, feature flags for controlled rollout, canary deployments |
 
 ## Notes
 

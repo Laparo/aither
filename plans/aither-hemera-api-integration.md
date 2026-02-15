@@ -146,7 +146,7 @@ Jeder Endpunkt prüft:
 import { auth } from '@clerk/nextjs/server';
 
 // Server-side guard for service endpoints — ensure the route handler is declared `async`
-export async function handler(request: Request) {
+export async function GET(request: Request) {
   const { userId } = await auth();
   if (!userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -169,10 +169,9 @@ Wichtig: Für Service‑zu‑Service Flows darf die Aither‑Seite **nicht** auf
 Pseudocode / Pattern (serverseitig in Aither):
 
 ```typescript
-// CONCEPTUAL PSEUDOCODE - needs a real backend implementation
-// Use CLERK_SECRET_KEY from env and Clerk backend APIs or a configured JWT template.
-// Implement a concrete tokenCache (process memory for dev, Redis/Vercel KV for production).
-
+// Simple, robust option: read a pre-provisioned service credential from the environment
+// (recommended). Store a pre-generated machine credential in your secrets manager and
+// expose it as `CLERK_SERVICE_USER_API_KEY` (or as a sign-in token `CLERK_SERVICE_USER_SIGNIN_TOKEN`).
 const tokenCache = new Map<string, { token: string; expiresAt: number }>();
 
 async function getServiceToken() {
@@ -180,21 +179,20 @@ async function getServiceToken() {
   const cached = tokenCache.get(cacheKey);
   if (cached && cached.expiresAt > Date.now() + 120000) return cached.token;
 
-  // Attempt to obtain a service/machine token from Clerk backend
-  // The exact API depends on Clerk SDK version; implement using the official backend pattern
-  try {
-    const tokenResp = await obtainServiceTokenFromClerkBackend({ scope: 'hemera-api' });
-    // Expect tokenResp: { token: string, expiresAt: number }
-    tokenCache.set(cacheKey, { token: tokenResp.token, expiresAt: tokenResp.expiresAt });
-    return tokenResp.token;
-  } catch (err) {
-    console.error('getServiceToken failed', err);
-    throw err; // caller should handle retries or surface an error
+  // Prefer a pre-provisioned key stored in the environment / secrets manager
+  const envToken = process.env.CLERK_SERVICE_USER_API_KEY || process.env.CLERK_SERVICE_USER_SIGNIN_TOKEN;
+  if (!envToken) {
+    throw new Error('Missing service credential: set CLERK_SERVICE_USER_API_KEY or CLERK_SERVICE_USER_SIGNIN_TOKEN');
   }
+
+  // Cache short-lived usage (expiresAt is approximate when using a static API key)
+  const expiresAt = Date.now() + 15 * 60 * 1000;
+  tokenCache.set(cacheKey, { token: envToken, expiresAt });
+  return envToken;
 }
 
 const token = await getServiceToken();
-const response = await fetch(`${process.env.HEMERA_API_URL}/api/service/courses`, {
+const response = await fetch(`${process.env.HEMERA_API_BASE_URL}/api/service/courses`, {
   headers: {
     'Authorization': `Bearer ${token}`,
     'Content-Type': 'application/json',
@@ -203,9 +201,9 @@ const response = await fetch(`${process.env.HEMERA_API_URL}/api/service/courses`
 ```
 
 Implementierungs‑Hinweise:
-- Lade `CLERK_SECRET_KEY` serverseitig aus der Umgebung und verwende das Clerk Backend SDK to mint or retrieve a scoped service token.
+- Lade `CLERK_SERVICE_USER_API_KEY` (oder `CLERK_SERVICE_USER_SIGNIN_TOKEN`) aus der Umgebung / dem Secrets-Manager. Das obige Muster verwendet einen statischen, vorab bereitgestellten Service-Credential — es wird zur Laufzeit kein Token dynamisch geminted.
 - Implementiere `tokenCache` in Aither; for horizontal scalability use a shared cache (Redis, Vercel KV) instead of process memory.
-- On 401 responses that include `WWW-Authenticate` or an expiry indication, refresh the token once and retry the failed request (retry-on-expiry).
+- On 401 responses that include `WWW-Authenticate` or an expiry indication, refresh the credential from the environment once and retry the failed request (retry-on-expiry).
 
 #### 5. Hemera: Middleware anpassen
 
@@ -258,15 +256,70 @@ flowchart LR
 - **Principle of Least Privilege**: `api-client` Rolle hat nur die minimal nötigen Rechte
 - **Audit Trail**: Alle Aktionen sind dem Service-User zugeordnet
 - **JWT-Validierung**: Clerk verifiziert Token-Integrität und -Ablauf
-- **Rate Limiting**: Empfehlung, Rate Limiting für `/api/service/*` einzuführen
-- **IP-Whitelisting**: Optional, falls Aither von bekannter IP deployed wird
+
+### Rate Limiting (implementation guidance)
+
+Use a server-side rate limiter to protect `/api/service/*`. Recommended library: `@upstash/ratelimit` with Upstash Redis.
+
+Example (Node/Edge):
+
+```ts
+import Redis from '@upstash/redis';
+import Ratelimit from '@upstash/ratelimit';
+
+const redis = Redis.fromEnv();
+const ratelimit = new Ratelimit({
+  redis,
+  limiter: Ratelimit.slidingWindow({ window: 60, limit: 120 }), // 120 requests/min per key
+});
+
+// In route handler
+const identifier = userId || request.ip;
+const result = await ratelimit.limit(identifier);
+if (!result.success) {
+  return new Response('Too Many Requests', { status: 429 });
+}
+```
+
+Call `ratelimit.limit(identifier)` early in `/api/service/*` handlers. Choose `identifier` by priority: authenticated userId → client IP → service API key.
+
+### IP Whitelisting
+
+Configure allowlists in the deployment platform (Vercel Edge Config, cloud firewall, or load balancer) and gate them with an environment flag, e.g. `SERVICE_IP_ALLOWLIST=1` to enable. Keep whitelisting optional and configurable so you can disable it for non-prod environments. Document the source of truth for the list and how to update it.
+
+### PII Redaction
+
+Add a dedicated PII redaction step for all API responses returning bookings/participations. Implement a single transform function used by service endpoints to ensure consistent sanitization:
+
+```ts
+// Example shape
+type CourseParticipation = { id: string; courseId: string; userId: string; resultOutcome?: string; resultNotes?: string; email?: string; phoneNumber?: string; billingAddress?: string; paymentMethod?: string; cardNumber?: string; transactionId?: string };
+
+function sanitizeParticipation(participation: CourseParticipation) {
+  // Keep allowed fields and pseudonymize userId
+  return {
+    id: participation.id,
+    courseId: participation.courseId,
+    userId: hashUserId(participation.userId), // pseudonymize
+    resultOutcome: participation.resultOutcome,
+    resultNotes: participation.resultNotes,
+  };
+}
+
+// Audit logging when PII is accessed
+function logPIIAccess(requesterId: string, fields: string[], reason: string) {
+  // Implement audit entry: timestamp, requesterId, fields touched, reason, request id
+}
+
+// Guidance: Enumerate all PII fields centrally (email, phoneNumber, birthDate, fullName, billingAddress, cardNumber, transactionId, paymentMethod) and specify strategy per field (remove/hash/pseudonymize). Use a KMS-backed HMAC key or KMS envelope encryption for stable pseudonymization and rotate keys following your key rotation policy.
+
 
 ## Geklärte Rahmenbedingungen
 
 | Frage | Antwort |
 |-------|---------|
 | Hosting | Hemera auf Vercel, Aither lokal/anderer Host |
-| Datenzugriff | Kurse, Bookings und Participations; sensible Booking‑Details (z. B. Zahlungsdaten) werden nicht zurückgegeben. |
+| Datenzugriff | Kurse, Bookings und Participations. Sensitive booking fields are explicitly excluded from responses: `paymentMethod`, `cardNumber`, `billingAddress`, `transactionId`. `CourseParticipation` exposes only `id`, `courseId`, `userId` (pseudonymous), `resultOutcome`, and `resultNotes`. PII fields (e.g., `email`, `phoneNumber`, `birthDate`, `fullName`) are redacted or hashed before returning. |
 | Clerk-Plan | Free/Hobby - kein M2M verfügbar → **Option A bestätigt** |
 
 ---

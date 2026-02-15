@@ -12,27 +12,22 @@ import { hasPermission } from "./permissions";
 /**
  * Get the user's role from Clerk session claims.
  */
-async function getUserRole(): Promise<Role | null> {
+function getUserRoleFromClaims(sessionClaims: unknown): Role | null {
 	try {
-		const { sessionClaims } = await auth();
-
 		// Extract role from public metadata in session claims
-		// Clerk stores custom data in publicMetadata
-		const metadata = sessionClaims?.publicMetadata as { role?: string } | undefined;
+		const claims = sessionClaims as { publicMetadata?: { role?: string } } | undefined;
+		const metadata = claims?.publicMetadata;
 		const role = metadata?.role;
 
-		if (!role || typeof role !== "string") {
-			return null;
-		}
+		if (!role || typeof role !== "string") return null;
 
-		// Validate that the role is one of our known roles
 		if (["admin", "api-client", "instructor", "participant"].includes(role)) {
 			return role as Role;
 		}
 
 		return null;
 	} catch (error) {
-		console.error("Failed to get user role:", error);
+		console.error("Failed to derive user role from session claims:", error);
 		return null;
 	}
 }
@@ -47,13 +42,16 @@ async function getUserRole(): Promise<Role | null> {
 export async function requireServiceAuth(
 	requiredPermission: Permission,
 ): Promise<NextResponse | null> {
-	const { userId } = await auth();
+	const session = await auth();
+
+	const userId = (session as { userId?: string })?.userId;
+	const sessionClaims = (session as { sessionClaims?: unknown })?.sessionClaims;
 
 	if (!userId) {
 		return createErrorResponse(401, "Unauthorized", "Authentication required");
 	}
 
-	const role = await getUserRole();
+	const role = getUserRoleFromClaims(sessionClaims);
 
 	if (!hasPermission(role, requiredPermission)) {
 		return createErrorResponse(403, "Forbidden", "Insufficient permissions");

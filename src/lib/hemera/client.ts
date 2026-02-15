@@ -110,29 +110,32 @@ export class HemeraClient {
 	}
 
 	/**
-	 * Fetches a resource from the Hemera API and validates it with Zod.
-	 * Retries on 5xx and network errors. Respects 429 Retry-After.
-	 * Uses Clerk JWT token for authentication.
-	 *
-	 * @param path   API endpoint (e.g., "/api/service/courses")
-	 * @param schema Zod schema for validation
-	 * @returns      Validated result
+	 * Resolve and validate the auth token. Throws HemeraTokenError if invalid.
 	 */
-	/**
-	 * Resolve and validate the auth token. Throws HemeraApiError if invalid.
-	 */
-	private async resolveToken(url: string): Promise<string> {
+	private async resolveToken(_url: string): Promise<string> {
 		const token = await this.getToken();
 		if (!token || typeof token !== "string" || token.trim().length === 0) {
-			throw new AbortError(
-				new HemeraApiError(
-					401,
-					"Unauthorized",
-					"Service token is empty or invalid — check getToken() implementation and credentials",
-					url,
-				),
+			throw new HemeraTokenError("Service token is empty or invalid (empty token)");
+		}
+
+		// Basic JWT structure validation (header.payload.signature)
+		const parts = token.split(".");
+		if (parts.length !== 3) {
+			throw new HemeraTokenError(
+				"malformed JWT structure: expected three parts (header.payload.signature)",
 			);
 		}
+
+		if (parts.some((p) => p.length === 0)) {
+			throw new HemeraTokenError("malformed JWT structure: empty segments in token");
+		}
+
+		// Validate base64url characters in header and payload (basic check)
+		const b64urlRe = /^[A-Za-z0-9_\-]+$/;
+		if (!b64urlRe.test(parts[0]) || !b64urlRe.test(parts[1]) || !b64urlRe.test(parts[2])) {
+			throw new HemeraTokenError("invalid base64url encoding in JWT segments");
+		}
+
 		return token;
 	}
 
@@ -142,8 +145,7 @@ export class HemeraClient {
 
 		const response = await pRetry(
 			async () => {
-				const token = await this.getToken();
-				this.validateToken(token);
+				const token = await this.resolveToken(url);
 				const res = await this.throttledFetch(url, {
 					method: "GET",
 					headers: {
@@ -201,8 +203,7 @@ export class HemeraClient {
 
 		const response = await pRetry(
 			async () => {
-				const token = await this.getToken();
-				this.validateToken(token);
+				const token = await this.resolveToken(url);
 				const res = await this.throttledFetch(url, {
 					method: "PUT",
 					headers: {
