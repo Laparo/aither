@@ -42,6 +42,16 @@ Create new service endpoints under `/api/service/`:
 Each endpoint must validate:
 - User is authenticated via Clerk JWT
 - User has `api-client` or `admin` role
+- Permission is checked against the specific resource operation (e.g. `read:courses`, `write:participation-results`). Return `403 Forbidden` if the user's role lacks the required permission.
+
+Error responses use a consistent JSON envelope:
+```json
+{
+  "error": { "code": "<HTTP_STATUS>", "type": "<ERROR_TYPE>", "message": "<human-readable>" }
+}
+```
+
+The `GET /api/service/courses` endpoint supports pagination via `?page=1&pageSize=50` query parameters (default `pageSize=50`, max `100`). Response includes `{ data: [...], pagination: { page, pageSize, total } }`.
 
 ### 4. Authentication Flow
 ```mermaid
@@ -88,17 +98,12 @@ Additional Security Requirements (explicit):
 - Ensure server-side token management (no client-side session tokens)
 
 ## Environment Variables
-- `HEMERA_API_URL`: Hemera API base URL
-- `CLERK_SECRET_KEY`: For backend SDK
-- `CLERK_SERVICE_USER_EMAIL`: Service user email reference
-- `CLERK_SERVICE_USER_ID` or API key: Service credentials
-
-- `HEMERA_API_URL`: Hemera API base URL
+- `HEMERA_API_BASE_URL`: Hemera API base URL
 - `CLERK_SECRET_KEY`: Clerk backend secret for server-side SDK operations (keep in secrets manager)
 - `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`: Clerk publishable key required for client-side Clerk initialization
 - `CLERK_SERVICE_USER_EMAIL`: Service user email reference (informational)
 - `CLERK_SERVICE_USER_ID`: Clerk user id for the service user (used for lookups)
-- `CLERK_SERVICE_API_KEY` or `CLERK_SERVICE_USER_SECRET`: Service credential (prefer an API key / machine token stored in secrets manager). Do NOT store plaintext passwords in source.
+- `CLERK_SERVICE_USER_API_KEY` or `CLERK_SERVICE_USER_SIGNIN_TOKEN`: Service credential. Prefer `CLERK_SERVICE_USER_SIGNIN_TOKEN` (created via `clerkClient.signInTokens.createSignInToken()`) for short-lived M2M flows; fall back to a static API key stored in the secrets manager. Do NOT store plaintext passwords in source.
 
 Notes:
 - Both `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` and `CLERK_SECRET_KEY` are typically required across Aither and Hemera for proper Clerk integration (client initialization and backend verification).

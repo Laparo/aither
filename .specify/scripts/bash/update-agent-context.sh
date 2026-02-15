@@ -6,88 +6,13 @@
 # and updating agent-specific configuration files with project information.
 #
 # MAIN FUNCTIONS:
-# 1. Environment Validation
-#    - Verifies git repository structure and branch information
-#    - Checks for required plan.md files and templates
-#    - Validates file permissions and accessibility
-#
-# 2. Plan Data Extraction
-#    - Parses plan.md files to extract project metadata
-#    - Identifies language/version, frameworks, databases, and project types
-#    - Handles missing or incomplete specification data gracefully
-#
-# 3. Agent File Management
-#    - Creates new agent context files from templates when needed
-#    - Updates existing agent files with new project information
-#    - Preserves manual additions and custom configurations
-#    - Supports multiple AI agent formats and directory structures
-#
-# 4. Content Generation
-#    - Generates language-specific build/test commands
-#    - Creates appropriate project directory structures
-#    - Updates technology stacks and recent changes sections
-#    - Maintains consistent formatting and timestamps
-#
-# 5. Multi-Agent Support
-#    - Handles agent-specific file paths and naming conventions
-#    - Supports: Claude, Gemini, Copilot, Cursor, Qwen, opencode, Codex, Windsurf, Kilo Code, Auggie CLI, Roo Code, CodeBuddy CLI, Qoder CLI, Amp, SHAI, Amazon Q Developer CLI, or Antigravity
-#    - Can update single agents or all existing agent files
-#    - Creates default Claude file if no agent files exist
-#
-# Usage: ./update-agent-context.sh [agent_type]
-# Agent types: claude|gemini|copilot|cursor-agent|qwen|opencode|codex|windsurf|kilocode|auggie|shai|q|agy|bob|qoder
-# Leave empty to update all existing agent files
 
-set -e
-
-# Enable strict error handling
-set -u
-set -o pipefail
-
-#==============================================================================
-# Configuration and Global Variables
-#==============================================================================
-
-# Get script directory and load common functions
-SCRIPT_DIR="$(CDPATH="" cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$SCRIPT_DIR/common.sh"
-
-# Get all paths and variables from common functions
-eval $(get_feature_paths)
-
-NEW_PLAN="$IMPL_PLAN"  # Alias for compatibility with existing code
-AGENT_TYPE="${1:-}"
-
-# Centralized list of valid agent identifiers (used for usage/help and validation)
-VALID_AGENTS="claude|gemini|copilot|cursor-agent|qwen|opencode|codex|windsurf|kilocode|auggie|roo|codebuddy|qoder|amp|shai|q|agy|bob"
-
-# Agent-specific file paths  
-CLAUDE_FILE="$REPO_ROOT/CLAUDE.md"
-GEMINI_FILE="$REPO_ROOT/GEMINI.md"
-COPILOT_FILE="$REPO_ROOT/.github/agents/copilot-instructions.md"
-CURSOR_FILE="$REPO_ROOT/.cursor/rules/specify-rules.mdc"
-QWEN_FILE="$REPO_ROOT/QWEN.md"
-AGENTS_FILE="$REPO_ROOT/AGENTS.md"
-WINDSURF_FILE="$REPO_ROOT/.windsurf/rules/specify-rules.md"
-KILOCODE_FILE="$REPO_ROOT/.kilocode/rules/specify-rules.md"
-AUGGIE_FILE="$REPO_ROOT/.augment/rules/specify-rules.md"
-ROO_FILE="$REPO_ROOT/.roo/rules/specify-rules.md"
-CODEBUDDY_FILE="$REPO_ROOT/CODEBUDDY.md"
-QODER_FILE="$REPO_ROOT/QODER.md"
-AMP_FILE="$REPO_ROOT/AGENTS.md"
-SHAI_FILE="$REPO_ROOT/SHAI.md"
-Q_FILE="$REPO_ROOT/AGENTS.md"
-AGY_FILE="$REPO_ROOT/.agent/rules/specify-rules.md"
-BOB_FILE="$REPO_ROOT/AGENTS.md"
-
-# Template file
-TEMPLATE_FILE="$REPO_ROOT/.specify/templates/agent-file-template.md"
-
-# Global variables for parsed plan data
-NEW_LANG=""
-NEW_FRAMEWORK=""
-NEW_DB=""
-NEW_PROJECT_TYPE=""
+# Default agent file locations (can be overridden via env)
+REPO_ROOT=${REPO_ROOT:-$(pwd)}
+CURSOR_FILE="${CURSOR_FILE:-$REPO_ROOT/.cursor/rules/specify-rules.mdc}"
+WINDSURF_FILE="${WINDSURF_FILE:-$REPO_ROOT/.windsurf/rules/specify-rules.md}"
+SHAI_FILE="${SHAI_FILE:-$REPO_ROOT/.shai/rules/specify-rules.md}"
+AGY_FILE="${AGY_FILE:-$REPO_ROOT/.agy/rules/specify-rules.md}"
 
 #==============================================================================
 # Utility Functions
@@ -106,17 +31,17 @@ log_error() {
 }
 
 log_warning() {
-    echo "WARNING: $1" >&2
+    printf 'WARNING: %s\n' "$1" >&2
 }
 
 # Print valid agents derived from VALID_AGENTS variable
 print_valid_agents() {
     # Replace pipe separators with commas for human-readable display
-    echo "Valid agents: ${VALID_AGENTS//|/, }"
+    printf 'Valid agents: %s\n' "${VALID_AGENTS//|/, }"
 }
 
 print_usage() {
-    echo "Usage: $0 [agent_type]"
+    printf 'Usage: %s [agent_type]\n' "$0"
     print_valid_agents
 }
 
@@ -148,6 +73,7 @@ validate_environment() {
     fi
     
     # Check if plan.md exists
+    # shellcheck disable=SC2153  # NEW_PLAN is set by the calling framework
     if [[ ! -f "$NEW_PLAN" ]]; then
         log_error "No plan.md found at $NEW_PLAN"
         log_info "Make sure you're working on a feature with a corresponding spec directory"
@@ -252,9 +178,9 @@ get_project_structure() {
     local project_type="$1"
     
     if [[ "$project_type" == *"web"* ]]; then
-        echo "backend/\\nfrontend/\\ntests/"
+        printf 'backend/\nfrontend/\ntests/\n'
     else
-        echo "src/\\ntests/"
+        printf 'src/\ntests/\n'
     fi
 }
 
@@ -317,9 +243,12 @@ create_new_agent_file() {
     
     # Perform substitutions with error checking using safer approach
     # Escape special characters for sed by using a different delimiter or escaping
-    local escaped_lang=$(printf '%s\n' "$NEW_LANG" | sed 's/[\[\.*^$()+{}|]/\\&/g')
-    local escaped_framework=$(printf '%s\n' "$NEW_FRAMEWORK" | sed 's/[\[\.*^$()+{}|]/\\&/g')
-    local escaped_branch=$(printf '%s\n' "$CURRENT_BRANCH" | sed 's/[\[\.*^$()+{}|]/\\&/g')
+    local escaped_lang
+    escaped_lang=$(printf '%s\n' "$NEW_LANG" | sed 's/[\[\.*^$()+{}|/&]/\\&/g')
+    local escaped_framework
+    escaped_framework=$(printf '%s\n' "$NEW_FRAMEWORK" | sed 's/[\[\.*^$()+{}|/&]/\\&/g')
+    local escaped_branch
+    escaped_branch=$(printf '%s\n' "$CURRENT_BRANCH" | sed 's/[\[\.*^$()+{}|/&]/\\&/g')
     
     # Build technology stack and recent change strings conditionally
     local tech_stack
@@ -389,7 +318,8 @@ update_existing_agent_file() {
     }
     
     # Process the file in one pass
-    local tech_stack=$(format_technology_stack "$NEW_LANG" "$NEW_FRAMEWORK")
+    local tech_stack
+    tech_stack=$(format_technology_stack "$NEW_LANG" "$NEW_FRAMEWORK")
     local new_tech_entries=()
     local new_change_entry=""
     
@@ -425,10 +355,7 @@ update_existing_agent_file() {
     local in_tech_section=false
     local in_changes_section=false
     local tech_entries_added=false
-    local changes_entries_added=false
     local existing_changes_count=0
-    local file_ended=false
-    
     while IFS= read -r line || [[ -n "$line" ]]; do
         # Handle Active Technologies section
         if [[ "$line" == "## Active Technologies" ]]; then
@@ -462,7 +389,6 @@ update_existing_agent_file() {
                 echo "$new_change_entry" >> "$temp_file"
             fi
             in_changes_section=true
-            changes_entries_added=true
             continue
         elif [[ $in_changes_section == true ]] && [[ "$line" =~ ^##[[:space:]] ]]; then
             echo "$line" >> "$temp_file"
@@ -493,17 +419,20 @@ update_existing_agent_file() {
     
     # If sections don't exist, add them at the end of the file
     if [[ $has_active_technologies -eq 0 ]] && [[ ${#new_tech_entries[@]} -gt 0 ]]; then
-        echo "" >> "$temp_file"
-        echo "## Active Technologies" >> "$temp_file"
-        printf '%s\n' "${new_tech_entries[@]}" >> "$temp_file"
+        {
+            echo ""
+            echo "## Active Technologies"
+            printf '%s\n' "${new_tech_entries[@]}"
+        } >> "$temp_file"
         tech_entries_added=true
     fi
     
     if [[ $has_recent_changes -eq 0 ]] && [[ -n "$new_change_entry" ]]; then
-        echo "" >> "$temp_file"
-        echo "## Recent Changes" >> "$temp_file"
-        echo "$new_change_entry" >> "$temp_file"
-        changes_entries_added=true
+        {
+            echo ""
+            echo "## Recent Changes"
+            echo "$new_change_entry"
+        } >> "$temp_file"
     fi
     
     # Move temp file to target atomically

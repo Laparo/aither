@@ -16,7 +16,8 @@ export function isAuthError(err: unknown): boolean {
 	// Fallback: check message-like fields
 	const msg = e?.message ?? e?.error ?? e?.code ?? "";
 	if (typeof msg === "string") {
-		return /unauthoriz|forbid|401|403/i.test(msg);
+		// Match whole-word '401' or '403' or words like 'unauthorized'/'forbidden'
+		return /\b(?:401|403|unauthori[sz]ed|forbidden)\b/i.test(msg);
 	}
 	return false;
 }

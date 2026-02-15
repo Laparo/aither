@@ -1,9 +1,9 @@
 ---
 description: Create or update the feature specification from a natural language feature description.
-handoffs: 
+handoffs:
   - label: Build Technical Plan
     agent: speckit.plan
-    prompt: Create a plan for the spec. I am building with...
+    prompt: "Create a plan for the spec. Use {TECH_STACK} as a placeholder; replace it with the target stack if known or leave it as a placeholder. List only necessary parameters; do not include implementation details."
   - label: Clarify Spec Requirements
     agent: speckit.clarify
     prompt: Clarify specification requirements
@@ -84,18 +84,18 @@ Given that feature description, do this:
    - If no existing branches/directories found with this short-name, start with number 1
    - You must only ever run this script once per feature
    - The JSON is provided in the terminal as output - always refer to it to get the actual content you're looking for
-   - The JSON output will contain BRANCH_NAME and SPEC_FILE paths
+   - The JSON output will contain BRANCH_NAME, FEATURE_DIR, and SPEC_FILE paths
    - For single quotes in args like "I'm Groot", use escape syntax: e.g 'I'\''m Groot' (or double-quote if possible: "I'm Groot")
 
 3. Load `.specify/templates/spec-template.md` to understand required sections.
 
 4. Follow this execution flow:
 
-    1. Parse user description from Input
-       If empty: write an explicit error to logs/output ("No feature description provided"), log the invocation context (user, timestamp, command), set a non-zero exit code, and abort the workflow immediately (throw/exit). Present a clear message asking the user to re-run the command with a description. Do NOT proceed or attempt recovery automatically.
-    2. Extract key concepts from description
-       Identify: actors, actions, data, constraints
-    3. For unclear aspects:
+   1. Parse user description from Input
+      If empty: write an explicit error to logs/output ("No feature description provided"), log the invocation context (user, timestamp, command), set a non-zero exit code, and abort the workflow immediately (throw/exit). Present a clear message asking the user to re-run the command with a description. Do NOT proceed or attempt recovery automatically.
+   2. Extract key concepts from description
+      Identify: actors, actions, data, constraints
+   3. For unclear aspects:
        - Make informed guesses based on context and industry standards
        - Only mark with [NEEDS CLARIFICATION: specific question] if:
          - The choice significantly impacts feature scope or user experience
@@ -103,8 +103,10 @@ Given that feature description, do this:
          - No reasonable default exists
        - **LIMIT: Maximum 3 [NEEDS CLARIFICATION] markers total**
        - Prioritize clarifications by impact: scope > security/privacy > user experience > technical details
-    4. Fill User Scenarios & Testing section
-       If no clear user flow: write an explicit error to logs/output ("Cannot determine user scenarios"), log context (spec path, feature description), set a non-zero exit code and abort the workflow immediately. Do not auto-guess user flows; instead mark the spec as failed and prompt the user for clarification.
+      4. Fill User Scenarios & Testing section
+         - **Ambiguous / underspecified flows**: mark the section with `[NEEDS CLARIFICATION]`, log context (spec path, feature description), and prompt the user for details. Do not make silent assumptions.
+         - **Unambiguous flows**: you MAY infer the flow using industry-standard defaults, but any inferred steps MUST be clearly flagged by prepending `ASSUMPTION:` to the step and recording the assumption in the Assumptions section.
+         - **Guiding principle**: ambiguous cases are always clarified; reasonable inference is allowed only when safe.
     5. Generate Functional Requirements
        Each requirement must be testable
        Use reasonable defaults for unspecified details (document assumptions in Assumptions section)
@@ -115,7 +117,11 @@ Given that feature description, do this:
     7. Identify Key Entities (if data involved)
     8. Return: SUCCESS (spec ready for planning)
 
-5. Write the specification to SPEC_FILE using the template structure, replacing placeholders with concrete details derived from the feature description (arguments) while preserving section order and headings.
+5. Initialize and write the specification to SPEC_FILE using the template structure:
+
+   a. Initialize SPEC_FILE (idempotent): If `SPEC_FILE` does not exist, create it and populate it with the template structure (placeholders intact). If `SPEC_FILE` already exists, leave it unchanged. This step transitions the state from `missing` → `templated`.
+
+   b. Write (render) SPEC_FILE (atomic overwrite): Take the template (either the newly initialized file or the existing templated file), render placeholders to concrete values derived from the feature description, and perform an atomic overwrite of `SPEC_FILE` so the final file contains the fully rendered spec. Do NOT append. This step transitions the state from `templated` → `fully rendered`.
 
 6. **Specification Quality Validation**: After writing the initial spec, validate it against quality criteria:
 
@@ -203,7 +209,7 @@ Given that feature description, do this:
            - Header separator MUST have at least 3 dashes per column: `|--------|` not `|--|`
            - All rows MUST have the same number of columns (pipes)
            - No trailing spaces after the final pipe on each line
-           - Pipes MUST be aligned vertically for readability (though not strictly required by spec)
+           - Pipes SHOULD be aligned vertically for readability (though not strictly required by spec)
            
            **Correct Example**:
            ```markdown
@@ -238,12 +244,13 @@ Given that feature description, do this:
 
 ## General Guidelines
 
+
 ### Quick Guidelines
 
 - Focus on **WHAT** users need and **WHY**.
 - Avoid HOW to implement (no tech stack, APIs, code structure).
 - Written for business stakeholders, not developers.
-- DO NOT create any checklists that are embedded in the spec. That will be a separate command.
+ - Do not embed checklists inline inside `spec.md`. Instead create external checklist files under the `checklists/` folder (for example: `FEATURE_DIR/checklists/requirements.md`). The workflow's checklist step (see Step 6a) will create/update such external files.
 
 ### Section Requirements
 
@@ -268,13 +275,16 @@ When creating this spec from a user prompt:
    - User types and permissions (if multiple conflicting interpretations possible)
    - Security/compliance requirements (when legally/financially significant)
 
-**Examples of reasonable defaults** (don't ask about these):
 
-- Data retention: Industry-standard practices for the domain
-- Performance targets: Standard web/mobile app expectations unless specified
-- Error handling: User-friendly messages with appropriate fallbacks
-- Authentication method: Standard session-based or OAuth2 for web apps
-- Integration patterns: RESTful APIs unless specified otherwise
+**Examples of reasonable defaults** (internal only; do NOT write these verbatim in the generated spec):
+
+- Data retention: Assume industry-standard practices for the domain
+- Performance targets: Assume standard web/mobile app expectations unless specified
+- Error handling: Assume user-friendly messages with appropriate fallbacks
+- Authentication method: assume industry-standard secure authentication (do not name protocols in the spec)
+- Integration patterns: assume standard API integration style (describe generically, do not mandate REST or specific protocols)
+
+Note: These are internal defaults for the Spec-Generator logic and must not be written verbatim into the produced Spec.
 
 ### Success Criteria Guidelines
 

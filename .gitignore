@@ -58,9 +58,10 @@ next-env.d.ts
 *.tsbuildinfo
 
 # Generated HTML output
+
 output/
 
-// (duplicate Python block removed — consolidated above)
+# (duplicate Python block removed — consolidated above)
 
-# Misc
+# (duplicate Python block removed — consolidated above)
 .qodo/

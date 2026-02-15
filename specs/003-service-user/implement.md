@@ -21,16 +21,17 @@ Create a new file `src/lib/auth/service-token.ts`:
 import { clerkClient } from '@clerk/nextjs/server';
 import { loadConfig } from '../config';
 
-interface CachedToken {
-  value: string;
-  expiresAt: Date;
-}
+// Token shape: { token: string; expiresAt: number }
+// Stored via TokenStore abstraction (see token-store.ts)
 
 // In-memory token cache (DEV-ONLY).
 // For production, replace this with a shared store such as Vercel KV, Upstash Redis, or similar.
 // The in-memory `Map` works for local development and CI tests but will not work across
 // multiple instances or serverless cold starts.
-const tokenCache = new Map<string, CachedToken>();
+
+// Use TokenStore abstraction for production; in-memory for dev only.
+import { tokenStore, setTokenStore } from '@/lib/auth/token-store';
+const refreshLocks = new Map<string, Promise<string>>();
 
 /**
  * Get a valid service token for Hemera API access.
@@ -38,24 +39,42 @@ const tokenCache = new Map<string, CachedToken>();
  */
 export async function getServiceToken(): Promise<string> {
   const cacheKey = 'hemera-service-token';
-  const cached = tokenCache.get(cacheKey);
-  
-  // Return cached token if still valid (with 2-minute buffer)
-  if (cached && cached.expiresAt > new Date(Date.now() + 120000)) {
-    return cached.value;
+  const cached = await tokenStore.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now() + 120000) {
+    return cached.token;
   }
-  
-  // Obtain new token from Clerk
-  const config = loadConfig();
-  const token = await obtainTokenFromClerk(config.CLERK_SERVICE_USER_ID);
-  
-  // Cache with 15-minute expiration
-  tokenCache.set(cacheKey, {
-    value: token,
-    expiresAt: new Date(Date.now() + 15 * 60 * 1000),
-  });
-  
-  return token;
+
+  // Deduplicate concurrent refreshes
+  if (refreshLocks.has(cacheKey)) {
+    return refreshLocks.get(cacheKey)!;
+  }
+
+  const refreshPromise = (async () => {
+    // Prefer pre-provisioned token from environment
+    const envToken = process.env.CLERK_SERVICE_USER_API_KEY || process.env.CLERK_SERVICE_USER_SIGNIN_TOKEN;
+    if (envToken && typeof envToken === 'string' && envToken.trim().length > 0) {
+      // Validate before caching
+      await validateToken(envToken, 'generated');
+      const expiresAt = Date.now() + 15 * 60 * 1000;
+      await tokenStore.set(cacheKey, { token: envToken, expiresAt });
+      return envToken;
+    }
+
+    const config = loadConfig();
+    const tokenResp = await obtainTokenFromClerk(config.CLERK_SERVICE_USER_ID);
+    // Validate before caching
+    await validateToken(tokenResp, 'generated');
+    const expiresAt = Date.now() + 15 * 60 * 1000;
+    await tokenStore.set(cacheKey, { token: tokenResp, expiresAt });
+    return tokenResp;
+  })();
+
+  refreshLocks.set(cacheKey, refreshPromise);
+  try {
+    return await refreshPromise;
+  } finally {
+    refreshLocks.delete(cacheKey);
+  }
 }
 
 /**
@@ -82,8 +101,8 @@ async function obtainTokenFromClerk(userId: string): Promise<string> {
 /**
  * Clear the token cache (useful for testing or forced refresh).
  */
-export function clearTokenCache(): void {
-  tokenCache.clear();
+export async function clearTokenCache(): Promise<void> {
+  await tokenStore.delete('hemera-service-token');
 }
 ```
 
@@ -186,8 +205,16 @@ describe('HemeraClient', () => {
     // Verify the Authorization header was passed to fetch
     const firstCall = mockFetch.mock.calls[0];
     const options = firstCall[1];
-    const hdrs = options?.headers as Headers | undefined;
-    expect(hdrs.get('Authorization')).toBe('Bearer mock-token');
+    let authHeader;
+    if (options?.headers instanceof Headers) {
+      authHeader = options.headers.get('Authorization');
+    } else if (Array.isArray(options?.headers)) {
+      const found = options.headers.find(([k]) => k.toLowerCase() === 'authorization');
+      authHeader = found ? found[1] : undefined;
+    } else if (options?.headers && typeof options.headers === 'object') {
+      authHeader = options.headers['Authorization'] || options.headers['authorization'];
+    }
+    expect(authHeader).toBe('Bearer mock-token');
   });
   
   // Add more tests...
@@ -224,33 +251,9 @@ UPSTASH_REDIS_REST_TOKEN=<upstash-rest-token>
 
 ### Step 1: Create getUserRole Helper
 
-Create `lib/auth/user-role.ts`:
+Create `lib/auth/user-role.ts` (canonical helper used by service endpoints). Implementations should import and use this single helper to avoid duplication.
 
-```typescript
-import { clerkClient } from '@clerk/nextjs/server';
-
-// Return the canonical `Role` string or `null` if the user has no role set.
-export async function getUserRole(userId: string): Promise<'admin' | 'api-client' | 'instructor' | 'participant' | null> {
-  if (!userId) return null;
-
-  try {
-    const user = await clerkClient.users.getUser(userId);
-    const role = (user?.publicMetadata?.role as string) || null;
-    if (!role) return null;
-    if (['admin', 'api-client', 'instructor', 'participant'].includes(role)) return role as any;
-    return null;
-  } catch (error) {
-    console.error('Failed to get user role:', error);
-    // If Clerk returned a server error or network error, rethrow so callers can handle/monitor it.
-    const status = (error as any)?.status;
-    if (!status || status >= 500) throw error;
-    // Otherwise treat as missing role (non-fatal)
-    return null;
-  }
-}
-```
-
-### Permissions (single canonical definition)
+### Step 2: Permissions (single canonical definition)
 
 Update `lib/auth/permissions.ts` to provide a single canonical RBAC definition used throughout the codebase:
 
@@ -260,14 +263,16 @@ Update `lib/auth/permissions.ts` to provide a single canonical RBAC definition u
 // Centralized role-based access control for service endpoints
 // ---------------------------------------------------------------------------
 
-export type Permission =
-  | 'read:courses'
-  | 'read:bookings'
-  | 'read:participations'
-  | 'write:participation-results'
-  | 'read:users'
-  | 'manage:courses'
-  | 'manage:users';
+export const Permission = {
+  READ_COURSES: 'read:courses',
+  READ_BOOKINGS: 'read:bookings',
+  READ_PARTICIPATIONS: 'read:participations',
+  WRITE_PARTICIPATION_RESULTS: 'write:participation-results',
+  READ_USERS: 'read:users',
+  MANAGE_COURSES: 'manage:courses',
+  MANAGE_USERS: 'manage:users',
+} as const;
+export type Permission = typeof Permission[keyof typeof Permission];
 
 // Consolidated role type - single source of truth
 export type Role = 'admin' | 'api-client' | 'instructor' | 'participant';
@@ -304,7 +309,7 @@ export function hasPermission(role: Role | null | undefined, permission: Permiss
 }
 ```
 
-### Step 4: Create Error Utilities
+### Step 3: Create Error Utilities
 
 Create `lib/utils/api-error.ts`:
 
@@ -333,7 +338,7 @@ export function createErrorResponse(
 }
 ```
 
-### Step 5: Create Auth Guard
+### Step 4: Create Auth Guard
 
 Create `lib/auth/service-guard.ts`:
 
@@ -350,34 +355,6 @@ import { hasPermission } from './permissions';
 import { createErrorResponse } from '../utils/api-error';
 
 /**
- * Get the user's role from Clerk session claims.
- */
-async function getUserRole(userId: string): Promise<Role | null> {
-  try {
-    const { sessionClaims } = await auth();
-    
-    // Extract role from public metadata in session claims
-    // Clerk stores custom data in publicMetadata
-    const metadata = sessionClaims?.publicMetadata as { role?: string } | undefined;
-    const role = metadata?.role;
-    
-    if (!role || typeof role !== 'string') {
-      return null;
-    }
-    
-    // Validate that the role is one of our known roles
-    if (['admin', 'api-client', 'instructor', 'participant'].includes(role)) {
-      return role as Role;
-    }
-    
-    return null;
-  } catch (error) {
-    console.error('Failed to get user role:', error);
-    return null;
-  }
-}
-
-/**
  * Require service authentication and authorization for an API endpoint.
  * Returns null if authorized, or a NextResponse with error if not.
  * 
@@ -385,15 +362,20 @@ async function getUserRole(userId: string): Promise<Role | null> {
  * @returns null if authorized, NextResponse with error otherwise
  */
 export async function requireServiceAuth(requiredPermission: Permission): Promise<NextResponse | null> {
-  const { userId } = await auth();
+  const { userId, sessionClaims } = await auth();
 
   if (!userId) {
     return createErrorResponse(401, 'Unauthorized', 'Authentication required');
   }
 
-  const role = await getUserRole(userId);
+  // Derive role from session claims directly (avoid double auth() call)
+  const metadata = sessionClaims?.publicMetadata as { role?: string } | undefined;
+  const role = metadata?.role;
+  const validatedRole = (role && typeof role === 'string' &&
+    ['admin', 'api-client', 'instructor', 'participant'].includes(role))
+    ? role as Role : null;
 
-  if (!hasPermission(role, requiredPermission)) {
+  if (!hasPermission(validatedRole, requiredPermission)) {
     return createErrorResponse(403, 'Forbidden', 'Insufficient permissions');
   }
 
@@ -401,7 +383,7 @@ export async function requireServiceAuth(requiredPermission: Permission): Promis
 }
 ```
 
-### Step 4: Create Service Endpoints
+### Step 5: Create Service Endpoints
 
 Create `app/api/service/courses/route.ts`:
 
@@ -500,19 +482,12 @@ export async function GET(
   try {
     const participation = await prisma.courseParticipation.findUnique({
       where: { id: params.id },
-      select: {
-        id: true,
-        courseId: true,
-        userId: true, // Pseudonymous identifier only; no name/email
-        resultOutcome: true,
-        resultNotes: true,
-      },
     });
-    
+
     if (!participation) {
       return createErrorResponse(404, 'Not Found', 'Participation not found');
     }
-    
+
     return NextResponse.json(participation);
   } catch (err) {
     console.error('Failed to fetch participation:', err);
@@ -545,47 +520,54 @@ export async function PUT(
   
   try {
     const body = await request.json();
-    const data = UpdateResultSchema.parse(body);
-    
-    // Ensure the participation exists before updating to provide a clear 404.
-    const existing = await prisma.courseParticipation.findUnique({ where: { id: params.id } });
-    if (!existing) {
-      return createErrorResponse(404, 'Not Found', 'Participation not found');
+    let data;
+    try {
+      data = UpdateResultSchema.parse(body);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return createErrorResponse(400, 'Bad Request', 'Invalid request data');
+      }
+      throw err;
     }
 
-    const participation = await prisma.courseParticipation.update({
-      where: { id: params.id },
-      data: {
-        resultOutcome: data.resultOutcome,
-        resultNotes: data.resultNotes,
-      },
-    });
-    
-    return NextResponse.json(participation);
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return createErrorResponse(400, 'Bad Request', 'Invalid request data');
+    try {
+      const participation = await prisma.courseParticipation.update({
+        where: { id: params.id },
+        data: {
+          resultOutcome: data.resultOutcome,
+          resultNotes: data.resultNotes,
+        },
+      });
+      return NextResponse.json(participation);
+    } catch (error) {
+      // Prisma known error handling
+      if ((error as any)?.code === 'P2025') {
+        return createErrorResponse(404, 'Not Found', 'Participation not found');
+      }
+      console.error('Failed to update participation result:', error);
+      return createErrorResponse(500, 'Server Error', 'Failed to update participation result');
     }
-    
-    console.error('Failed to update participation result:', error);
-    return createErrorResponse(500, 'Server Error', 'Failed to update participation result');
+  } catch (err) {
+    console.error('Failed to process participation result request:', err);
+    return createErrorResponse(500, 'Server Error', 'Internal server error');
   }
 }
 ```
 
-### Step 5: Update Middleware
+### Step 6: Update Middleware
 
-Update `proxy.ts`:
+Update `middleware.ts` (renamed from `proxy.ts`):
 
 ```typescript
+// middleware.ts — Clerk auth for all routes; per-endpoint authorization
+// is handled by requireServiceAuth in route handlers.
 import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
 
 const isServiceRoute = createRouteMatcher(['/api/service/(.*)']);
 
-export default clerkMiddleware((auth, req) => {
-  // Require authentication for service routes
+export default clerkMiddleware(async (auth, req) => {
   if (isServiceRoute(req)) {
-    auth().protect();
+    await auth.protect();
   }
 });
 
@@ -597,7 +579,9 @@ export const config = {
 };
 ```
 
-### Step 6: Add Rate Limiting
+Note: This follows a two-step approach — `middleware.ts` performs authentication (`auth.protect()`), while per-endpoint authorization (permission checks) is implemented in `requireServiceAuth` and used within individual route handlers.
+
+### Step 7: Add Rate Limiting
 
 Create `lib/rate-limit.ts`:
 
@@ -632,10 +616,16 @@ import { auth } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
 
 export async function GET(request: Request) {
-  const { userId } = await auth();
-  
-  // Check rate limit
-  const rateLimit = await checkRateLimit(`service:${userId}`);
+  // Check rate limit after auth to prevent unauthenticated DoS
+  let userId: string | null = null;
+  try {
+    const authResult = await auth();
+    userId = authResult.userId;
+  } catch (err) {
+    console.warn('Rate limit pre-check: auth() failed, using anon key', err);
+  }
+  const key = userId ? `service:${userId}` : 'service:anon';
+  const rateLimit = await checkRateLimit(key);
   if (!rateLimit.success) {
     return NextResponse.json(
       { error: 'TooManyRequests', message: 'Rate limit exceeded' },
@@ -649,7 +639,6 @@ export async function GET(request: Request) {
       }
     );
   }
-  
   // ... rest of the implementation
 }
 ```

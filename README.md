@@ -8,23 +8,14 @@
 npm run open:code
 ```
 
-- **Python tools**: the repository uses a local virtualenv at `.venv`. Activate it with:
+- **Python tools** (optional, for `specify` CLI): the repository uses a local virtualenv at `.venv`. Activate it with:
 
 ```bash
-# Unix / Linux / macOS
-source .venv/bin/activate
-
-# Windows PowerShell
-.venv\Scripts\Activate.ps1
-
-# Windows CMD
-.venv\Scripts\activate.bat
-
-# then run Python CLI tools like `specify`
+source .venv/bin/activate   # macOS / Linux
 specify --help
 ```
 
-# spec-kit
+## Spec-Kit
 
 ## Rollbar API Tokens
 

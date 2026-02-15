@@ -1,13 +1,14 @@
+---
 description: Execute the implementation planning workflow using the plan template to generate design artifacts.
 handoffs:
-   - label: Create Tasks
-      agent: speckit.tasks
-      prompt: "Break the plan into discrete, testable tasks suitable for issue creation. Include task title, short description, estimated effort (S/M/L), and acceptance criteria."
-      send: true
-   - label: Create Checklist
-      agent: speckit.checklist
-      prompt: "Create a checklist for the following domain <DOMAIN>. Produce 8-12 checklist items divided into three sections: 'tasks', 'prerequisites', and 'verification steps'. For each checklist item include a one-line description, any input required, and an example where helpful. Constrain items to be actionable and unambiguous."
-      send: true
+  - label: Create Tasks
+    agent: speckit.tasks
+    prompt: "Break the plan into discrete, testable tasks suitable for issue creation. Include task title, short description, estimated effort (S/M/L), and acceptance criteria."
+    send: true
+  - label: Create Checklist
+    agent: speckit.checklist
+    prompt: "Create a checklist for the following domain <DOMAIN>. (Set DOMAIN via the 'domain' task input, or use 'example.com' as a fallback if not provided. If DOMAIN is not set, replace <DOMAIN> with 'example.com'.) Produce 8-12 checklist items divided into three sections: 'tasks', 'prerequisites', and 'verification steps'. For each checklist item include a one-line description, any input required, and an example where helpful. Constrain items to be actionable and unambiguous."
+    send: true
 ---
 
 ## User Input
@@ -29,8 +30,7 @@ You **MUST** consider the user input before proceeding (if not empty).
    - Fill Constitution Check section from constitution
    - Evaluate gates (ERROR if violations unjustified)
    - Phase 0: Generate research.md (resolve all NEEDS CLARIFICATION)
-   - Phase 1: Generate data-model.md, contracts/, quickstart.md
-   - Phase 1: Update agent context by running the agent script
+   - Phase 1: Generate data-model.md, contracts/, quickstart.md, and update agent context
    - Re-evaluate Constitution Check post-design
 
 4. **Stop and report**: Command ends after Phase 1 planning. Report branch, IMPL_PLAN path, and generated artifacts.
@@ -39,10 +39,11 @@ You **MUST** consider the user input before proceeding (if not empty).
 
 ### Phase 0: Outline & Research
 
-1. **Extract unknowns from Technical Context** above:
+1. **Extract unknowns from Technical Context in the IMPL_PLAN template above**:
    - For each NEEDS CLARIFICATION → research task
    - For each dependency → best practices task
    - For each integration → patterns task
+   - See "Technical Context" section in the IMPL_PLAN template above for details.
 
 2. **Generate and dispatch research agents**:
 
@@ -75,8 +76,7 @@ You **MUST** consider the user input before proceeding (if not empty).
    - Output OpenAPI/GraphQL schema to `/contracts/`
 
 3. **Agent context update**:
-   - Run `.specify/scripts/bash/update-agent-context.sh kilocode`
-   - These scripts detect which AI agent is in use
+   - Run `.specify/scripts/bash/update-agent-context.sh <agent-name>` where `<agent-name>` is the target agent (for example: `kilocode`). The script expects an explicit agent name argument and will update the corresponding agent-specific context file.
    - Update the appropriate agent-specific context file
    - Add only new technology from current plan
    - Preserve manual additions between explicit markers. Use a clearly defined start/end pair such as:
@@ -103,5 +103,7 @@ You **MUST** consider the user input before proceeding (if not empty).
 
 ## Key rules
 
-- Use absolute paths
-- ERROR on gate failures or unresolved clarifications ~
+- ERROR on gate failures or unresolved clarifications.
+- Log and report errors immediately.
+- Escalate unresolved clarifications by flagging them in the plan output and notifying the feature owner.
+- Run validation checks before merge and require passing checks for gate closure.
