@@ -50,8 +50,13 @@ output/
 .venv/
 __pycache__/
 *.py[cod]
+*.pyo
+*.pyd
+.Python
+python-env/
 *.egg-info/
 .eggs/
+.pytest_cache/
 
 # Misc
 .qodo/
