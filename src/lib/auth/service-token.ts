@@ -105,19 +105,64 @@ async function obtainTokenFromClerk(userId: string): Promise<string> {
 			);
 		}
 
-		// Prefer a machine/service token or session JWT for M2M flows.
-		// Create a server-side session for the service user and obtain a JWT
-		// NOTE: Clerk SDK versions differ; if `sessions.create` / `sessions.getToken` are not available,
-		// document the required backend pattern and consult Clerk docs.
-		const session = await clerk.sessions.create({ userId: user.id });
-		if (!session?.id) {
-			throw new Error('Failed to create session for service user in Clerk');
+		// For service-to-service authentication in Clerk v6+, we need to use the Backend API
+		// to create a session token. The SessionAPI in v6+ doesn't have a create method,
+		// so we use the Backend API directly via fetch.
+		
+		// Get the Clerk secret key from environment
+		const secretKey = process.env.CLERK_SECRET_KEY;
+		if (!secretKey) {
+			throw new Error('CLERK_SECRET_KEY is not set in environment variables');
 		}
 
-		// Obtain a JWT for the session. The second argument may be a template name depending on SDK.
-		const jwt = await clerk.sessions.getToken(session.id, 'hemera-api');
-		if (!jwt) {
-			throw new Error('Failed to obtain session JWT from Clerk for service user');
+		// Create a session using Clerk's Backend API
+		const response = await fetch('https://api.clerk.com/v1/sessions', {
+			method: 'POST',
+			headers: {
+				'Authorization': `Bearer ${secretKey}`,
+				'Content-Type': 'application/json',
+			},
+			body: JSON.stringify({
+				user_id: user.id,
+			}),
+		});
+
+		if (!response.ok) {
+			const errorText = await response.text();
+			throw new Error(
+				`Failed to create session via Clerk API (status ${response.status}): ${errorText}`
+			);
+		}
+
+		const sessionData = await response.json();
+		if (!sessionData?.id) {
+			throw new Error('Session creation succeeded but no session ID was returned');
+		}
+
+		// Get the session token using the session ID
+		const tokenResponse = await fetch(
+			`https://api.clerk.com/v1/sessions/${sessionData.id}/tokens/hemera-api`,
+			{
+				method: 'POST',
+				headers: {
+					'Authorization': `Bearer ${secretKey}`,
+					'Content-Type': 'application/json',
+				},
+			}
+		);
+
+		if (!tokenResponse.ok) {
+			const errorText = await tokenResponse.text();
+			throw new Error(
+				`Failed to get session token via Clerk API (status ${tokenResponse.status}): ${errorText}`
+			);
+		}
+
+		const tokenData = await tokenResponse.json();
+		const jwt = tokenData?.jwt;
+		
+		if (!jwt || typeof jwt !== 'string') {
+			throw new Error('Failed to extract JWT from Clerk API response');
 		}
 
 		return jwt;
