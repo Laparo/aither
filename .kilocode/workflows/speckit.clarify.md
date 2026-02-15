@@ -121,6 +121,15 @@ Execution steps:
        - All rows MUST have the same number of columns
        - No trailing spaces after the final pipe
 
+       **Correct Example**:
+       ```markdown
+       | Option | Description |
+       |--------|-------------|
+       | A | Use OAuth2 for authentication |
+       | B | Use JWT tokens with refresh logic |
+       | Short | Provide your own answer |
+       ```
+
        - After the table, add: `You can reply with the option letter (e.g., "A"), accept the recommendation by saying "yes" or "recommended", or provide your own short answer.`
     - For short‑answer style (no meaningful discrete options):
        - Provide your **suggested answer** based on best practices and context.

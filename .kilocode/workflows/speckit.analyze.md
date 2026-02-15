@@ -132,6 +132,15 @@ Output a Markdown report (no file writes) with the following structure:
 - All rows MUST have the same number of columns
 - No trailing spaces after the final pipe
 
+**Correct Example**:
+```markdown
+| ID | Category | Severity | Location(s) | Summary | Recommendation |
+|----|----------|----------|-------------|---------|----------------|
+| D1 | Duplication | HIGH | spec.md:L120-134 | Two similar requirements ... | Merge phrasing; keep clearer version |
+```
+
+**Findings Table:**
+
 | ID | Category | Severity | Location(s) | Summary | Recommendation |
 |----|----------|----------|-------------|---------|----------------|
 | D1 | Duplication | HIGH | spec.md:L120-134 | Two similar requirements ... | Merge phrasing; keep clearer version |

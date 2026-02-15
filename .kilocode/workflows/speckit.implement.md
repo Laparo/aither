@@ -14,13 +14,28 @@ You **MUST** consider the user input before proceeding (if not empty).
 
 1. Run `.specify/scripts/bash/check-prerequisites.sh --json --require-tasks --include-tasks` from repo root and parse FEATURE_DIR and AVAILABLE_DOCS list. All paths must be absolute. For single quotes in args like "I'm Groot", use escape syntax: e.g 'I'\''m Groot' (or double-quote if possible: "I'm Groot").
 
+1a. **Validate required environment variables** (if implementation depends on service user authentication):
+    - Check for presence and non-empty values of service user env vars:
+      - `CLERK_SERVICE_USER_ID` — Required for service-to-service authentication
+      - `CLERK_SERVICE_USER_EMAIL` — Required for service user identification
+    - If any required env var is missing or empty:
+      - **STOP** and display error: "Missing required environment variable: [VAR_NAME]. Please configure it in .env (see .env.example for reference)."
+      - Halt execution to prevent runtime failures
+    - This validation reduces runtime surprises and ensures proper configuration before task execution
+
 2. **Check checklists status** (if FEATURE_DIR/checklists/ exists):
    - Scan all checklist files in the checklists/ directory
    - For each checklist, count:
      - Total items: All lines matching `- [ ]` or `- [X]` or `- [x]`
      - Completed items: Lines matching `- [X]` or `- [x]`
      - Incomplete items: Lines matching `- [ ]`
-   - Create a status table:
+   - Create a status table (ensure proper markdown formatting):
+
+     **Table Formatting Rules**:
+     - Each cell MUST have exactly one space before and after content: `| Content |`
+     - Header separator MUST have at least 3 dashes per column: `|--------|`
+     - All rows MUST have the same number of columns
+     - No trailing spaces after the final pipe
 
      ```text
      | Checklist | Total | Completed | Incomplete | Status |
@@ -124,6 +139,22 @@ You **MUST** consider the user input before proceeding (if not empty).
    - Provide clear error messages with context for debugging
    - Suggest next steps if implementation cannot proceed
    - **IMPORTANT** For completed tasks, make sure to mark the task off as [X] in the tasks file.
+
+   ### Failure classification
+
+   **Explicit failure behavior rules** to ensure consistent handling across runs:
+
+   | Failure Type | Condition | Behavior | Examples |
+   |--------------|-----------|----------|----------|
+   | **Blocking** | Non-parallel task fails | Abort current phase and overall run | Sequential task compilation error, missing prerequisite file, checklist gating failure |
+   | **Blocking** | All [P] tasks in a group fail | Abort current phase and overall run | All parallel unit tests fail, all parallel API endpoints fail validation |
+   | **Warning** | Some [P] tasks fail, others succeed | Continue with successful tasks, report failures at phase end | 2 of 5 parallel tests fail, 1 of 3 parallel API routes has linting errors |
+   | **Blocking** | Corrupted state detected | Abort immediately | Git repository corruption, filesystem permission errors, invalid configuration |
+
+   **Retry policy**:
+   - Allow a single retry for transient IO/network errors on non-destructive steps (e.g., fetching dependencies, reading files)
+   - Do not auto-retry destructive operations; require manual intervention
+   - Log retry attempts with timestamps for debugging
 
 9. Completion validation:
    - Verify all required tasks are completed

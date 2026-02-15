@@ -62,6 +62,21 @@ You **MUST** consider the user input before proceeding (if not empty).
    - Never ask the user to restate what they already said
    - Avoid speculative categories (no hallucination). If uncertain, ask explicitly: "Confirm whether X belongs in scope."
 
+   **Table Formatting Rules** (MUST follow to prevent renderer rejection):
+   - Each cell MUST have exactly one space before and after content: `| Content |`
+   - Header separator MUST have at least 3 dashes per column: `|--------|`
+   - All rows MUST have the same number of columns
+   - No trailing spaces after the final pipe
+
+   **Correct Example**:
+   ```markdown
+   | Option | Candidate | Why It Matters |
+   |--------|-----------|----------------|
+   | A | Standard depth | Covers common scenarios without overwhelming detail |
+   | B | Deep dive | Includes edge cases and recovery flows |
+   | C | Minimal | Only critical path items |
+   ```
+
    Defaults when interaction impossible:
    - Depth: Standard
    - Audience: Reviewer (PR) if code-related; Author otherwise

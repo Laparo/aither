@@ -48,6 +48,13 @@ Follow this execution flow:
    - Read `.specify/templates/tasks-template.md` and ensure task categorization reflects new or removed principle-driven task types (e.g., observability, versioning, testing discipline).
    - Read each command file in `.specify/templates/commands/*.md` (including this one) to verify no outdated references remain. Avoid hard-coding product/brand or proprietary agent names (e.g., "Claude", "Copilot"). Instead use generic phrasing such as "an AI assistant" or "agent-specific configuration". Example acceptable wording: "Do not include product-specific agent names; use a generic placeholder like 'AgentName' when describing agent-agnostic behavior." Also ensure command templates do not reference vendor-specific identifiers.
    - Read any runtime guidance docs (e.g., `README.md`, `docs/quickstart.md`, or agent-specific guidance files if present). Update references to principles changed.
+   - **Table formatting propagation**: Verify all workflow docs that generate markdown tables include the strict formatting rules and conforming examples:
+     - Check `.kilocode/workflows/speckit.specify.md` — Should have rules + correct/incorrect examples
+     - Check `.kilocode/workflows/speckit.analyze.md` — Should have rules + correct example
+     - Check `.kilocode/workflows/speckit.clarify.md` — Should have rules + correct example
+     - Check `.kilocode/workflows/speckit.checklist.md` — Should have rules + correct example
+     - Check `.kilocode/workflows/speckit.implement.md` — Should have rules note for status tables
+     - Ensure consistency: All rules must state the same requirements (1 space padding, 3+ dashes, aligned columns, no trailing spaces)
 
 5. Produce a Sync Impact Report (prepend as an HTML comment at top of the constitution file after update):
    - Version change: old → new
