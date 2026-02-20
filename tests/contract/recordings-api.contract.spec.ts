@@ -22,6 +22,14 @@ vi.mock("@/lib/hemera/client", () => ({
 	})),
 }));
 
+// Mock factory — prevent getTokenManager() from requiring HEMERA_API_KEY env var
+vi.mock("@/lib/hemera/factory", () => ({
+	createHemeraClient: vi.fn(() => ({
+		get: vi.fn(),
+		put: vi.fn().mockResolvedValue({ status: 200, message: "OK" }),
+	})),
+}));
+
 // Mock config
 vi.mock("@/lib/config", () => ({
 	loadConfig: vi.fn().mockReturnValue({
