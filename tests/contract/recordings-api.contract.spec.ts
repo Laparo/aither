@@ -22,6 +22,7 @@ vi.mock("@/lib/hemera/client", () => ({
 	})),
 }));
 
+// Mock factory — prevent getTokenManager() from requiring HEMERA_API_KEY env var
 vi.mock("@/lib/hemera/factory", () => ({
 	createHemeraClient: vi.fn(() => ({
 		get: vi.fn(),
@@ -33,7 +34,7 @@ vi.mock("@/lib/hemera/factory", () => ({
 vi.mock("@/lib/config", () => ({
 	loadConfig: vi.fn().mockReturnValue({
 		HEMERA_API_BASE_URL: "https://hemera.academy/api",
-		HEMERA_SERVICE_TOKEN: "test-key",
+		HEMERA_API_KEY: "test-key-minimum-32-characters-long-for-validation",
 		HTML_OUTPUT_DIR: "/tmp/output",
 	}),
 }));

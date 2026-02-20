@@ -49,43 +49,41 @@ statt kurzlebiger Dashboard-Sessions. Dashboard-generierte Session-Tokens sind
 typischerweise kurzlebig (z. B. ~60m) und eignen sich nicht für unbeaufsichtigte
 Service-to-Service-Kommunikation.
 
-Empfohlene Optionen:
+Für M2M-Auth verwenden wir einen statischen API-Key (nicht Clerk JWTs):
 
-- Clerk Backend API: Erzeuge ein dauerhaftes Service-Credential oder nutze
-  organisation/permission Tokens über die Clerk Backend API und implementiere
-  eine Rotation. Siehe: https://clerk.com/docs/server/backend-api
-- Organisation/Service-Tokens: Falls eure Organisation einen eigenen Service-
-  token-Mechanismus unterstützt, verwendet diesen (z. B. organisationMembership
-  tokens).
-
-Beispiel (nur Illustration) — generiere ein langlebiges Token mit dem Backend
-API und setze es in `.env` als `HEMERA_SERVICE_TOKEN`.
+```bash
+# API-Key generieren (48 Byte, base64url-kodiert)
+node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"
+```
 
 **Wichtig**: Rotieren und verwalten Sie diese Schlüssel über einen Secret
 Manager (Vercel/AWS/GCP) und vermeiden Sie das Committen in die Versionskontrolle.
 
 ## Schritt 3: Environment Variables konfigurieren
 
-### In Aither (.env)
+### In Hemera (.env.local)
+
+```bash
+# API-Key für Service-Authentifizierung (muss mit Aither übereinstimmen)
+HEMERA_SERVICE_API_KEY=<generierter-api-key>
+
+# Clerk User-ID des Service-Users (für Audit-Logging)
+HEMERA_SERVICE_USER_ID=<clerk-user-id>
+```
+
+### In Aither (.env.local)
 
 ```bash
 # Hemera API Base URL
-HEMERA_API_BASE_URL=https://hemera-academy.vercel.app
+HEMERA_API_BASE_URL=https://www.hemera.academy
 
-# Service Token — use a long-lived service credential (see step above)
-HEMERA_SERVICE_TOKEN=your-long-lived-service-token-here
+# API-Key für Hemera Service API (muss mit Hemera übereinstimmen)
+HEMERA_API_KEY=<gleicher-api-key-wie-oben>
 
-# Clerk Credentials
+# Clerk Credentials (für lokale Aither-Auth)
 NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_...
 CLERK_SECRET_KEY=sk_...
 ```
-
-### In Hemera (keine Änderungen nötig)
-
-Die Hemera-Seite ist bereits konfiguriert:
-- `api-client` Rolle ist in `lib/auth/permissions.ts` definiert
-- Service-Endpunkte unter `/api/service/*` sind implementiert
-- Auth-Guards prüfen auf `api-client` oder `admin` Rolle
 
 ## Schritt 4: Berechtigungen verifizieren
 
@@ -212,12 +210,12 @@ Logs sind in Rollbar und Hemera-Datenbank verfügbar.
 
 ### Problem: 401 Unauthorized
 
-**Ursache**: Token ungültig oder abgelaufen
+**Ursache**: API-Key ungültig oder nicht gesetzt
 
 **Lösung**:
-1. Token-Gültigkeit prüfen (JWT dekodieren)
-2. Neues Token generieren (siehe Schritt 2)
-3. `HEMERA_SERVICE_TOKEN` in `.env` aktualisieren
+1. Prüfen, dass `HEMERA_API_KEY` in Aither gesetzt ist
+2. Prüfen, dass `HEMERA_SERVICE_API_KEY` in Hemera den gleichen Wert hat
+3. `HEMERA_SERVICE_API_KEY` in `.env` aktualisieren
 
 ### Problem: 403 Forbidden
 

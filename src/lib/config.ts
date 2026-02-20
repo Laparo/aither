@@ -65,22 +65,8 @@ const EnvSchema = z
 		// Hemera Academy API
 		// Base URL must include the full origin (e.g. https://hemera-academy.vercel.app)
 		HEMERA_API_BASE_URL: z.string().url(),
-		// Service token must be a valid JWT (three base64url-encoded parts separated by dots)
-		HEMERA_SERVICE_TOKEN: z
-			.string()
-			.min(1)
-			.refine(
-				(token) => {
-					const parts = token.split(".");
-					if (parts.length !== 3) return false;
-					if (parts.some((p) => p.length === 0)) return false;
-					// Validate all three parts for base64url-safe characters
-					return parts.every((p) => /^[A-Za-z0-9_-]+$/.test(p));
-				},
-				{
-					message: `HEMERA_SERVICE_TOKEN must be a valid JWT (header.payload.signature). Obtain a durable service credential for ${SERVICE_USER_EMAIL} (see Clerk Backend API or dedicated service tokens).`,
-				},
-			),
+		// API key for service-to-service authentication (min 32 chars)
+		HEMERA_API_KEY: z.string().min(32, "HEMERA_API_KEY must be at least 32 characters"),
 
 		// Context7 API key (optional) — use secret key starting with ctx7sk_
 		CONTEXT7_API_KEY: z
