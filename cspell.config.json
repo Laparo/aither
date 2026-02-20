@@ -77,7 +77,22 @@
 		"reencrypt",
 		"reenc",
 		"unauthori",
-		"hasura"
+		"hasura",
+		"remuxed",
+		"remuxing",
+		"RTSP",
+		"rtsp",
+		"MJPEG",
+		"hardlink",
+		"movflags",
+		"faststart",
+		"moov",
+		"ffprobe",
+		"ONVIF",
+		"Sigterm",
+		"noprint",
+		"nokey",
+		"unconfigured"
 	],
 	"ignorePaths": [
 		"node_modules/**",

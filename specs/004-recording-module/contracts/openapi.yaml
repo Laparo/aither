@@ -1,0 +1,722 @@
+openapi: "3.1.0"
+info:
+  title: Aither Recording Module API
+  version: "1.0.0"
+  description: |
+    Video and audio recording module for capturing WLAN webcam streams,
+    managing recordings, controlling playback, and streaming files.
+    All endpoints require Clerk authentication.
+
+servers:
+  - url: http://localhost:3000
+    description: Local development
+
+paths:
+  /api/recording/start:
+    post:
+      operationId: startRecording
+      summary: Start a new recording session
+      description: |
+        Initiates webcam stream capture via FFmpeg. Returns 409 if a recording
+        is already in progress. Returns 503 if webcam or FFmpeg is unavailable.
+        Maximum recording duration is 15 minutes (auto-stop).
+      security:
+        - clerkAuth: []
+      x-required-role: admin
+      responses:
+        "200":
+          description: Recording started successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StartRecordingResponse"
+        "409":
+          description: A recording session is already in progress
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: CONFLICT
+                message: A recording session is already in progress
+        "503":
+          description: Webcam unreachable or FFmpeg not available
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: EXTERNAL_SERVICE_ERROR
+                message: "Webcam stream at rtsp://192.168.1.100:554/stream is not reachable"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/recording/stop:
+    post:
+      operationId: stopRecording
+      summary: Stop the active recording session
+      description: |
+        Sends SIGINT to the FFmpeg process to gracefully finalize the MP4 file.
+        Returns 404 if no recording is in progress.
+      security:
+        - clerkAuth: []
+      x-required-role: admin
+      responses:
+        "200":
+          description: Recording stopped successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StopRecordingResponse"
+        "404":
+          description: No active recording session
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: NOT_FOUND
+                message: No active recording session
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/recording/status:
+    get:
+      operationId: getRecordingStatus
+      summary: Get current recording status
+      security:
+        - clerkAuth: []
+      x-required-role: admin
+      responses:
+        "200":
+          description: Current recording status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RecordingStatusResponse"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/recording/list:
+    get:
+      operationId: listRecordings
+      summary: List all available recordings
+      description: Returns recordings sorted by creation date descending.
+      security:
+        - clerkAuth: []
+      x-required-role: admin
+      responses:
+        "200":
+          description: List of recordings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RecordingListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/recording/{id}:
+    delete:
+      operationId: deleteRecording
+      summary: Delete a specific recording
+      description: |
+        Deletes the recording file from disk. If the recording is currently
+        being played, playback is stopped first and SSE connections are closed.
+      security:
+        - clerkAuth: []
+      x-required-role: admin
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: "^rec_\\d{4}-\\d{2}-\\d{2}T\\d{2}-\\d{2}-\\d{2}Z$"
+          example: rec_2026-02-19T10-30-00Z
+      responses:
+        "200":
+          description: Recording deleted
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [deleted, id]
+                properties:
+                  deleted:
+                    type: boolean
+                    const: true
+                  id:
+                    type: string
+        "404":
+          description: Recording not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/recording/playback/play:
+    post:
+      operationId: playRecording
+      summary: Start or resume playback
+      security:
+        - clerkAuth: []
+      x-required-role: [admin, api-client]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PlaybackCommandRequest"
+      responses:
+        "200":
+          description: Playback started
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlaybackResponse"
+        "404":
+          description: No active player session or recording not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/recording/playback/stop:
+    post:
+      operationId: pausePlayback
+      summary: Stop (pause) playback
+      security:
+        - clerkAuth: []
+      x-required-role: [admin, api-client]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PlaybackCommandRequest"
+      responses:
+        "200":
+          description: Playback paused
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlaybackResponse"
+        "404":
+          description: No active player session or recording not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/recording/playback/rewind:
+    post:
+      operationId: rewindPlayback
+      summary: Seek backward by specified seconds
+      security:
+        - clerkAuth: []
+      x-required-role: [admin, api-client]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SeekCommandRequest"
+      responses:
+        "200":
+          description: Seeked backward
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlaybackResponse"
+        "404":
+          description: No active player session or recording not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/recording/playback/forward:
+    post:
+      operationId: forwardPlayback
+      summary: Seek forward by specified seconds
+      security:
+        - clerkAuth: []
+      x-required-role: [admin, api-client]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SeekCommandRequest"
+      responses:
+        "200":
+          description: Seeked forward
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlaybackResponse"
+        "404":
+          description: No active player session or recording not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/recording/playback/state:
+    post:
+      operationId: reportPlayerState
+      summary: Player reports its current state
+      description: |
+        Called by the player page to report state changes (playing, paused,
+        ended, error) back to the server. Authenticated via Clerk session
+        cookie from the player browser context.
+      security:
+        - clerkAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PlayerStateReport"
+      responses:
+        "200":
+          description: State accepted
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [accepted]
+                properties:
+                  accepted:
+                    type: boolean
+                    const: true
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/recording/events:
+    get:
+      operationId: subscribePlaybackEvents
+      summary: SSE endpoint for playback commands
+      description: |
+        Server-Sent Events stream. The player page connects to receive
+        real-time playback commands (play, stop, seek). Connection stays
+        open until the player disconnects or the recording is deleted.
+      security:
+        - clerkAuth: []
+      parameters:
+        - name: recordingId
+          in: query
+          required: true
+          schema:
+            type: string
+            pattern: "^rec_\\d{4}-\\d{2}-\\d{2}T\\d{2}-\\d{2}-\\d{2}Z$"
+      responses:
+        "200":
+          description: SSE stream established
+          content:
+            text/event-stream:
+              schema:
+                type: string
+                description: |
+                  event: command
+                  data: {"action": "play"|"stop"|"seek", "position"?: number}
+        "404":
+          description: Recording not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/recording/stream/{id}:
+    get:
+      operationId: streamRecording
+      summary: Stream recording file for video playback
+      description: |
+        Serves the MP4 file with support for HTTP Range requests to enable
+        seeking without full download.
+      security:
+        - clerkAuth: []
+      x-required-role: [admin, api-client]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: "^rec_\\d{4}-\\d{2}-\\d{2}T\\d{2}-\\d{2}-\\d{2}Z$"
+        - name: Range
+          in: header
+          required: false
+          schema:
+            type: string
+            example: "bytes=0-1048575"
+      responses:
+        "200":
+          description: Full file response
+          headers:
+            Content-Type:
+              schema:
+                type: string
+                const: video/mp4
+            Content-Length:
+              schema:
+                type: integer
+            Accept-Ranges:
+              schema:
+                type: string
+                const: bytes
+          content:
+            video/mp4:
+              schema:
+                type: string
+                format: binary
+        "206":
+          description: Partial content (Range request)
+          headers:
+            Content-Type:
+              schema:
+                type: string
+                const: video/mp4
+            Content-Range:
+              schema:
+                type: string
+                example: "bytes 0-1048575/281000000"
+            Content-Length:
+              schema:
+                type: integer
+          content:
+            video/mp4:
+              schema:
+                type: string
+                format: binary
+        "404":
+          description: Recording not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /api/recording/upload/{id}:
+    post:
+      operationId: uploadRecordingToMux
+      summary: Upload recording to MUX and transmit playback URL
+      description: |
+        Uploads the specified recording's MP4 file to MUX via direct upload,
+        waits for the asset to become ready (120s timeout, 2s polling interval),
+        retrieves the playback URL, and forwards it to hemera.academy via the
+        existing transmitRecording flow (Spec 001). Returns 207 if MUX upload
+        succeeds but hemera.academy transmission fails.
+      security:
+        - clerkAuth: []
+      x-required-role: admin
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: "^rec_\\d{4}-\\d{2}-\\d{2}T\\d{2}-\\d{2}-\\d{2}Z$"
+          example: rec_2026-02-19T10-30-00Z
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MuxUploadRequest"
+      responses:
+        "200":
+          description: Full success — MUX upload and hemera.academy transmission
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MuxUploadResponse"
+        "207":
+          description: Partial success — MUX upload succeeded, hemera.academy transmission failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MuxUploadPartialResponse"
+        "404":
+          description: Recording not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Recording is still being captured (active session)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: CONFLICT
+                message: Recording is still in progress
+        "502":
+          description: MUX API failure
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: EXTERNAL_SERVICE_ERROR
+                message: MUX upload failed
+        "503":
+          description: MUX credentials not configured
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: EXTERNAL_SERVICE_ERROR
+                message: "MUX credentials (MUX_TOKEN_ID, MUX_TOKEN_SECRET) are not configured"
+        "401":
+          $ref: "#/components/responses/Unauthenticated"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+components:
+  securitySchemes:
+    clerkAuth:
+      type: http
+      scheme: bearer
+      description: Clerk session token
+
+  responses:
+    Unauthenticated:
+      description: Missing or invalid authentication
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            error: UNAUTHENTICATED
+    Forbidden:
+      description: Insufficient role permissions
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            error: FORBIDDEN
+
+  schemas:
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+
+    StartRecordingResponse:
+      type: object
+      required: [sessionId, filename, startedAt]
+      properties:
+        sessionId:
+          type: string
+          example: rec_2026-02-19T10-30-00Z
+        filename:
+          type: string
+          example: rec_2026-02-19T10-30-00Z.mp4
+        startedAt:
+          type: string
+          format: date-time
+
+    StopRecordingResponse:
+      type: object
+      required: [sessionId, filename, duration, fileSize, filePath]
+      properties:
+        sessionId:
+          type: string
+        filename:
+          type: string
+        duration:
+          type: number
+          description: Duration in seconds
+          minimum: 0
+          maximum: 900
+        fileSize:
+          type: integer
+          description: File size in bytes
+          minimum: 0
+        filePath:
+          type: string
+          example: output/recordings/rec_2026-02-19T10-30-00Z.mp4
+
+    RecordingStatusResponse:
+      oneOf:
+        - type: object
+          required: [recording, sessionId, startedAt, filename]
+          properties:
+            recording:
+              type: boolean
+              const: true
+            sessionId:
+              type: string
+            startedAt:
+              type: string
+              format: date-time
+            filename:
+              type: string
+        - type: object
+          required: [recording]
+          properties:
+            recording:
+              type: boolean
+              const: false
+
+    RecordingListResponse:
+      type: object
+      required: [recordings]
+      properties:
+        recordings:
+          type: array
+          items:
+            $ref: "#/components/schemas/RecordingFile"
+
+    RecordingFile:
+      type: object
+      required: [id, filename, duration, fileSize, createdAt]
+      properties:
+        id:
+          type: string
+        filename:
+          type: string
+        duration:
+          type: number
+          minimum: 0
+        fileSize:
+          type: integer
+          minimum: 0
+        createdAt:
+          type: string
+          format: date-time
+
+    PlaybackCommandRequest:
+      type: object
+      required: [recordingId]
+      properties:
+        recordingId:
+          type: string
+
+    SeekCommandRequest:
+      type: object
+      required: [recordingId, seconds]
+      properties:
+        recordingId:
+          type: string
+        seconds:
+          type: number
+          minimum: 0
+          description: Number of seconds to seek
+
+    PlaybackResponse:
+      type: object
+      required: [status, position]
+      properties:
+        status:
+          type: string
+          enum: [playing, paused]
+        position:
+          type: number
+          description: Current playback position in seconds
+
+    PlayerStateReport:
+      type: object
+      required: [recordingId, state, position]
+      properties:
+        recordingId:
+          type: string
+        state:
+          type: string
+          enum: [playing, paused, ended, error]
+        position:
+          type: number
+          minimum: 0
+        message:
+          type: string
+          description: Error message when state is "error"
+
+    MuxUploadRequest:
+      type: object
+      required: [seminarSourceId]
+      properties:
+        seminarSourceId:
+          type: string
+          description: Seminar source ID to associate the MUX recording with
+          example: SEM-2026-042
+
+    MuxUploadResponse:
+      type: object
+      required: [muxAssetId, muxPlaybackUrl, seminarSourceId, transmitted]
+      properties:
+        muxAssetId:
+          type: string
+          example: a1b2c3d4e5
+        muxPlaybackUrl:
+          type: string
+          format: uri
+          example: "https://stream.mux.com/a1b2c3d4e5.m3u8"
+        seminarSourceId:
+          type: string
+          example: SEM-2026-042
+        transmitted:
+          type: boolean
+          const: true
+
+    MuxUploadPartialResponse:
+      type: object
+      required: [muxAssetId, muxPlaybackUrl, seminarSourceId, transmitted, transmissionError]
+      properties:
+        muxAssetId:
+          type: string
+        muxPlaybackUrl:
+          type: string
+          format: uri
+        seminarSourceId:
+          type: string
+        transmitted:
+          type: boolean
+          const: false
+        transmissionError:
+          type: string
+          description: Error details from hemera.academy transmission failure

@@ -1,0 +1,59 @@
+// ---------------------------------------------------------------------------
+// Recording Module — TypeScript Types (Inferred from Zod Schemas)
+// Task: T005 — All recording-related types
+// ---------------------------------------------------------------------------
+
+import type { z } from "zod";
+import type {
+	MuxUploadRequestSchema,
+	MuxUploadResponseSchema,
+	PlaybackCommandSchema,
+	PlaybackResponseSchema,
+	PlaybackStateSchema,
+	PlayerState,
+	PlayerStateReportSchema,
+	RecordingFileSchema,
+	RecordingListResponseSchema,
+	RecordingSessionSchema,
+	RecordingStatus,
+	RecordingStatusActiveSchema,
+	RecordingStatusInactiveSchema,
+	SeekCommandSchema,
+	StartRecordingResponseSchema,
+	StopRecordingResponseSchema,
+} from "./schemas";
+
+// ── Enum Types ────────────────────────────────────────────────────────────
+
+export type RecordingStatusType = z.infer<typeof RecordingStatus>;
+export type PlayerStateType = z.infer<typeof PlayerState>;
+
+// ── Entity Types ──────────────────────────────────────────────────────────
+
+export type RecordingSession = z.infer<typeof RecordingSessionSchema>;
+export type RecordingFile = z.infer<typeof RecordingFileSchema>;
+export type PlaybackState = z.infer<typeof PlaybackStateSchema>;
+
+// ── Request Types ─────────────────────────────────────────────────────────
+
+export type PlaybackCommand = z.infer<typeof PlaybackCommandSchema>;
+export type SeekCommand = z.infer<typeof SeekCommandSchema>;
+export type PlayerStateReport = z.infer<typeof PlayerStateReportSchema>;
+export type MuxUploadRequest = z.infer<typeof MuxUploadRequestSchema>;
+
+// ── Response Types ────────────────────────────────────────────────────────
+
+export type StartRecordingResponse = z.infer<typeof StartRecordingResponseSchema>;
+export type StopRecordingResponse = z.infer<typeof StopRecordingResponseSchema>;
+export type RecordingStatusActive = z.infer<typeof RecordingStatusActiveSchema>;
+export type RecordingStatusInactive = z.infer<typeof RecordingStatusInactiveSchema>;
+export type RecordingListResponse = z.infer<typeof RecordingListResponseSchema>;
+export type PlaybackResponse = z.infer<typeof PlaybackResponseSchema>;
+export type MuxUploadResponse = z.infer<typeof MuxUploadResponseSchema>;
+
+// ── SSE Types ─────────────────────────────────────────────────────────────
+
+export type SSECommand =
+	| { action: "play" }
+	| { action: "stop" }
+	| { action: "seek"; position: number };

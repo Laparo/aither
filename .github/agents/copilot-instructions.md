@@ -3,6 +3,8 @@
 Auto-generated from all feature plans. Last updated: 2026-02-11
 
 ## Active Technologies
+- TypeScript 5.9+ on Node.js (Next.js 16+ App Router) + Next.js 16, Clerk auth, Zod, Rollbar (all existing); FFmpeg (system binary) (004-video-recorder)
+- Local filesystem (`output/recordings/`), gitignored. In-memory session state (no database). (004-video-recorder)
 
 - TypeScript 5+, Node.js (Next.js 16+ with App Router, React 18+) + Zod (validation), Clerk (auth/RBAC), MUI (dashboard UI), Rollbar (error monitoring), Nodemailer (SMTP email notifications) (001-hemera-api-integration)
 
@@ -22,6 +24,7 @@ npm test && npm run lint
 TypeScript 5+, Node.js (Next.js 16+ with App Router, React 18+): Follow standard conventions
 
 ## Recent Changes
+- 004-video-recorder: Added TypeScript 5.9+ on Node.js (Next.js 16+ App Router) + Next.js 16, Clerk auth, Zod, Rollbar (all existing); FFmpeg (system binary)
 
 - 001-hemera-api-integration: Added TypeScript 5+, Node.js (Next.js 16+ with App Router, React 18+) + Zod (validation), Clerk (auth/RBAC), MUI (dashboard UI), Rollbar (error monitoring), Nodemailer (SMTP email notifications)
 
