@@ -12,7 +12,7 @@
 
 All requests include:
 ```
-Authorization: Bearer {HEMERA_SERVICE_TOKEN}
+X-API-Key: {HEMERA_API_KEY}
 Content-Type: application/json
 ```
 
@@ -22,24 +22,26 @@ Content-Type: application/json
 
 **Error Responses:**
 
-- `401 Unauthorized` — The token is invalid or expired. Example:
+- `401 Unauthorized` — The API key is invalid or missing. Example:
   ```json
   { "error": "Unauthorized", "message": "Missing or invalid API key." }
   ```
-- `403 Forbidden` — The token is valid, but permissions are insufficient. Example:
+- `403 Forbidden` — The API key is valid, but permissions are insufficient. Example:
   ```json
   { "error": "Forbidden", "message": "Insufficient permissions." }
   ```
 
 **Retry Strategy:**
-- When using `HEMERA_SERVICE_TOKEN` as a durable service credential (recommended), authentication failures must be reported immediately to the client:
-  - `401 Unauthorized` — report immediately, do NOT retry. Service credentials are not expected to support runtime refresh.
-  - `403 Forbidden` — report immediately, do NOT retry.
-
-  If your integration explicitly implements a runtime refresh (e.g. Clerk session refresh for short-lived dashboard sessions), document and implement the refresh flow clearly. In that case only apply a single retry on `401` after a successful refresh; `403` should never be retried.
+- For `401 Unauthorized`, since authentication uses a static API key (`HEMERA_API_KEY` from environment), a 401 must be reported immediately with **no retry**.
+- For `403 Forbidden`, no retry is allowed — the error must be reported directly to the client.
 
 **Note:**
-Authentication is performed via the header `Authorization: Bearer {HEMERA_SERVICE_TOKEN}`. The service token is read from `process.env.HEMERA_SERVICE_TOKEN` and MUST be a long-lived, non-refreshable service credential generated via the Clerk Backend API (a Clerk Backend service token) or an organisation-level service-token mechanism. Do NOT use short-lived Clerk session tokens from the Dashboard for unattended service-to-service authentication; those require runtime refresh and are unsuitable for production S2S usage.
+Authentication is performed via the header `X-API-Key: {HEMERA_API_KEY}`.
+
+- **`HEMERA_API_KEY`** (aither / client-side): The shared secret read from `process.env.HEMERA_API_KEY` and sent in the `X-API-Key` request header.
+- **`HEMERA_SERVICE_API_KEY`** (hemera / server-side): The expected secret configured in hemera's environment, used to validate incoming `X-API-Key` headers.
+
+Both variables **must contain the exact same value** for authentication to succeed. The associated service user has the `api-client` role.
 
 ---
 
