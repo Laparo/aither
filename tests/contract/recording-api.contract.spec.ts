@@ -364,8 +364,11 @@ describe("DELETE /api/recording/[id]", () => {
 		mockDeleteRecording.mockResolvedValueOnce(false);
 
 		const { DELETE } = await import("@/app/api/recording/[id]/route");
-		const req = createRequest("http://localhost:3000/api/recording/nonexistent", "DELETE");
-		const res = await DELETE(req, { params: Promise.resolve({ id: "nonexistent" }) });
+		const req = createRequest(
+			"http://localhost:3000/api/recording/rec_2099-01-01T00-00-00Z",
+			"DELETE",
+		);
+		const res = await DELETE(req, { params: Promise.resolve({ id: "rec_2099-01-01T00-00-00Z" }) });
 
 		expect(res.status).toBe(404);
 		const json = await res.json();

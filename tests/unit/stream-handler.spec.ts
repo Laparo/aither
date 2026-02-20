@@ -4,6 +4,7 @@
 //                          Range format, invalid Range→416, missing file error
 // ---------------------------------------------------------------------------
 
+import { Readable } from "node:stream";
 import { describe, expect, it, vi } from "vitest";
 
 // Mock fs/promises
@@ -11,20 +12,15 @@ vi.mock("node:fs/promises", () => ({
 	stat: vi.fn().mockResolvedValue({ size: 10000 }),
 }));
 
-// Mock fs — createReadStream
-const mockOn = vi.fn();
+// Mock fs — createReadStream returns a real Readable so Readable.toWeb() succeeds
 vi.mock("node:fs", () => ({
-	createReadStream: vi.fn().mockReturnValue({
-		on: (...args: unknown[]) => {
-			mockOn(...args);
-			// Auto-trigger 'end' for simple tests
-			const [event, handler] = args as [string, () => void];
-			if (event === "end") {
-				setTimeout(() => handler(), 10);
-			}
-			return { on: mockOn, destroy: vi.fn() };
-		},
-		destroy: vi.fn(),
+	createReadStream: vi.fn().mockImplementation(() => {
+		const stream = new Readable({
+			read() {
+				this.push(null);
+			},
+		});
+		return stream;
 	}),
 }));
 
