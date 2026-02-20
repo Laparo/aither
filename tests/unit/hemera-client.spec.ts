@@ -36,7 +36,6 @@ function createClient(
 		baseUrl: "https://api.hemera.academy",
 		getToken: async () => "test-api-key",
 		allowedPathPrefix: "/",
-		requiredRole: undefined,
 		maxRetries: overrides?.maxRetries ?? 1,
 		rateLimit: overrides?.rateLimit ?? 100, // high limit to avoid throttle delays in tests
 		fetchFn: fetchFn as unknown as typeof fetch,
@@ -61,7 +60,7 @@ describe("HemeraClient", () => {
 	// ── Auth Header ──────────────────────────────────────────────────────
 
 	describe("authentication", () => {
-		it("sends Authorization Bearer header with API key", async () => {
+		it("sends X-API-Key header with API key", async () => {
 			const mockFetch = createMockFetch([{ status: 200, body: [{ id: "1", name: "Test" }] }]);
 			const client = createClient(mockFetch);
 
@@ -71,7 +70,7 @@ describe("HemeraClient", () => {
 			const callArgs = mockFetch.mock.calls[0];
 			expect(callArgs[0]).toBe("https://api.hemera.academy/seminars");
 			expect(callArgs[1]?.headers).toMatchObject({
-				Authorization: "Bearer test-api-key",
+				"X-API-Key": "test-api-key",
 			});
 		});
 
@@ -81,7 +80,6 @@ describe("HemeraClient", () => {
 				baseUrl: "https://api.hemera.academy///",
 				getToken: async () => "key",
 				allowedPathPrefix: "/",
-				requiredRole: undefined,
 				maxRetries: 0,
 				rateLimit: 100,
 				fetchFn: mockFetch as unknown as typeof fetch,
@@ -194,7 +192,7 @@ describe("HemeraClient", () => {
 			const callArgs = mockFetch.mock.calls[0];
 			expect(callArgs[1]?.method).toBe("PUT");
 			expect(callArgs[1]?.headers).toMatchObject({
-				Authorization: "Bearer test-api-key",
+				"X-API-Key": "test-api-key",
 				"Content-Type": "application/json",
 			});
 		});
