@@ -10,7 +10,9 @@ export type Permission =
 	| "write:participation-results"
 	| "read:users"
 	| "manage:courses"
-	| "manage:users";
+	| "manage:users"
+	| "manage:recordings"
+	| "control:playback";
 
 // Consolidated role type - single source of truth
 export type Role = "admin" | "api-client" | "instructor" | "participant";
@@ -25,12 +27,15 @@ export const rolePermissions: Record<Role, Permission[]> = {
 		"read:users",
 		"manage:courses",
 		"manage:users",
+		"manage:recordings",
+		"control:playback",
 	],
 	"api-client": [
 		"read:courses",
 		"read:bookings",
 		"read:participations",
 		"write:participation-results",
+		"control:playback",
 	],
 	instructor: ["read:courses", "read:participations"],
 	participant: [],

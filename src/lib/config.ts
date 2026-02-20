@@ -144,6 +144,14 @@ const EnvSchema = z
 		// Output
 		HTML_OUTPUT_DIR: z.string().min(1).default("output"),
 		SLIDES_OUTPUT_DIR: z.string().min(1).default("output/slides"),
+		RECORDINGS_OUTPUT_DIR: z.string().min(1).default("output/recordings"),
+
+		// Recording — webcam stream URL (required for recording, not at boot)
+		WEBCAM_STREAM_URL: z.string().optional(),
+
+		// MUX — video upload (optional, US6 only)
+		MUX_TOKEN_ID: z.string().optional(),
+		MUX_TOKEN_SECRET: z.string().optional(),
 
 		// Notification recipient (distinct from SMTP_FROM)
 		SMTP_TO: z.string().email().optional(),
