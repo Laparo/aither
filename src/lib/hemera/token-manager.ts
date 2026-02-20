@@ -1,73 +1,66 @@
 // ---------------------------------------------------------------------------
 // Hemera Service Token Manager
-// Manages authentication tokens for service-to-service communication
+// Manages API key for service-to-service communication
 // ---------------------------------------------------------------------------
 
 /**
- * Simple token provider that returns a static service token.
- * For Clerk-based authentication, provide a durable service credential
- * (generated via Clerk Backend API or an organisation/service-token mechanism).
+ * Simple token provider that returns a static API key.
+ * The API key authenticates aither as a service client against hemera's
+ * service API endpoints via the X-API-Key header.
  *
- * In production, this could be enhanced to:
- * - Fetch tokens from Clerk backend API
- * - Cache tokens with expiry
- * - Auto-refresh before expiry
- *
- * For now, we use a simple approach where the service token
- * is provided via environment variable and represents a long-lived
- * service credential suitable for unattended service-to-service auth.
+ * The API key is validated server-side by hemera and maps to a
+ * specific service user with the `api-client` role.
  */
 export class HemeraTokenManager {
-	private readonly serviceToken: string;
+	private readonly apiKey: string;
 
 	/**
-	 * @param serviceToken - Long-lived service credential for the service user
+	 * @param apiKey - API key for hemera service authentication
 	 */
-	constructor(serviceToken: string) {
-		if (!serviceToken) {
-			throw new Error("Service token is required");
+	constructor(apiKey: string) {
+		if (!apiKey) {
+			throw new Error("API key is required");
 		}
-		this.serviceToken = serviceToken;
+		this.apiKey = apiKey;
 	}
 
 	/**
-	 * Get the service token for API authentication.
-	 * Returns the configured service token.
+	 * Get the API key for service authentication.
 	 */
 	async getToken(): Promise<string> {
-		return this.serviceToken;
+		return this.apiKey;
 	}
 }
 
 /**
  * Singleton instance of the token manager.
- * Initialized with service token from environment.
+ * Initialized with API key from environment.
  */
 let tokenManagerInstance: HemeraTokenManager | null = null;
 
 /**
  * Get the singleton token manager instance.
- * Requires HEMERA_SERVICE_TOKEN environment variable.
+ * Requires HEMERA_API_KEY environment variable.
  *
- * The service token should be a durable service credential for
- * the aither-service@hemera-academy.com user with `api-client` role.
+ * The API key authenticates the aither service user
+ * (aither-service@hemera-academy.com) with `api-client` role
+ * against hemera's service API.
  *
- * Recommended generation/rotation flow:
- * 1. Create a service user or service credential via Clerk Backend API
- *    (or use an organisation-level service token mechanism)
- * 2. Store the credential in a secret manager (Vercel/AWS/GCP)
- * 3. Rotate periodically and update deployment secrets
- * 4. Set `HEMERA_SERVICE_TOKEN` in your deployment environment
+ * Key management:
+ * 1. API key is generated and shared between hemera and aither
+ * 2. hemera validates via HEMERA_SERVICE_API_KEY env var
+ * 3. Set HEMERA_API_KEY in aither's deployment environment
+ * 4. Rotate by generating a new key and updating both sides
  */
 export function getTokenManager(): HemeraTokenManager {
 	if (!tokenManagerInstance) {
-		const serviceToken = process.env.HEMERA_SERVICE_TOKEN;
-		if (!serviceToken) {
+		const apiKey = process.env.HEMERA_API_KEY;
+		if (!apiKey) {
 			throw new Error(
-				"HEMERA_SERVICE_TOKEN environment variable is required for Hemera API authentication",
+				"HEMERA_API_KEY environment variable is required for Hemera API authentication",
 			);
 		}
-		tokenManagerInstance = new HemeraTokenManager(serviceToken);
+		tokenManagerInstance = new HemeraTokenManager(apiKey);
 	}
 	return tokenManagerInstance;
 }

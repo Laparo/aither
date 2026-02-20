@@ -27,8 +27,8 @@
 2. **Configure environment variables** — copy `.env.example` to `.env` and fill in:
    ```env
   # Hemera Academy API
-  HEMERA_API_BASE_URL=https://api.hemera.academy
-  HEMERA_SERVICE_TOKEN=your-service-token-here
+  HEMERA_API_BASE_URL=https://www.hemera.academy
+  HEMERA_API_KEY=your-api-key-here
 
    # Clerk Authentication
    NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_...
