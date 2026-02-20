@@ -44,7 +44,6 @@ function createClient(
 }
 
 describe("HemeraClient", () => {
-
 	it("throws if constructed without getToken()", () => {
 		const badOptions: any = {
 			baseUrl: "https://api.hemera.academy",
@@ -54,7 +53,9 @@ describe("HemeraClient", () => {
 			fetchFn: (async () => null) as unknown as typeof fetch,
 		};
 
-		expect(() => new HemeraClient(badOptions)).toThrow(/a valid `getToken\(\)` function is required/);
+		expect(() => new HemeraClient(badOptions)).toThrow(
+			/a valid `getToken\(\)` function is required/,
+		);
 	});
 
 	// ── Auth Header ──────────────────────────────────────────────────────

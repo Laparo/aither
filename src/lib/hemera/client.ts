@@ -57,8 +57,8 @@ export class HemeraClient {
 		if (!options.getToken || typeof options.getToken !== "function") {
 			throw new Error(
 				"HemeraClient construction error: a valid `getToken()` function is required in options.\n" +
-				"Provide `getToken: () => Promise<string>` (e.g. from `getTokenManager().getToken`) or use `createHemeraClient()` which wires the token manager.\n" +
-				"Ensure HEMERA_API_KEY is set for the token manager when using the default factory."
+					"Provide `getToken: () => Promise<string>` (e.g. from `getTokenManager().getToken`) or use `createHemeraClient()` which wires the token manager.\n" +
+					"Ensure HEMERA_API_KEY is set for the token manager when using the default factory.",
 			);
 		}
 		this.getToken = options.getToken;
@@ -197,7 +197,9 @@ export class HemeraClient {
 	 */
 	private ensurePathAllowed(path: string) {
 		if (!path.startsWith(this.allowedPathPrefix)) {
-			throw new Error(`HemeraClient: disallowed path "${path}" — only ${this.allowedPathPrefix} endpoints are permitted`);
+			throw new Error(
+				`HemeraClient: disallowed path "${path}" — only ${this.allowedPathPrefix} endpoints are permitted`,
+			);
 		}
 	}
 }

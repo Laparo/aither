@@ -66,9 +66,7 @@ const EnvSchema = z
 		// Base URL must include the full origin (e.g. https://hemera-academy.vercel.app)
 		HEMERA_API_BASE_URL: z.string().url(),
 		// API key for service-to-service authentication (min 32 chars)
-		HEMERA_API_KEY: z
-			.string()
-			.min(32, "HEMERA_API_KEY must be at least 32 characters"),
+		HEMERA_API_KEY: z.string().min(32, "HEMERA_API_KEY must be at least 32 characters"),
 
 		// Context7 API key (optional) — use secret key starting with ctx7sk_
 		CONTEXT7_API_KEY: z
