@@ -162,13 +162,13 @@ export class HemeraClient {
 				}
 
 				if (res.status >= 500) {
-					const body = await res.text();
-					throw new HemeraApiError(res.status, res.statusText, body, url);
+					const errorBody = await res.text();
+					throw new HemeraApiError(res.status, res.statusText, errorBody, url);
 				}
 
 				if (!res.ok) {
-					const body = await res.text();
-					throw new AbortError(new HemeraApiError(res.status, res.statusText, body, url));
+					const errorBody = await res.text();
+					throw new AbortError(new HemeraApiError(res.status, res.statusText, errorBody, url));
 				}
 
 				return res;
