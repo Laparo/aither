@@ -151,3 +151,47 @@ export const ServiceCoursesResponseSchema = z.object({
 });
 
 export type ServiceCoursesResponse = z.infer<typeof ServiceCoursesResponseSchema>;
+
+// --- Service API: Course Detail with Participants ---
+
+/** Participant within a course detail response (from Hemera GET /api/service/courses/[id]) */
+export const ServiceParticipantSchema = z.object({
+	participationId: z.string(),
+	userId: z.string(),
+	name: z.string().nullable(),
+	status: z.string(),
+	preparationIntent: z.string().nullable(),
+	desiredResults: z.string().nullable(),
+	lineManagerProfile: z.string().nullable(),
+	preparationCompletedAt: z.string().nullable(),
+});
+
+export type ServiceParticipant = z.infer<typeof ServiceParticipantSchema>;
+
+/** Course detail with nested participants (from Hemera GET /api/service/courses/[id]) */
+export const ServiceCourseDetailSchema = z.object({
+	id: z.string().min(1),
+	title: z.string().min(1),
+	slug: z.string().min(1),
+	level: z.enum(["BEGINNER", "INTERMEDIATE", "ADVANCED"]),
+	startDate: z.string().datetime({ offset: true }).nullable(),
+	endDate: z.string().datetime({ offset: true }).nullable(),
+	participants: z.array(ServiceParticipantSchema),
+});
+
+export type ServiceCourseDetail = z.infer<typeof ServiceCourseDetailSchema>;
+
+/** Envelope for Hemera course detail response */
+export const ServiceCourseDetailResponseSchema = z.object({
+	success: z.boolean(),
+	data: ServiceCourseDetailSchema,
+	meta: z
+		.object({
+			requestId: z.string().optional(),
+			timestamp: z.string().optional(),
+			version: z.string().optional(),
+		})
+		.optional(),
+});
+
+export type ServiceCourseDetailResponse = z.infer<typeof ServiceCourseDetailResponseSchema>;
