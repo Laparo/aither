@@ -123,3 +123,31 @@ export const ParticipationResponseSchema = ParticipationSchema;
 export type Participation = z.infer<typeof ParticipationSchema>;
 export type CourseWithParticipants = z.infer<typeof CourseWithParticipantsSchema>;
 export type CoursesResponse = z.infer<typeof CoursesResponseSchema>;
+
+// --- Service API envelope schemas (actual response format) ---
+
+/** Course summary as returned by GET /api/service/courses */
+export const ServiceCourseSchema = z.object({
+	id: z.string().min(1),
+	title: z.string().min(1),
+	slug: z.string().min(1),
+	level: z.enum(["BEGINNER", "INTERMEDIATE", "ADVANCED"]),
+	startDate: z.string().datetime({ offset: true }).nullable(),
+	endDate: z.string().datetime({ offset: true }).nullable(),
+	participantCount: z.number().int().nonnegative(),
+});
+
+export type ServiceCourse = z.infer<typeof ServiceCourseSchema>;
+
+/** Standard envelope returned by Hemera service API */
+export const ServiceCoursesResponseSchema = z.object({
+	success: z.boolean(),
+	data: z.array(ServiceCourseSchema),
+	meta: z.object({
+		requestId: z.string(),
+		timestamp: z.string(),
+		version: z.string(),
+	}),
+});
+
+export type ServiceCoursesResponse = z.infer<typeof ServiceCoursesResponseSchema>;
