@@ -15,7 +15,52 @@ source .venv/bin/activate   # macOS / Linux
 specify --help
 ```
 
-## Spec-Kit
+## Data Sync (005-data-sync)
+
+Aither synchronisiert Kursdaten von der Hemera API und generiert statische HTML-Seiten für Trainer.
+
+### Architektur
+
+```
+Cron / curl POST /api/sync
+        ↓
+   Mutex (409 bei Overlap)
+        ↓
+   selectNextCourse() → nächster Kurs nach Startdatum
+        ↓
+   Hemera API: GET /api/service/courses/:id
+        ↓
+   Hash-basierter Vergleich (.sync-manifest.json)
+        ↓  (nur bei Änderung)
+   Handlebars-Template → HTML nach output/courses/
+        ↓
+   Manifest aktualisieren
+```
+
+### API-Endpunkte
+
+| Methode | Pfad | Beschreibung | Status |
+|---------|------|-------------|--------|
+| POST | `/api/sync` | Sync starten (fire-and-forget) | 202 / 409 |
+| GET | `/api/sync` | Letzten Job-Status abfragen | 200 / 404 |
+
+### Inkrementeller Sync
+
+- Dateihashes werden in `output/courses/.sync-manifest.json` gespeichert
+- Bei unveränderter Datenlage wird die HTML-Generierung übersprungen (`filesSkipped`)
+- Korrupte Manifeste werden per Rollbar-Warning geloggt und neu erstellt
+
+### Homepage (SSR)
+
+Die Startseite (`src/app/page.tsx`) zeigt den nächsten Kurs mit Teilnehmer-Tabelle via Server-Side Rendering.
+
+### Quickstart
+
+Siehe [`specs/005-data-sync/quickstart.md`](specs/005-data-sync/quickstart.md) für 7 Verifikationsschritte.
+
+### Cron-Scheduling
+
+Siehe [`docs/sync-scheduling.md`](docs/sync-scheduling.md) für Crontab-Beispiele und Monitoring.
 
 ## Rollbar API Tokens
 

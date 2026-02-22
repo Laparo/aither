@@ -6,6 +6,7 @@
 // ---------------------------------------------------------------------------
 
 import { requireAdmin } from "@/lib/auth/role-check";
+import { getRouteAuth } from "@/lib/auth/route-auth";
 import { reportError } from "@/lib/monitoring/rollbar-official";
 import { registerClient, unregisterClient } from "@/lib/recording/playback-controller";
 import { ErrorCodes, createErrorResponse } from "@/lib/utils/api-response";
@@ -13,11 +14,24 @@ import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 
 export async function GET(req: NextRequest) {
-	type AuthenticatedRequest = NextRequest & { auth?: unknown };
-	const auth = (req as AuthenticatedRequest).auth ?? null;
-	const authResult = requireAdmin(auth);
-	if (authResult.status !== 200) {
-		return NextResponse.json(authResult.body, { status: authResult.status });
+	try {
+		const authData = await getRouteAuth();
+		const authResult = requireAdmin(authData);
+		if (authResult.status !== 200) {
+			return NextResponse.json(authResult.body, { status: authResult.status });
+		}
+	} catch (error) {
+		reportError(error instanceof Error ? error : new Error(String(error)), undefined, "error");
+		return NextResponse.json(
+			{
+				success: false,
+				error: {
+					code: "AUTH_ERROR",
+					message: "Authentication failed",
+				},
+			},
+			{ status: 500 },
+		);
 	}
 
 	const recordingId = req.nextUrl.searchParams.get("recordingId");

@@ -44,6 +44,7 @@ function createClient(
 
 describe("HemeraClient", () => {
 	it("throws if constructed without getToken()", () => {
+		// biome-ignore lint/suspicious/noExplicitAny: intentional - testing error case
 		const badOptions: any = {
 			baseUrl: "https://api.hemera.academy",
 			// intentionally missing getToken

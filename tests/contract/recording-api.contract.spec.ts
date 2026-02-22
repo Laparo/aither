@@ -15,6 +15,9 @@ vi.mock("@/lib/auth/role-check", () => ({
 		body: { sessionClaims: { metadata: { role: "admin" } } },
 	}),
 }));
+vi.mock("@/lib/auth/route-auth", () => ({
+	getRouteAuth: vi.fn().mockResolvedValue({ sessionClaims: { metadata: { role: "admin" } } }),
+}));
 
 // Mock config
 vi.mock("@/lib/config", () => ({
@@ -140,6 +143,7 @@ function createJsonRequest(
 		method,
 		headers: { "Content-Type": "application/json" },
 		body: JSON.stringify(body),
+		// biome-ignore lint/suspicious/noExplicitAny: test helper requires flexible typing
 	} as any);
 }
 

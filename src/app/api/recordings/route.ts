@@ -4,6 +4,7 @@
 // ---------------------------------------------------------------------------
 
 import { requireAdmin } from "@/lib/auth/role-check";
+import { getRouteAuth } from "@/lib/auth/route-auth";
 import { createHemeraClient } from "@/lib/hemera/factory";
 import { transmitRecording } from "@/lib/sync/recording-transmitter";
 import type { TransmitResult } from "@/lib/sync/recording-transmitter";
@@ -18,8 +19,8 @@ import { NextResponse } from "next/server";
  * Response: 200 on success, 400 on validation error, 502 on Hemera API failure
  */
 export async function POST(request: Request): Promise<NextResponse> {
-	const auth = (request as unknown as { auth?: unknown }).auth ?? null;
-	const authResult = requireAdmin(auth);
+	const authData = await getRouteAuth();
+	const authResult = requireAdmin(authData);
 	if (authResult.status !== 200) {
 		return NextResponse.json(authResult.body, { status: authResult.status });
 	}

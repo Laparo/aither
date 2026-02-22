@@ -4,6 +4,7 @@
 // ---------------------------------------------------------------------------
 
 import { requireAdmin } from "@/lib/auth/role-check";
+import { getRouteAuth } from "@/lib/auth/route-auth";
 import { loadConfig } from "@/lib/config";
 import { createHemeraClient } from "@/lib/hemera/factory";
 import { reportError } from "@/lib/monitoring/rollbar-official";
@@ -21,10 +22,9 @@ export function _resetState() {
 
 // ── POST /api/slides — Trigger slide generation ──────────────────────────
 
-export async function POST(req: NextRequest) {
-	type AuthenticatedRequest = NextRequest & { auth?: unknown };
-	const auth = (req as AuthenticatedRequest).auth ?? null;
-	const authResult = requireAdmin(auth);
+export async function POST(_req: NextRequest) {
+	const authData = await getRouteAuth();
+	const authResult = requireAdmin(authData);
 	if (authResult.status !== 200) {
 		return NextResponse.json(authResult.body, { status: authResult.status });
 	}

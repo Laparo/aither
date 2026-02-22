@@ -1,7 +1,10 @@
 // ---------------------------------------------------------------------------
 // Sync Engine — Types
 // Derived from: specs/001-hemera-api-integration/data-model.md
+//               specs/005-data-sync/data-model.md
 // ---------------------------------------------------------------------------
+
+import type { ServiceCourseDetail } from "../hemera/schemas";
 
 /** Represents one sync execution. Transient — lost on restart. */
 export interface SyncJob {
@@ -26,4 +29,30 @@ export interface SyncError {
 export interface SyncManifest {
 	lastSyncTime: string;
 	hashes: Record<string, string>;
+}
+
+// ---------------------------------------------------------------------------
+// 005-data-sync types
+// ---------------------------------------------------------------------------
+
+/** In-memory context for the next-course sync pipeline. */
+export interface NextCourseSyncData {
+	course: ServiceCourseDetail;
+	fetchedAt: string;
+	contentHash: string;
+}
+
+/** Sync job status for the data-sync pipeline (flat structure per contracts/sync-api.yaml). */
+export interface DataSyncJob {
+	jobId: string;
+	status: "running" | "success" | "failed";
+	startTime: string;
+	endTime: string | null;
+	durationMs: number | null;
+	courseId: string | null;
+	noUpcomingCourse: boolean;
+	participantsFetched: number;
+	filesGenerated: number;
+	filesSkipped: number;
+	errors: SyncError[];
 }

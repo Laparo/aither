@@ -1,9 +1,14 @@
 // ---------------------------------------------------------------------------
 // Contract Tests: Aither Sync API
 // Task: T028 [US1] — POST → 202, GET → 200, concurrent POST → 409
+// Task: T012 [005-data-sync] — Updated envelope format (success/data/error/meta)
 // ---------------------------------------------------------------------------
 
-import { SyncJobResponseSchema } from "@/lib/sync/schemas";
+import {
+	SyncErrorResponseSchema,
+	SyncStartedResponseSchema,
+	SyncStatusResponseSchema,
+} from "@/lib/sync/schemas";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // Mock loadConfig
@@ -22,6 +27,9 @@ vi.mock("@/lib/auth/role-check", () => ({
 		body: { sessionClaims: { metadata: { role: "admin" } } },
 	}),
 }));
+vi.mock("@/lib/auth/route-auth", () => ({
+	getRouteAuth: vi.fn().mockResolvedValue({ sessionClaims: { metadata: { role: "admin" } } }),
+}));
 
 // Mock modules before importing route
 vi.mock("@/lib/hemera/client", () => ({
@@ -39,6 +47,45 @@ vi.mock("@/lib/hemera/factory", () => ({
 	})),
 }));
 
+// Mock orchestrator with DataSyncJob-shaped runDataSync()
+vi.mock("@/lib/sync/orchestrator", () => ({
+	SyncOrchestrator: vi.fn().mockImplementation(() => ({
+		run: vi.fn().mockResolvedValue({
+			jobId: "test-job",
+			startTime: new Date().toISOString(),
+			endTime: new Date().toISOString(),
+			status: "success",
+			recordsFetched: 0,
+			htmlFilesGenerated: 0,
+			htmlFilesSkipped: 0,
+			recordsTransmitted: 0,
+			errors: [],
+		}),
+		runDataSync: vi.fn().mockImplementation(
+			() =>
+				new Promise((resolve) =>
+					setTimeout(
+						() =>
+							resolve({
+								jobId: "test-job",
+								status: "success",
+								startTime: new Date().toISOString(),
+								endTime: new Date().toISOString(),
+								durationMs: 50,
+								courseId: null,
+								noUpcomingCourse: true,
+								participantsFetched: 0,
+								filesGenerated: 0,
+								filesSkipped: 0,
+								errors: [],
+							}),
+						50,
+					),
+				),
+		),
+	})),
+}));
+
 // We test the route handlers directly by importing and calling them
 import { GET, POST, _resetState } from "@/app/api/sync/route";
 import { NextRequest } from "next/server";
@@ -52,16 +99,18 @@ describe("POST /api/sync", () => {
 		_resetState();
 	});
 
-	it("returns 202 with a valid SyncJobResponse", async () => {
+	it("returns 202 with a valid SyncStartedResponse envelope", async () => {
 		const res = await POST(createRequest("POST"));
 
 		expect(res.status).toBe(202);
 		const body = await res.json();
-		expect(body.status).toBe("running");
-		expect(body.jobId).toBeTruthy();
+		expect(body.success).toBe(true);
+		expect(body.data.status).toBe("running");
+		expect(body.data.jobId).toBeTruthy();
+		expect(body.meta.requestId).toBeTruthy();
 
 		// Validate response shape matches contract
-		const parsed = SyncJobResponseSchema.safeParse(body);
+		const parsed = SyncStartedResponseSchema.safeParse(body);
 		expect(parsed.success).toBe(true);
 	});
 
@@ -74,7 +123,11 @@ describe("POST /api/sync", () => {
 
 		expect(res.status).toBe(409);
 		const body = await res.json();
-		expect(body.error).toBe("SYNC_ALREADY_RUNNING");
+		expect(body.success).toBe(false);
+		expect(body.error.code).toBe("SYNC_IN_PROGRESS");
+
+		const parsed = SyncErrorResponseSchema.safeParse(body);
+		expect(parsed.success).toBe(true);
 	});
 });
 
@@ -88,7 +141,11 @@ describe("GET /api/sync", () => {
 
 		expect(res.status).toBe(404);
 		const body = await res.json();
-		expect(body.error).toBe("NO_SYNC_HISTORY");
+		expect(body.success).toBe(false);
+		expect(body.error.code).toBe("NO_SYNC_JOB");
+
+		const parsed = SyncErrorResponseSchema.safeParse(body);
+		expect(parsed.success).toBe(true);
 	});
 
 	it("returns 200 with sync status after a sync has been triggered", async () => {
@@ -99,7 +156,11 @@ describe("GET /api/sync", () => {
 
 		expect(res.status).toBe(200);
 		const body = await res.json();
-		expect(body.jobId).toBeTruthy();
-		expect(["running", "success", "failed"]).toContain(body.status);
+		expect(body.success).toBe(true);
+		expect(body.data.jobId).toBeTruthy();
+		expect(["running", "success", "failed"]).toContain(body.data.status);
+
+		const parsed = SyncStatusResponseSchema.safeParse(body);
+		expect(parsed.success).toBe(true);
 	});
 });
