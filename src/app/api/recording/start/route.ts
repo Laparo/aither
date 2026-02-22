@@ -5,16 +5,16 @@
 // ---------------------------------------------------------------------------
 
 import { requireAdmin } from "@/lib/auth/role-check";
+import { getRouteAuth } from "@/lib/auth/route-auth";
 import { reportError } from "@/lib/monitoring/rollbar-official";
 import { startRecording } from "@/lib/recording/session-manager";
 import { ErrorCodes, createErrorResponse, createSuccessResponse } from "@/lib/utils/api-response";
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 
-export async function POST(req: NextRequest) {
-	type AuthenticatedRequest = NextRequest & { auth?: unknown };
-	const auth = (req as AuthenticatedRequest).auth ?? null;
-	const authResult = requireAdmin(auth);
+export async function POST(_req: NextRequest) {
+	const authData = await getRouteAuth();
+	const authResult = requireAdmin(authData);
 	if (authResult.status !== 200) {
 		return NextResponse.json(authResult.body, { status: authResult.status });
 	}

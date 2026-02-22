@@ -1,0 +1,378 @@
+openapi: 3.1.0
+info:
+  title: Aither Sync API
+  description: |
+    Data synchronization endpoints for pulling the next upcoming course
+    and participant preparations from the Hemera Academy Service API.
+  version: 1.0.0
+  contact:
+    name: Aither Development
+
+servers:
+  - url: http://localhost:3500
+    description: Local development
+
+paths:
+  /api/sync:
+    post:
+      operationId: triggerSync
+      summary: Trigger data sync
+      description: |
+        Triggers a full or incremental data sync cycle. Fetches the next upcoming
+        course from Hemera, including all participants and their preparations.
+        Generates HTML output to `output/` if data has changed.
+
+        The request returns immediately with 202 Accepted. The sync runs
+        asynchronously in the background.
+      security:
+        - adminAuth: []
+      responses:
+        '202':
+          description: Sync started successfully (fire-and-forget)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SyncStartedResponse'
+              example:
+                success: true
+                data:
+                  jobId: "sync-1708523400000"
+                  status: "running"
+                  startTime: "2026-02-21T14:30:00.000Z"
+                meta:
+                  requestId: "req-abc123"
+                  timestamp: "2026-02-21T14:30:00.000Z"
+        '409':
+          description: A sync is already running
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                error:
+                  code: "SYNC_IN_PROGRESS"
+                  message: "A sync operation is already running"
+                meta:
+                  requestId: "req-def456"
+                  timestamp: "2026-02-21T14:30:01.000Z"
+        '401':
+          description: Unauthorized (missing or invalid admin credentials)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    get:
+      operationId: getSyncStatus
+      summary: Get sync status
+      description: |
+        Returns the status of the last (or currently running) sync operation,
+        including the selected course, participant count, and file counts.
+      security:
+        - adminAuth: []
+      responses:
+        '200':
+          description: Sync status retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SyncStatusResponse'
+              examples:
+                completed:
+                  summary: Completed sync with course
+                  value:
+                    success: true
+                    data:
+                      jobId: "sync-1708523400000"
+                      status: "success"
+                      startTime: "2026-02-21T14:30:00.000Z"
+                      endTime: "2026-02-21T14:30:02.340Z"
+                      durationMs: 2340
+                      courseId: "cm5abc123def456ghi"
+                      noUpcomingCourse: false
+                      participantsFetched: 5
+                      filesGenerated: 1
+                      filesSkipped: 0
+                      errors: []
+                    meta:
+                      requestId: "req-abc123"
+                      timestamp: "2026-02-21T14:30:02.340Z"
+                noUpcomingCourse:
+                  summary: No upcoming course found
+                  value:
+                    success: true
+                    data:
+                      jobId: "sync-1708523400000"
+                      status: "success"
+                      startTime: "2026-02-21T14:30:00.000Z"
+                      endTime: "2026-02-21T14:30:00.500Z"
+                      durationMs: 500
+                      courseId: null
+                      noUpcomingCourse: true
+                      participantsFetched: 0
+                      filesGenerated: 0
+                      filesSkipped: 0
+                      errors: []
+                    meta:
+                      requestId: "req-ghi789"
+                      timestamp: "2026-02-21T14:30:00.500Z"
+                skipped:
+                  summary: Incremental sync with no changes
+                  value:
+                    success: true
+                    data:
+                      jobId: "sync-1708523500000"
+                      status: "success"
+                      startTime: "2026-02-21T14:31:40.000Z"
+                      endTime: "2026-02-21T14:31:40.800Z"
+                      durationMs: 800
+                      courseId: "cm5abc123def456ghi"
+                      noUpcomingCourse: false
+                      participantsFetched: 5
+                      filesGenerated: 0
+                      filesSkipped: 1
+                      errors: []
+                    meta:
+                      requestId: "req-jkl012"
+                      timestamp: "2026-02-21T14:31:40.800Z"
+        '404':
+          description: No sync has been run yet
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                error:
+                  code: "NO_SYNC_JOB"
+                  message: "No sync operation has been run"
+                meta:
+                  requestId: "req-mno345"
+                  timestamp: "2026-02-21T14:30:00.000Z"
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  securitySchemes:
+    adminAuth:
+      type: apiKey
+      in: header
+      name: Authorization
+      description: Admin authentication token
+
+  schemas:
+    SyncStartedResponse:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success:
+          type: boolean
+          const: true
+        data:
+          type: object
+          required: [jobId, status, startTime]
+          properties:
+            jobId:
+              type: string
+              description: Unique identifier for this sync job
+            status:
+              type: string
+              enum: [running]
+            startTime:
+              type: string
+              format: date-time
+        meta:
+          $ref: '#/components/schemas/ResponseMeta'
+
+    SyncStatusResponse:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success:
+          type: boolean
+          const: true
+        data:
+          $ref: '#/components/schemas/DataSyncJob'
+        meta:
+          $ref: '#/components/schemas/ResponseMeta'
+
+    DataSyncJob:
+      type: object
+      required:
+        - jobId
+        - status
+        - startTime
+        - endTime
+        - durationMs
+        - courseId
+        - noUpcomingCourse
+        - participantsFetched
+        - filesGenerated
+        - filesSkipped
+        - errors
+      properties:
+        jobId:
+          type: string
+          description: Unique identifier for this sync job
+        status:
+          type: string
+          enum: [running, success, failed]
+        startTime:
+          type: string
+          format: date-time
+        endTime:
+          type: string
+          format: date-time
+          nullable: true
+        durationMs:
+          type: integer
+          minimum: 0
+          description: Total sync duration in milliseconds
+        courseId:
+          type: string
+          nullable: true
+          description: ID of the selected next course (null if no upcoming course)
+        noUpcomingCourse:
+          type: boolean
+          description: True if no future courses were found
+        participantsFetched:
+          type: integer
+          minimum: 0
+          description: Number of participants retrieved for the course
+        filesGenerated:
+          type: integer
+          minimum: 0
+          description: HTML files written to output/
+        filesSkipped:
+          type: integer
+          minimum: 0
+          description: Files not rewritten (content unchanged)
+        errors:
+          type: array
+          items:
+            $ref: '#/components/schemas/SyncError'
+
+    SyncError:
+      type: object
+      required: [entity, message, timestamp]
+      properties:
+        entity:
+          type: string
+          description: Entity or stage that produced the error
+        message:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+
+    ErrorResponse:
+      type: object
+      required: [success, error, meta]
+      properties:
+        success:
+          type: boolean
+          const: false
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              description: Machine-readable error code
+            message:
+              type: string
+              description: Human-readable error message
+        meta:
+          $ref: '#/components/schemas/ResponseMeta'
+
+    ResponseMeta:
+      type: object
+      required: [requestId, timestamp]
+      properties:
+        requestId:
+          type: string
+          description: Unique request identifier for tracing
+        timestamp:
+          type: string
+          format: date-time
+        version:
+          type: string
+          description: API version (optional)
+
+    # --- Hemera API types (for reference / contract testing) ---
+
+    ServiceCourseDetail:
+      type: object
+      description: |
+        Response shape from Hemera GET /api/service/courses/[id]
+        (after endpoint extension). Used by Aither to get course + participants.
+      required: [id, title, slug, level, startDate, endDate, participants]
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        slug:
+          type: string
+        level:
+          type: string
+          enum: [BEGINNER, INTERMEDIATE, ADVANCED]
+        startDate:
+          type: string
+          format: date-time
+        endDate:
+          type: string
+          format: date-time
+        participants:
+          type: array
+          items:
+            $ref: '#/components/schemas/ServiceParticipant'
+
+    ServiceParticipant:
+      type: object
+      required: [participationId, userId, name, status, preparationIntent, desiredResults, lineManagerProfile, preparationCompletedAt]
+      properties:
+        participationId:
+          type: string
+          description: CourseParticipation.id
+        userId:
+          type: string
+          description: Clerk user ID
+        name:
+          type: string
+          nullable: true
+          description: User display name (from User.name via booking join)
+        status:
+          type: string
+          description: CourseParticipation status
+        preparationIntent:
+          type: string
+          nullable: true
+          maxLength: 2000
+          description: Participant's preparation intent
+        desiredResults:
+          type: string
+          nullable: true
+          maxLength: 2000
+          description: Participant's desired results
+        lineManagerProfile:
+          type: string
+          nullable: true
+          maxLength: 2000
+          description: Line manager profile
+        preparationCompletedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: When preparation was completed (null if not yet)

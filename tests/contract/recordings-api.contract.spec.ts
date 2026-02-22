@@ -7,6 +7,9 @@ import { POST } from "@/app/api/recordings/route";
 import { describe, expect, it, vi } from "vitest";
 
 // Mock auth — bypass requireAdmin check
+vi.mock("@/lib/auth/route-auth", () => ({
+	getRouteAuth: vi.fn().mockResolvedValue({ sessionClaims: { metadata: { role: "admin" } } }),
+}));
 vi.mock("@/lib/auth/role-check", () => ({
 	requireAdmin: vi.fn().mockReturnValue({
 		status: 200,

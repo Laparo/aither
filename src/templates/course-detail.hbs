@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{course.title}} — Kursdetails</title>
+  <style>
+    body { font-family: system-ui, -apple-system, sans-serif; margin: 2rem; color: #1a1a1a; }
+    h1 { font-size: 1.5rem; margin-bottom: 1.5rem; }
+    h2 { font-size: 1.2rem; margin-top: 2rem; margin-bottom: 1rem; }
+    table { border-collapse: collapse; width: 100%; margin-bottom: 2rem; }
+    th, td { border: 1px solid #d0d0d0; padding: 0.5rem 0.75rem; text-align: left; }
+    th { background-color: #f5f5f5; font-weight: 600; }
+    td { word-break: break-word; }
+    .meta { color: #666; font-size: 0.85rem; margin-top: 2rem; }
+    .kv-label { width: 200px; font-weight: 600; background-color: #f9f9f9; }
+  </style>
+</head>
+<body>
+  <h1>{{course.title}}</h1>
+
+  <h2>Kursdetails</h2>
+  <table>
+    <tbody>
+      <tr>
+        <td class="kv-label">Kurs</td>
+        <td>{{course.title}}</td>
+      </tr>
+      <tr>
+        <td class="kv-label">Slug</td>
+        <td>{{course.slug}}</td>
+      </tr>
+      <tr>
+        <td class="kv-label">Level</td>
+        <td>{{course.level}}</td>
+      </tr>
+      <tr>
+        <td class="kv-label">Startdatum</td>
+        <td>{{course.startDate}}</td>
+      </tr>
+      <tr>
+        <td class="kv-label">Enddatum</td>
+        <td>{{course.endDate}}</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>Teilnehmer &amp; Vorbereitungen</h2>
+  {{#if participants.length}}
+  <table>
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Vorbereitungsabsicht</th>
+        <th>Gewünschte Ergebnisse</th>
+        <th>Vorgesetzten-Profil</th>
+        <th>Vorbereitung abgeschlossen</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{#each participants}}
+      <tr>
+        <td>{{#if name}}{{name}}{{else}}&ndash;{{/if}}</td>
+        <td>{{#if preparationIntent}}{{preparationIntent}}{{else}}&ndash;{{/if}}</td>
+        <td>{{#if desiredResults}}{{desiredResults}}{{else}}&ndash;{{/if}}</td>
+        <td>{{#if lineManagerProfile}}{{lineManagerProfile}}{{else}}&ndash;{{/if}}</td>
+        <td>{{#if preparationCompleted}}Ja{{else}}&ndash;{{/if}}</td>
+      </tr>
+      {{/each}}
+    </tbody>
+  </table>
+  {{else}}
+  <p>Keine Teilnehmer vorhanden.</p>
+  {{/if}}
+
+  <p class="meta">Generiert am: {{generatedAt}}</p>
+</body>
+</html>

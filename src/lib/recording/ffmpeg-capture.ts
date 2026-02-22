@@ -127,17 +127,23 @@ export async function stopFFmpeg(
 	proc.child.kill("SIGINT");
 
 	// Race: normal exit vs. timeout
-	let timer: ReturnType<typeof setTimeout>;
+	let timer: ReturnType<typeof setTimeout> | null = null;
 	const timeoutPromise = new Promise<null>((resolve) => {
 		timer = setTimeout(() => resolve(null), KILL_GRACE_MS);
 	});
 
 	// Clear timer when process exits normally
-	proc.exited.then(() => clearTimeout(timer));
+	proc.exited.then(() => {
+		if (timer !== null) {
+			clearTimeout(timer);
+		}
+	});
 
 	const result = await Promise.race([proc.exited, timeoutPromise]);
 
-	clearTimeout(timer!);
+	if (timer !== null) {
+		clearTimeout(timer);
+	}
 
 	if (result === null) {
 		// Timed out — force kill
