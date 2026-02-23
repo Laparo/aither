@@ -50,6 +50,15 @@ vi.mock("@/lib/sync/orchestrator", () => ({
 	})),
 }));
 
+// Mock transmitRecording to prevent real Hemera API calls
+vi.mock("@/lib/sync/recording-transmitter", () => ({
+	transmitRecording: vi.fn().mockResolvedValue({
+		success: true,
+		seminarSourceId: "test-seminar",
+		hemeraResponse: { status: 200, message: "OK" },
+	}),
+}));
+
 const mockGetRouteAuth = vi.mocked(getRouteAuth);
 
 function createRequest(): NextRequest {
@@ -113,7 +122,12 @@ describe("/api/sync and /api/recordings auth", () => {
 		});
 		const req = new NextRequest(new URL("http://localhost:3500/api/recordings"), {
 			method: "POST",
-			body: JSON.stringify({ recordingId: "test-id", status: "saved" }),
+			body: JSON.stringify({
+				seminarSourceId: "test-seminar-123",
+				muxAssetId: "test-asset-456",
+				muxPlaybackUrl: "https://image.mux.com/test/low.mp4",
+				recordingDate: "2026-02-23T10:00:00Z",
+			}),
 			headers: { "Content-Type": "application/json" },
 		});
 		const res = await recPOST(req);
