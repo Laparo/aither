@@ -8,6 +8,7 @@ import { requireAdmin } from "@/lib/auth/role-check";
 import { getRouteAuth } from "@/lib/auth/route-auth";
 import { loadConfig } from "@/lib/config";
 import { createHemeraClient } from "@/lib/hemera/factory";
+import { rollbar } from "@/lib/monitoring/rollbar-official";
 import { SyncOrchestrator } from "@/lib/sync/orchestrator";
 import type { DataSyncJob } from "@/lib/sync/types";
 import { type NextRequest, NextResponse } from "next/server";
@@ -174,24 +175,38 @@ export async function POST(_req: NextRequest) {
 		orchestrator
 			.runDataSync()
 			.then((completedJob) => {
-				// Preserve the original jobId from the route
-				currentJob = { ...completedJob, jobId };
+				// Update state under mutex protection
+				return syncMutex.runExclusive(() => {
+					// Preserve the original jobId from the route
+					currentJob = { ...completedJob, jobId };
+				});
 			})
 			.catch((err) => {
-				if (currentJob) {
-					currentJob.status = "failed";
-					currentJob.endTime = new Date().toISOString();
-					currentJob.durationMs = syncStartedAt ? Date.now() - syncStartedAt : null;
-					currentJob.errors.push({
-						entity: "sync",
-						message: err instanceof Error ? err.message : String(err),
-						timestamp: new Date().toISOString(),
-					});
-				}
+				// Log to Rollbar immediately
+				const errorObj = err instanceof Error ? err : new Error(String(err));
+				rollbar.error(errorObj, {
+					additionalData: { context: "sync_background_execution" },
+				});
+
+				// Update state under mutex protection
+				return syncMutex.runExclusive(() => {
+					if (currentJob) {
+						currentJob.status = "failed";
+						currentJob.endTime = new Date().toISOString();
+						currentJob.durationMs = syncStartedAt ? Date.now() - syncStartedAt : null;
+						currentJob.errors.push({
+							entity: "sync",
+							message: err instanceof Error ? err.message : String(err),
+							timestamp: new Date().toISOString(),
+						});
+					}
+				});
 			})
 			.finally(() => {
-				isSyncRunning = false;
-				syncStartedAt = null;
+				return syncMutex.runExclusive(() => {
+					isSyncRunning = false;
+					syncStartedAt = null;
+				});
 			});
 
 		// Respond immediately with 202 + envelope

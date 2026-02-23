@@ -14,24 +14,35 @@ import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 
 export async function GET(req: NextRequest) {
+	let authData: unknown;
 	try {
-		const authData = await getRouteAuth();
-		const authResult = requireAdmin(authData);
-		if (authResult.status !== 200) {
-			return NextResponse.json(authResult.body, { status: authResult.status });
-		}
+		authData = await getRouteAuth();
 	} catch (error) {
-		reportError(error instanceof Error ? error : new Error(String(error)), undefined, "error");
+		const errorObj = error instanceof Error ? error : new Error(String(error));
+		reportError(
+			errorObj,
+			{
+				route: "/api/recording/events",
+				method: "GET",
+				additionalData: { context: "auth_retrieval_failed" },
+			},
+			"error",
+		);
 		return NextResponse.json(
 			{
 				success: false,
 				error: {
-					code: "AUTH_ERROR",
-					message: "Authentication failed",
+					code: "AUTH_RETRIEVAL_FAILED",
+					message: errorObj.message || "Failed to retrieve authentication",
 				},
 			},
-			{ status: 500 },
+			{ status: 401 },
 		);
+	}
+
+	const authResult = requireAdmin(authData);
+	if (authResult.status !== 200) {
+		return NextResponse.json(authResult.body, { status: authResult.status });
 	}
 
 	const recordingId = req.nextUrl.searchParams.get("recordingId");
