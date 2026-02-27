@@ -15,6 +15,10 @@ vi.mock("@/lib/config", () => ({
 }));
 
 // Mock auth — default: admin
+vi.mock("@/lib/auth/route-auth", () => ({
+	getRouteAuth: vi.fn().mockResolvedValue({ sessionClaims: { metadata: { role: "admin" } } }),
+}));
+
 const mockRequireAdmin = vi.fn().mockReturnValue({
 	status: 200,
 	body: { sessionClaims: { metadata: { role: "admin" } } },

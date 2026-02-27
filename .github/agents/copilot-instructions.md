@@ -5,8 +5,10 @@ Auto-generated from all feature plans. Last updated: 2026-02-11
 ## Active Technologies
 - TypeScript 5.9+ on Node.js (Next.js 16+ App Router) + Next.js 16, Clerk auth, Zod, Rollbar (all existing); FFmpeg (system binary) (004-video-recorder)
 - Local filesystem (`output/recordings/`), gitignored. In-memory session state (no database). (004-video-recorder)
+- TypeScript 5.9.3 + Next.js 16.1.6, React 19.2.4, Zod 3.24, Handlebars 4.7.8, p-throttle 6.2, p-retry 6.2, MUI 6.4 (005-data-sync)
+- Flat files only (output/ directory + .sync-manifest.json). No database (Constitution VII). (005-data-sync)
 
-- TypeScript 5+, Node.js (Next.js 16+ with App Router, React 18+) + Zod (validation), Clerk (auth/RBAC), MUI (dashboard UI), Rollbar (error monitoring), Nodemailer (SMTP email notifications) (001-hemera-api-integration)
+- TypeScript 5.9.3, Node.js (Next.js 16.1.6 with App Router, React 19.2.4) + Zod (validation), Clerk (auth/RBAC), MUI (dashboard UI), Rollbar (error monitoring), Nodemailer (SMTP email notifications) (001-hemera-api-integration)
 
 ## Project Structure
 
@@ -21,12 +23,13 @@ npm test && npm run lint
 
 ## Code Style
 
-TypeScript 5+, Node.js (Next.js 16+ with App Router, React 18+): Follow standard conventions
+TypeScript 5.9.3, Node.js (Next.js 16.1.6 with App Router, React 19.2.4): Follow standard conventions
 
 ## Recent Changes
+- 005-data-sync: Added TypeScript 5.9.3 + Next.js 16.1.6, React 19.2.4, Zod 3.24, Handlebars 4.7.8, p-throttle 6.2, p-retry 6.2, MUI 6.4
+- 005-data-sync: Added Flat files (output/ directory + .sync-manifest.json)
 - 004-video-recorder: Added TypeScript 5.9+ on Node.js (Next.js 16+ App Router) + Next.js 16, Clerk auth, Zod, Rollbar (all existing); FFmpeg (system binary)
 
-- 001-hemera-api-integration: Added TypeScript 5+, Node.js (Next.js 16+ with App Router, React 18+) + Zod (validation), Clerk (auth/RBAC), MUI (dashboard UI), Rollbar (error monitoring), Nodemailer (SMTP email notifications)
 
 <!-- MANUAL ADDITIONS START -->
 <!-- MANUAL ADDITIONS END -->

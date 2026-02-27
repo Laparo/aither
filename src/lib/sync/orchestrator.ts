@@ -1,14 +1,20 @@
 // ---------------------------------------------------------------------------
 // Sync Job Orchestrator
 // Task: T026 [US1] — Fetch → hash compare → populate → write → update manifest
+// Task: T011 [005-data-sync] — runDataSync(): next course + participants pipeline
 // ---------------------------------------------------------------------------
 
+import * as fs from "node:fs/promises";
+import * as path from "node:path";
 import type { HemeraClient } from "@/lib/hemera/client";
 import {
 	HtmlTemplatesResponseSchema,
 	LessonsResponseSchema,
 	MediaAssetsResponseSchema,
 	SeminarsResponseSchema,
+	type ServiceCourseDetail,
+	ServiceCourseDetailResponseSchema,
+	ServiceCoursesResponseSchema,
 	TextContentsResponseSchema,
 	UserProfilesResponseSchema,
 } from "@/lib/hemera/schemas";
@@ -22,9 +28,11 @@ import type {
 } from "@/lib/hemera/types";
 import { populateTemplate } from "@/lib/html/populator";
 import { cleanOrphans, writeHtmlFile } from "@/lib/html/writer";
+import { rollbar } from "@/lib/monitoring/rollbar-official";
 import { v4 as uuidv4 } from "uuid";
+import { selectNextCourse } from "./course-selector";
 import { computeContentHash, diffManifest, readManifest, writeManifest } from "./hash-manifest";
-import type { SyncJob } from "./types";
+import type { DataSyncJob, SyncJob } from "./types";
 
 export interface SyncOrchestratorOptions {
 	client: HemeraClient;
@@ -269,5 +277,159 @@ export class SyncOrchestrator {
 			map.set(key, existing);
 		}
 		return map;
+	}
+
+	// ── Data Sync Pipeline (005-data-sync) ──────────────────────────────────
+
+	/**
+	 * Runs the data-sync pipeline: fetch courses → selectNextCourse →
+	 * fetch course detail with participants → populate template → write HTML.
+	 *
+	 * Returns a DataSyncJob with flat status fields per contracts/sync-api.yaml.
+	 */
+	async runDataSync(): Promise<DataSyncJob> {
+		const startMs = Date.now();
+		const job: DataSyncJob = {
+			jobId: uuidv4(),
+			status: "running",
+			startTime: new Date().toISOString(),
+			endTime: null,
+			durationMs: null,
+			courseId: null,
+			noUpcomingCourse: false,
+			participantsFetched: 0,
+			filesGenerated: 0,
+			filesSkipped: 0,
+			errors: [],
+		};
+
+		try {
+			// 1. Fetch course list from Hemera
+			const coursesResponse = await this.client.get(
+				"/api/service/courses",
+				ServiceCoursesResponseSchema,
+			);
+			const courses = coursesResponse.data;
+
+			// 2. Select next upcoming course
+			const nextCourse = selectNextCourse(courses);
+
+			if (!nextCourse) {
+				// No upcoming course — success with noUpcomingCourse flag
+				job.status = "success";
+				job.noUpcomingCourse = true;
+				job.endTime = new Date().toISOString();
+				job.durationMs = Date.now() - startMs;
+				this.emitSyncLog(job);
+				return job;
+			}
+
+			job.courseId = nextCourse.id;
+
+			// 3. Fetch course detail with participants
+			const detailResponse = await this.client.get(
+				`/api/service/courses/${nextCourse.id}`,
+				ServiceCourseDetailResponseSchema,
+			);
+			const courseDetail = detailResponse.data;
+			job.participantsFetched = courseDetail.participants.length;
+
+			// 4. Read Handlebars template
+			const templatePath = path.resolve(process.cwd(), "src", "templates", "course-detail.hbs");
+			const templateHtml = await fs.readFile(templatePath, "utf-8");
+
+			// 5. Build template context
+			const templateData = this.buildCourseTemplateData(courseDetail);
+
+			// 6. Compute content hash and compare with manifest
+			const contentHash = computeContentHash(templateHtml, templateData);
+			const manifestKey = `courses:${courseDetail.id}`;
+
+			let oldManifest = { lastSyncTime: "", hashes: {} as Record<string, string> };
+			try {
+				oldManifest = await readManifest(this.manifestPath);
+			} catch (err) {
+				// Corrupted manifest — warn and proceed with full regeneration
+				rollbar.warning("sync.manifest.corrupted", {
+					manifestPath: this.manifestPath,
+					error: err instanceof Error ? err.message : String(err),
+				});
+			}
+
+			const existingHash = oldManifest.hashes[manifestKey];
+
+			if (existingHash === contentHash) {
+				// Content unchanged — skip regeneration
+				job.filesSkipped = 1;
+			} else {
+				// 7. Populate template with generatedAt added and write HTML
+				const templateDataWithTimestamp = {
+					...templateData,
+					generatedAt: new Date().toISOString(),
+				};
+				const html = populateTemplate(templateHtml, templateDataWithTimestamp);
+				await writeHtmlFile(this.outputDir, "courses", courseDetail.slug, html);
+				job.filesGenerated = 1;
+			}
+
+			// 8. Update manifest with new hash
+			await writeManifest(this.manifestPath, {
+				lastSyncTime: new Date().toISOString(),
+				hashes: { ...oldManifest.hashes, [manifestKey]: contentHash },
+			});
+
+			job.status = "success";
+		} catch (err) {
+			job.status = "failed";
+			job.errors.push({
+				entity: "data-sync",
+				message: err instanceof Error ? err.message : String(err),
+				timestamp: new Date().toISOString(),
+			});
+		}
+
+		job.endTime = new Date().toISOString();
+		job.durationMs = Date.now() - startMs;
+		this.emitSyncLog(job);
+		return job;
+	}
+
+	/** Build the template context object for Handlebars rendering (without generatedAt). */
+	private buildCourseTemplateData(courseDetail: ServiceCourseDetail): Record<string, unknown> {
+		return {
+			course: {
+				title: courseDetail.title,
+				slug: courseDetail.slug,
+				level: courseDetail.level,
+				startDate: courseDetail.startDate,
+				endDate: courseDetail.endDate,
+			},
+			participants: courseDetail.participants.map((p) => ({
+				name: p.name,
+				preparationIntent: p.preparationIntent,
+				desiredResults: p.desiredResults,
+				lineManagerProfile: p.lineManagerProfile,
+				preparationCompleted: p.preparationCompletedAt !== null,
+			})),
+		};
+	}
+
+	/** Emit a structured Rollbar info log after sync completion (T013). */
+	private emitSyncLog(job: DataSyncJob): void {
+		try {
+			rollbar.info("sync.completed", {
+				jobId: job.jobId,
+				status: job.status,
+				durationMs: job.durationMs,
+				courseId: job.courseId,
+				noUpcomingCourse: job.noUpcomingCourse,
+				participantsFetched: job.participantsFetched,
+				filesGenerated: job.filesGenerated,
+				filesSkipped: job.filesSkipped,
+				errorCount: job.errors.length,
+			});
+		} catch {
+			// Rollbar should never break the sync pipeline
+		}
 	}
 }

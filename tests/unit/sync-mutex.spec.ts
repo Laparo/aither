@@ -23,6 +23,9 @@ vi.mock("@/lib/auth/role-check", () => ({
 		body: { sessionClaims: { metadata: { role: "admin" } } },
 	}),
 }));
+vi.mock("@/lib/auth/route-auth", () => ({
+	getRouteAuth: vi.fn().mockResolvedValue({ sessionClaims: { metadata: { role: "admin" } } }),
+}));
 
 // Mock dependencies
 vi.mock("@/lib/hemera/client", () => ({
@@ -62,6 +65,28 @@ vi.mock("@/lib/sync/orchestrator", () => ({
 					),
 				),
 		),
+		runDataSync: vi.fn().mockImplementation(
+			() =>
+				new Promise((resolve) =>
+					setTimeout(
+						() =>
+							resolve({
+								jobId: "test-job",
+								status: "success",
+								startTime: new Date().toISOString(),
+								endTime: new Date().toISOString(),
+								durationMs: 50,
+								courseId: null,
+								noUpcomingCourse: true,
+								participantsFetched: 0,
+								filesGenerated: 0,
+								filesSkipped: 0,
+								errors: [],
+							}),
+						50,
+					),
+				),
+		),
 	})),
 }));
 
@@ -83,7 +108,8 @@ describe("Sync Mutex", () => {
 		const res2 = await POST(createRequest("POST"));
 		expect(res2.status).toBe(409);
 		const body = await res2.json();
-		expect(body.error).toBe("SYNC_ALREADY_RUNNING");
+		expect(body.success).toBe(false);
+		expect(body.error.code).toBe("SYNC_IN_PROGRESS");
 	});
 
 	it("allows sequential syncs after completion", async () => {
@@ -106,6 +132,7 @@ describe("Sync Mutex", () => {
 			() =>
 				({
 					run: vi.fn().mockRejectedValue(new Error("fetch failed")),
+					runDataSync: vi.fn().mockRejectedValue(new Error("fetch failed")),
 				}) as unknown as InstanceType<typeof SyncOrchestrator>,
 		);
 
@@ -130,7 +157,8 @@ describe("Sync Mutex", () => {
 		const res = await GET(createRequest("GET"));
 		expect(res.status).toBe(200);
 		const body = await res.json();
-		expect(body).toHaveProperty("jobId");
-		expect(body).toHaveProperty("status");
+		expect(body.success).toBe(true);
+		expect(body.data).toHaveProperty("jobId");
+		expect(body.data).toHaveProperty("status");
 	});
 });
