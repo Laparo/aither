@@ -37,6 +37,15 @@
 		}
 	},
 	"files": {
-		"ignore": ["node_modules/", ".next/", "output/", "dist/", "build/", "coverage/", "*.min.js"]
+		"ignore": [
+			"node_modules/",
+			".next/",
+			"output/",
+			"dist/",
+			"build/",
+			"coverage/",
+			"*.min.js",
+			"specs/"
+		]
 	}
 }

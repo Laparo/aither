@@ -1,10 +1,16 @@
 // ---------------------------------------------------------------------------
 // Slide Generation — Course Resolver
 // Task: T005 [US1] — Determine the next upcoming course
+// Task: T005 [US5] — Determine the next upcoming course with participants
 // ---------------------------------------------------------------------------
 
 import type { HemeraClient } from "@/lib/hemera/client";
-import { SeminarsResponseSchema } from "@/lib/hemera/schemas";
+import {
+	SeminarsResponseSchema,
+	type ServiceCourseDetail,
+	ServiceCourseDetailResponseSchema,
+	ServiceCoursesResponseSchema,
+} from "@/lib/hemera/schemas";
 import type { Seminar } from "@/lib/hemera/types";
 
 /**
@@ -29,4 +35,42 @@ export async function getNextCourse(client: HemeraClient): Promise<Seminar> {
 	}
 
 	return futureSeminars[0];
+}
+
+/**
+ * Fetches courses from the Hemera Service API, selects the nearest upcoming
+ * course, then fetches its detail (including participants).
+ *
+ * Returns `null` when no upcoming course exists (empty course list or all
+ * courses in the past). The generator skips participant slide generation
+ * gracefully.
+ *
+ * @param client HemeraClient instance for API access
+ * @returns Course detail with participants, or null if none upcoming
+ */
+export async function getNextCourseWithParticipants(
+	client: HemeraClient,
+): Promise<ServiceCourseDetail | null> {
+	const response = await client.get("/api/service/courses", ServiceCoursesResponseSchema);
+	const now = new Date();
+
+	const futureCourses = response.data
+		.filter((c) => c.startDate !== null)
+		.filter((c) => new Date(c.startDate as string) > now)
+		.sort(
+			(a, b) =>
+				new Date(a.startDate as string).getTime() - new Date(b.startDate as string).getTime(),
+		);
+
+	if (futureCourses.length === 0) {
+		return null;
+	}
+
+	const nextCourse = futureCourses[0];
+	const detailResponse = await client.get(
+		`/api/service/courses/${nextCourse.id}`,
+		ServiceCourseDetailResponseSchema,
+	);
+
+	return detailResponse.data;
 }

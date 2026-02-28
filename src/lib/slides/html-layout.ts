@@ -3,6 +3,8 @@
 // Task: T002 — wrapInLayout(title, content)
 // ---------------------------------------------------------------------------
 
+import { escapeHtml } from "./utils";
+
 /**
  * Wraps slide content in a consistent HTML layout optimized for 1920×1080.
  * Uses CSS custom properties for future branding customization.
@@ -48,15 +50,4 @@ export function wrapInLayout(title: string, content: string): string {
   </div>
 </body>
 </html>`;
-}
-
-/**
- * Escapes HTML special characters in a string to prevent injection.
- */
-function escapeHtml(text: string): string {
-	return text
-		.replace(/&/g, "&amp;")
-		.replace(/</g, "&lt;")
-		.replace(/>/g, "&gt;")
-		.replace(/"/g, "&quot;");
 }
