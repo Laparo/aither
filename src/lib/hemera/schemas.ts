@@ -195,3 +195,46 @@ export const ServiceCourseDetailResponseSchema = z.object({
 });
 
 export type ServiceCourseDetailResponse = z.infer<typeof ServiceCourseDetailResponseSchema>;
+
+// --- Service API: Course Materials ---
+
+/** Single material within a topic (from Hemera GET /api/service/courses/[id]/materials) */
+export const ServiceMaterialSchema = z.object({
+	materialId: z.string(),
+	identifier: z.string(),
+	title: z.string(),
+	sortOrder: z.number(),
+	htmlContent: z.string().nullable(),
+});
+
+export type ServiceMaterial = z.infer<typeof ServiceMaterialSchema>;
+
+/** Topic containing materials */
+export const ServiceMaterialTopicSchema = z.object({
+	topicId: z.string(),
+	topicTitle: z.string(),
+	materials: z.array(ServiceMaterialSchema),
+});
+
+export type ServiceMaterialTopic = z.infer<typeof ServiceMaterialTopicSchema>;
+
+/** Data payload of the materials response */
+export const ServiceMaterialsDataSchema = z.object({
+	courseId: z.string(),
+	topics: z.array(ServiceMaterialTopicSchema),
+});
+
+/** Envelope for Hemera materials endpoint response */
+export const ServiceMaterialsResponseSchema = z.object({
+	success: z.boolean(),
+	data: ServiceMaterialsDataSchema,
+	meta: z
+		.object({
+			requestId: z.string().optional(),
+			timestamp: z.string().optional(),
+			version: z.string().optional(),
+		})
+		.optional(),
+});
+
+export type ServiceMaterialsResponse = z.infer<typeof ServiceMaterialsResponseSchema>;

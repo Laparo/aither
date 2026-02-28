@@ -5,6 +5,7 @@
 
 import type { Lesson, MediaAsset, Seminar, TextContent } from "@/lib/hemera/types";
 import { wrapInLayout } from "./html-layout";
+import { escapeHtml } from "./utils";
 
 /** Date formatter for de-CH locale (e.g., "15. März 2026"). */
 const dateFormatter = new Intl.DateTimeFormat("de-CH", {
@@ -62,11 +63,20 @@ export function buildCurriculumSlide(lesson: Lesson): string {
  * Builds a material slide for text content.
  * Renders the text body as HTML centered on the page.
  *
+ * Branches on `text.contentType`:
+ * - "html": passes body through (already safe HTML from CMS)
+ * - "text": escapes body to prevent XSS
+ * - "markdown": escapes body (no markdown renderer available yet)
+ *
  * @param text The text content to render
  * @returns Complete HTML document string
  */
 export function buildTextSlide(text: TextContent): string {
-	const content = `<div style="font-size: 1.5rem; line-height: 1.6;">${text.body}</div>`;
+	const safeBody =
+		text.contentType === "html"
+			? text.body // trusted CMS HTML
+			: escapeHtml(text.body); // plain text or markdown — escape to prevent injection
+	const content = `<div style="font-size: 1.5rem; line-height: 1.6;">${safeBody}</div>`;
 	return wrapInLayout("Text Content", content);
 }
 
@@ -93,15 +103,4 @@ export function buildImageSlide(media: MediaAsset): string {
 export function buildVideoSlide(media: MediaAsset): string {
 	const content = `<video src="${escapeHtml(media.sourceUrl)}" controls style="max-width: 100%; max-height: 900px;"></video>`;
 	return wrapInLayout(media.altText ?? "Video", content);
-}
-
-/**
- * Escapes HTML special characters to prevent injection.
- */
-function escapeHtml(text: string): string {
-	return text
-		.replace(/&/g, "&amp;")
-		.replace(/</g, "&lt;")
-		.replace(/>/g, "&gt;")
-		.replace(/"/g, "&quot;");
 }
