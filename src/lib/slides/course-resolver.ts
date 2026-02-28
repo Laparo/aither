@@ -55,12 +55,9 @@ export async function getNextCourseWithParticipants(
 	const now = new Date();
 
 	const futureCourses = response.data
-		.filter((c) => c.startDate !== null)
-		.filter((c) => new Date(c.startDate as string) > now)
-		.sort(
-			(a, b) =>
-				new Date(a.startDate as string).getTime() - new Date(b.startDate as string).getTime(),
-		);
+		.filter((c): c is typeof c & { startDate: string } => c.startDate !== null)
+		.filter((c) => new Date(c.startDate) > now)
+		.sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
 
 	if (futureCourses.length === 0) {
 		return null;

@@ -23,6 +23,7 @@ type CollectionRecord = Record<string, string>;
 ```
 
 **Fields**:
+
 | Field | Type | Source | Description |
 |-------|------|--------|-------------|
 | `scalars.courseTitle` | `string` | `ServiceCourseDetail.title` | Course title |
@@ -34,6 +35,7 @@ type CollectionRecord = Record<string, string>;
 | `collections.participant` | `CollectionRecord[]` | `ServiceCourseDetail.participants` | Participant records |
 
 **Participant CollectionRecord fields**:
+
 | Key | Source | Null handling |
 |-----|--------|---------------|
 | `name` | `ServiceParticipant.name` | `"—"` |
@@ -217,7 +219,7 @@ const ServiceMaterialsResponseSchema = z.object({
 
 ## Entity Relationships
 
-```
+```text
 ServiceCourseDetail (hemera API)
 ├── scalars → SlideContext.scalars
 ├── participants[] → SlideContext.collections["participant"]
@@ -235,7 +237,8 @@ SlideGenerationEvent (observability)
 ## State Transitions
 
 No persistent state. All data flows are:
-```
+
+```text
 API Fetch → In-Memory Transform → HTML File Output
 ```
 

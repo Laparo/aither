@@ -10,23 +10,8 @@
 // Constitution: I (Test-First), III (Contract-First), VII (Stateless)
 // ---------------------------------------------------------------------------
 
-import { describe, expect, it } from 'vitest';
-
-// --- Types (from data-model.md) ---
-
-/** Flat key-value record for a single collection item (e.g., one participant) */
-type CollectionRecord = Record<string, string>;
-
-interface DistributedSlide {
-  /** Output filename, e.g., "video-analysis-01.html" */
-  filename: string;
-  /** Processed HTML with all placeholders replaced */
-  html: string;
-  /** Which participant record was assigned (0-based index) */
-  participantIndex: number;
-  /** The identifier used for grouping */
-  identifier: string;
-}
+import { describe, it } from 'vitest';
+import type { CollectionRecord, DistributedSlide } from '@/lib/slides/types';
 
 // --- Contract: distributeByIdentifier ---
 

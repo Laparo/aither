@@ -10,16 +10,8 @@
 // Constitution: I (Test-First), III (Contract-First)
 // ---------------------------------------------------------------------------
 
-import { describe, expect, it } from 'vitest';
-
-// --- Types (from data-model.md) ---
-
-interface ParsedPlaceholder {
-  raw: string;
-  type: 'scalar' | 'collection';
-  key: string;
-  field?: string;
-}
+import { describe, it } from 'vitest';
+import type { ParsedPlaceholder } from '@/lib/slides/types';
 
 // --- Contract: parsePlaceholders ---
 

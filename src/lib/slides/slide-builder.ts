@@ -63,11 +63,20 @@ export function buildCurriculumSlide(lesson: Lesson): string {
  * Builds a material slide for text content.
  * Renders the text body as HTML centered on the page.
  *
+ * Branches on `text.contentType`:
+ * - "html": passes body through (already safe HTML from CMS)
+ * - "text": escapes body to prevent XSS
+ * - "markdown": escapes body (no markdown renderer available yet)
+ *
  * @param text The text content to render
  * @returns Complete HTML document string
  */
 export function buildTextSlide(text: TextContent): string {
-	const content = `<div style="font-size: 1.5rem; line-height: 1.6;">${text.body}</div>`;
+	const safeBody =
+		text.contentType === "html"
+			? text.body // trusted CMS HTML
+			: escapeHtml(text.body); // plain text or markdown — escape to prevent injection
+	const content = `<div style="font-size: 1.5rem; line-height: 1.6;">${safeBody}</div>`;
 	return wrapInLayout("Text Content", content);
 }
 

@@ -18,21 +18,33 @@ import { escapeHtml } from "@/lib/slides/utils";
  */
 const PLACEHOLDER_RE = /{([a-zA-Z][a-zA-Z0-9]*(?::[a-zA-Z][a-zA-Z0-9]*)?)}/g;
 
+/** Regex to match `<style>...</style>` blocks (case-insensitive, dotAll). */
+const STYLE_BLOCK_RE = /<style[\s>][\s\S]*?<\/style>/gi;
+
+/**
+ * Strip `<style>` blocks from HTML to prevent CSS declarations
+ * like `{color:red}` from being detected as collection placeholders.
+ */
+function stripStyleBlocks(html: string): string {
+	return html.replace(STYLE_BLOCK_RE, "");
+}
+
 /**
  * Extract all `{key}` and `{collection:field}` placeholders from HTML.
  *
+ * - Strips `<style>` blocks before scanning to avoid CSS false-positives
  * - Deduplicates by raw string
  * - Classifies as scalar (no colon) or collection (has colon)
- * - Ignores CSS declarations and nested braces
  *
  * @param html  Raw HTML string to scan
  * @returns     Deduplicated array of parsed placeholders
  */
 export function parsePlaceholders(html: string): ParsedPlaceholder[] {
+	const stripped = stripStyleBlocks(html);
 	const seen = new Set<string>();
 	const results: ParsedPlaceholder[] = [];
 
-	for (const match of html.matchAll(PLACEHOLDER_RE)) {
+	for (const match of stripped.matchAll(PLACEHOLDER_RE)) {
 		const raw = match[0];
 		const inner = match[1];
 

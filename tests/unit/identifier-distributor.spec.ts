@@ -4,7 +4,7 @@
 // Constitution: §I Test-First, §III Contract-First
 // ---------------------------------------------------------------------------
 
-import { distributeByIdentifier } from "@/lib/slides/identifier-distributor";
+import { distributeByIdentifier, sanitizeIdentifier } from "@/lib/slides/identifier-distributor";
 import type { CollectionRecord } from "@/lib/slides/types";
 import { describe, expect, it, vi } from "vitest";
 
@@ -12,6 +12,30 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("@/lib/monitoring/rollbar-official", () => ({
 	serverInstance: { warning: vi.fn() },
 }));
+
+import { serverInstance } from "@/lib/monitoring/rollbar-official";
+
+describe("sanitizeIdentifier", () => {
+	it("keeps lowercase alphanumeric identifiers unchanged", () => {
+		expect(sanitizeIdentifier("video-analysis")).toBe("video-analysis");
+	});
+
+	it("lowercases uppercase characters", () => {
+		expect(sanitizeIdentifier("Video-Analysis")).toBe("video-analysis");
+	});
+
+	it("strips path traversal sequences", () => {
+		expect(sanitizeIdentifier("../my-slides")).toBe("my-slides");
+	});
+
+	it("strips special characters", () => {
+		expect(sanitizeIdentifier("my file (1)")).toBe("myfile1");
+	});
+
+	it("throws on empty result", () => {
+		expect(() => sanitizeIdentifier("!!!")).toThrow("empty filename");
+	});
+});
 
 describe("distributeByIdentifier", () => {
 	it("produces one slide per participant with sequential naming", () => {
@@ -105,6 +129,18 @@ describe("distributeByIdentifier", () => {
 		expect(result[1].filename).toBe("video-analysis-02.html");
 	});
 
+	it("logs Rollbar warning when expectedInstanceCount mismatches record count", () => {
+		const template = "<div>{participant:name}</div>";
+		const records: CollectionRecord[] = [{ name: "Anna Müller" }, { name: "Ben Fischer" }];
+
+		distributeByIdentifier(template, "video-analysis", "participant", records, {}, 3);
+
+		expect(serverInstance.warning).toHaveBeenCalledWith(
+			expect.stringContaining("1:1 invariant mismatch"),
+			expect.objectContaining({ expectedInstanceCount: 3, actualCount: 2 }),
+		);
+	});
+
 	it("generates zero-padded file names based on record count digits", () => {
 		const records: CollectionRecord[] = Array.from({ length: 12 }, (_, i) => ({
 			name: `Teilnehmer ${i + 1}`,
@@ -161,5 +197,17 @@ describe("distributeByIdentifier", () => {
 		expect(result[0].html).toBe(
 			'<div class="title"><img src="logo.png" /><h1>React Workshop</h1><p>Teilnehmer: Anna Müller</p></div>',
 		);
+	});
+
+	it("sanitizes identifier for safe filenames", () => {
+		const records: CollectionRecord[] = [{ name: "Anna" }];
+		const result = distributeByIdentifier(
+			"<p>{participant:name}</p>",
+			"../my-slides",
+			"participant",
+			records,
+			{},
+		);
+		expect(result[0].filename).toBe("my-slides-01.html");
 	});
 });

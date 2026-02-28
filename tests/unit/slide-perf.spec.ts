@@ -199,12 +199,9 @@ describe("Performance: Slide Generation", () => {
 		// Mode B: 3 materials × 20 distributed = 60
 		// Scalar: 2 materials × 1 = 2
 		// Total template: 162 + 1 intro + 1 curriculum = 164
-		expect(result.slidesGenerated).toBeGreaterThan(100);
+		expect(result.slidesGenerated).toBe(164);
 
 		// Performance budget: < 5 seconds
 		expect(elapsed).toBeLessThan(5000);
-
-		// Log for visibility
-		console.log(`Performance: ${result.slidesGenerated} slides in ${elapsed.toFixed(0)}ms`);
 	});
 });

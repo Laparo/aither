@@ -10,16 +10,8 @@
 // Constitution: I (Test-First), III (Contract-First)
 // ---------------------------------------------------------------------------
 
-import { describe, expect, it } from 'vitest';
-
-// --- Types (from data-model.md) ---
-
-interface TemplateSection {
-  body: string;
-  scalars: string[];
-  collections: Map<string, string[]>;
-  index: number;
-}
+import { describe, it } from 'vitest';
+import type { TemplateSection } from '@/lib/slides/types';
 
 // --- Contract: parseSections ---
 

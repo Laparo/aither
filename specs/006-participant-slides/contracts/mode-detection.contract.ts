@@ -10,11 +10,8 @@
 // Constitution: I (Test-First), III (Contract-First)
 // ---------------------------------------------------------------------------
 
-import { describe, expect, it } from 'vitest';
-
-// --- Types ---
-
-type ReplacementMode = 'section-iteration' | 'identifier-distribution' | 'scalar-only';
+import { describe, it } from 'vitest';
+import type { ReplacementMode } from '@/lib/slides/types';
 
 // --- Contract: detectMode ---
 
@@ -79,7 +76,7 @@ describe('detectMode', () => {
 
 // --- Contract: groupMaterialsByIdentifier ---
 
-describe('groupMaterialsByIdentifier', () => {
+describe('groupMaterialsByMaterialId', () => {
   // Signature: groupMaterialsByIdentifier(
   //   topics: Array<{ topicId: string; materials: Array<{ materialId: string; identifier: string; htmlContent: string | null }> }>
   // ): Map<string, MaterialWithLinks>

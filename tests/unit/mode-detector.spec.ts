@@ -1,10 +1,10 @@
 // ---------------------------------------------------------------------------
-// Unit Tests: Mode Detector — detectMode, groupMaterialsByIdentifier
+// Unit Tests: Mode Detector — detectMode, groupMaterialsByMaterialId
 // Contract: specs/006-participant-slides/contracts/mode-detection.contract.ts
 // Constitution: §I Test-First, §III Contract-First
 // ---------------------------------------------------------------------------
 
-import { detectMode, groupMaterialsByIdentifier } from "@/lib/slides/mode-detector";
+import { detectMode, groupMaterialsByMaterialId } from "@/lib/slides/mode-detector";
 import type { MaterialWithLinks } from "@/lib/slides/types";
 import { describe, expect, it } from "vitest";
 
@@ -47,9 +47,9 @@ describe("detectMode", () => {
 	});
 });
 
-// --- groupMaterialsByIdentifier (US7 — T016) ---
+// --- groupMaterialsByMaterialId (US7 — T016) ---
 
-describe("groupMaterialsByIdentifier", () => {
+describe("groupMaterialsByMaterialId", () => {
 	it("groups materials that appear in multiple topics", () => {
 		const topics = [
 			{
@@ -90,7 +90,7 @@ describe("groupMaterialsByIdentifier", () => {
 			},
 		];
 
-		const result = groupMaterialsByIdentifier(topics);
+		const result = groupMaterialsByMaterialId(topics);
 
 		expect(result.size).toBe(1);
 		const entry = result.get("mat-1") as MaterialWithLinks;
@@ -123,7 +123,7 @@ describe("groupMaterialsByIdentifier", () => {
 			},
 		];
 
-		const result = groupMaterialsByIdentifier(topics);
+		const result = groupMaterialsByMaterialId(topics);
 
 		expect(result.size).toBe(2);
 		expect(result.get("mat-1")?.curriculumLinkCount).toBe(1);
@@ -146,7 +146,7 @@ describe("groupMaterialsByIdentifier", () => {
 			},
 		];
 
-		const result = groupMaterialsByIdentifier(topics);
+		const result = groupMaterialsByMaterialId(topics);
 
 		expect(result.size).toBe(1);
 		expect(result.get("mat-1")?.htmlContent).toBeNull();
@@ -154,7 +154,7 @@ describe("groupMaterialsByIdentifier", () => {
 
 	it("returns empty map for empty topics", () => {
 		const topics: Array<{ topicId: string; materials: never[] }> = [];
-		const result = groupMaterialsByIdentifier(topics);
+		const result = groupMaterialsByMaterialId(topics);
 
 		expect(result.size).toBe(0);
 	});

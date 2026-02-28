@@ -17,7 +17,7 @@ import { serverInstance } from "@/lib/monitoring/rollbar-official";
 import { getNextCourse, getNextCourseWithParticipants } from "./course-resolver";
 import { wrapInLayout } from "./html-layout";
 import { distributeByIdentifier } from "./identifier-distributor";
-import { detectMode, groupMaterialsByIdentifier } from "./mode-detector";
+import { detectMode, groupMaterialsByMaterialId } from "./mode-detector";
 import { parseSections } from "./section-parser";
 import {
 	buildCurriculumSlide,
@@ -59,6 +59,7 @@ export class SlideGenerator {
 	 * @returns Result with slide count, course info, and slide metadata
 	 */
 	async generate(): Promise<SlideGenerationResult> {
+		const startMs = Date.now();
 		const slides: GeneratedSlide[] = [];
 
 		// Step 1: Resolve next course (needed before preparing directory)
@@ -120,7 +121,6 @@ export class SlideGenerator {
 		}
 
 		// Step 7: Materials pipeline — fetch via Service API, detect mode, process templates
-		const startMs = Date.now();
 		const event: SlideGenerationEvent = {
 			event: "slides.generated",
 			courseId: seminar.sourceId,
@@ -139,13 +139,14 @@ export class SlideGenerator {
 			const courseDetail = await getNextCourseWithParticipants(this.client);
 
 			if (courseDetail) {
+				event.courseId = courseDetail.id;
 				const context = buildSlideContext(courseDetail);
 				const materialsResp = await this.client.get(
 					`/api/service/courses/${courseDetail.id}/materials`,
 					ServiceMaterialsResponseSchema,
 				);
 
-				const grouped = groupMaterialsByIdentifier(materialsResp.data.topics);
+				const grouped = groupMaterialsByMaterialId(materialsResp.data.topics);
 
 				for (const [, material] of grouped) {
 					if (material.htmlContent === null) {
@@ -176,6 +177,7 @@ export class SlideGenerator {
 							collectionName,
 							records,
 							context.scalars,
+							material.curriculumLinkCount,
 						);
 						for (const dist of distributed) {
 							const wrapped = wrapInLayout(material.title, dist.html);
@@ -195,6 +197,16 @@ export class SlideGenerator {
 							const collectionName = section.collections.keys().next().value ?? "participant";
 							const records = context.collections[collectionName] ?? [];
 
+							if (records.length === 0 && section.collections.size > 0) {
+								// No records for this collection — skip to avoid unreplaced placeholders
+								event.skippedSections++;
+								serverInstance.warning(
+									`Skipping section ${section.index} of "${material.identifier}" — 0 records for "${collectionName}"`,
+									{ materialId: material.materialId, collectionName },
+								);
+								continue;
+							}
+
 							if (records.length > 0 && section.collections.size > 0) {
 								const rendered = replaceCollection(
 									section.body,
@@ -202,8 +214,10 @@ export class SlideGenerator {
 									records,
 									context.scalars,
 								);
+								const padWidth = Math.max(2, String(rendered.length).length);
 								for (let ri = 0; ri < rendered.length; ri++) {
-									const filename = `03_material_t${material.materialId}_s${section.index}_p${ri}.html`;
+									const paddedIdx = String(ri + 1).padStart(padWidth, "0");
+									const filename = `03_material_t${material.materialId}_s${section.index}_p${paddedIdx}.html`;
 									const wrapped = wrapInLayout(material.title, rendered[ri]);
 									await this.writeSlide(courseOutputDir, filename, wrapped);
 									slides.push({
@@ -275,8 +289,13 @@ export class SlideGenerator {
 
 	/**
 	 * Writes a single slide HTML file to the given directory.
+	 * Validates that the resolved path stays inside the target directory.
 	 */
 	private async writeSlide(dir: string, filename: string, html: string): Promise<void> {
-		await fs.writeFile(path.join(dir, filename), html, "utf-8");
+		const resolved = path.resolve(dir, filename);
+		if (!resolved.startsWith(path.resolve(dir) + path.sep) && resolved !== path.resolve(dir)) {
+			throw new Error(`Path traversal detected: "${filename}" escapes output directory`);
+		}
+		await fs.writeFile(resolved, html, "utf-8");
 	}
 }

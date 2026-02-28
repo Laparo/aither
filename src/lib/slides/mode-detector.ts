@@ -73,7 +73,7 @@ export function detectMode(
  * @param topics  Array of curriculum topics with their materials
  * @returns       Map from materialId to MaterialWithLinks
  */
-export function groupMaterialsByIdentifier(
+export function groupMaterialsByMaterialId(
 	topics: TopicWithMaterials[],
 ): Map<string, MaterialWithLinks> {
 	const result = new Map<string, MaterialWithLinks>();

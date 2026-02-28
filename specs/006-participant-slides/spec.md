@@ -190,7 +190,7 @@ As a course instructor, I want slides before the seminar that are automatically 
 
 Replaced directly with the corresponding value. Produce **one** slide.
 
-```
+```text
 {courseTitle}          → "Gehaltsverhandlung meistern"
 {courseLevel}          → "ADVANCED"
 {courseStartDate}      → "2026-03-15T09:00:00Z"
@@ -201,7 +201,7 @@ Replaced directly with the corresponding value. Produce **one** slide.
 
 Recognized by the `:` separator. The part before the colon is the **object type** (collection), the part after is the **field**. A section with object placeholders is **repeated for each entity in the collection** — the parser reads the first object type and iterates over all records.
 
-```
+```text
 {participant:name}              → "Anna Müller"
 {participant:preparationIntent} → "Ich möchte selbstbewusster auftreten"
 {participant:desiredResults}    → "Gehaltserhöhung von 15%"

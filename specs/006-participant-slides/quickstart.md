@@ -87,7 +87,7 @@ head -30 output/slides/<course-id>/video-analysis-01.html
 
 Mode A produces files named by topic/section/iteration index:
 
-```
+```text
 output/slides/<course-id>/
 ├── 01_intro.html
 ├── 02_curriculum.html
@@ -101,7 +101,7 @@ output/slides/<course-id>/
 
 Mode B produces files named by identifier + sequential number:
 
-```
+```text
 output/slides/<course-id>/
 ├── video-analysis-01.html      # Participant 1 (Alice)
 ├── video-analysis-02.html      # Participant 2 (Bob)

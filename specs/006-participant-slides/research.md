@@ -66,6 +66,7 @@ function detectMode(
 ```
 
 ### Decision Table
+
 | `<section>` tags | Link count > 1 | Collection placeholders | Result |
 |---|---|---|---|
 | Yes | Any | Any | `section-iteration` (Mode A) |
@@ -109,7 +110,7 @@ The hemera `GET /api/service/courses/{id}/materials` endpoint returns:
 
 Key observations for Mode B detection:
 - The same `materialId` + `identifier` can appear in **multiple topics** (same template linked N times in curriculum).
-- To detect Mode B, aither must group the flat topic→material list by `materialId` and count occurrences.
+- To detect Mode B, Aither must group the flat topic→material list by `materialId` and count occurrences.
 - `htmlContent` can be `null` if blob fetch failed — skip gracefully.
 
 ### Schema Design
@@ -239,7 +240,7 @@ Mode B files don't use the `03_` prefix because they are identified and grouped 
 
 ## R9: HTML Escaping Strategy
 
-### Decision: Reuse existing `escapeHtml()` from `html-layout.ts`
+### Decision: Extract shared `escapeHtml()` utility to `src/lib/slides/utils.ts`
 
 ### Rationale
 The `escapeHtml()` function in `src/lib/slides/html-layout.ts` already handles the standard XSS escaping:

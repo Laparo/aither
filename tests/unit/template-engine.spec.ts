@@ -87,6 +87,19 @@ describe("parsePlaceholders", () => {
 		expect(result[0]).toMatchObject({ raw: "{courseTitle}", type: "scalar" });
 	});
 
+	it("ignores minified CSS that resembles collection placeholders", () => {
+		const html = "<style>body{color:red}</style><p>{participant:name}</p>";
+		const result = parsePlaceholders(html);
+
+		expect(result).toHaveLength(1);
+		expect(result[0]).toMatchObject({
+			raw: "{participant:name}",
+			type: "collection",
+			key: "participant",
+			field: "name",
+		});
+	});
+
 	it("handles nested braces gracefully (no match)", () => {
 		const html = "{participant:{name}}";
 		const result = parsePlaceholders(html);

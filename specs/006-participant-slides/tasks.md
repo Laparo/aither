@@ -151,7 +151,7 @@
 - [x] T027 Run `npx tsc --noEmit` to verify zero type errors across all new and modified files
 - [x] T028 Run full test suite `npx vitest run tests/unit/` to verify all tests pass
 - [x] T029 Run performance benchmark: generate slides for a course with 20 participants + 10 materials, verify completion in <5s (plan §Technical Context target)
-- [x] T030 Run quickstart.md validation scenarios against running dev servers (hemera:3000 + aither:3500)
+- [x] T030 Run quickstart.md validation scenarios against running dev servers (Hemera:3000 + Aither:3500)
 
 ---
 
@@ -170,7 +170,7 @@
 
 ### User Story Dependencies
 
-```
+```text
 Phase 1 (Setup)
     |-- Phase 2 (US5 + US6) ----------------------+
     +-- Phase 3 (US1) ---+-- Phase 4 (US2) ---+-- Phase 7 (US4)
@@ -263,5 +263,5 @@ Task T019: "Implement distributeByIdentifier() in src/lib/slides/identifier-dist
 - All test tasks reference specific contract files in `specs/006-participant-slides/contracts/` — use these as test case specifications
 - `escapeHtml()` extraction (T001) should be done first since multiple modules depend on it
 - The `ServiceMaterialsResponseSchema` (T002) must match the hemera endpoint response exactly — see `hemera/app/api/service/courses/[id]/materials/route.ts`
-- Mode B 1:1 invariant (participant count = curriculum link count) is enforced by hemera, but aither logs a Rollbar warning on mismatch
+- Mode B 1:1 invariant (participant count = curriculum link count) is enforced by Hemera, but Aither logs a Rollbar warning on mismatch
 - Constitution Principle I: All test tasks (T004, T006, T008, T010, T012, T014, T016, T018, T020) must be written FIRST and FAIL before their corresponding implementation task
