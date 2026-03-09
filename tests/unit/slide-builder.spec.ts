@@ -143,6 +143,27 @@ describe("buildTextSlide", () => {
 		expect(html).toContain("<!DOCTYPE html>");
 		expect(html).toContain("width: 1920px");
 	});
+
+	it("passes HTML content through unchanged when contentType is html", () => {
+		const html = buildTextSlide(makeText({ body: "<b>Bold</b>", contentType: "html" }));
+		expect(html).toContain("<b>Bold</b>");
+	});
+
+	it("escapes body when contentType is text to prevent XSS", () => {
+		const html = buildTextSlide(
+			makeText({ body: '<script>alert("xss")</script>', contentType: "text" }),
+		);
+		expect(html).toContain("&lt;script&gt;");
+		expect(html).not.toContain("<script>");
+	});
+
+	it("escapes body when contentType is markdown", () => {
+		const html = buildTextSlide(
+			makeText({ body: "<img onerror=alert(1)>", contentType: "markdown" }),
+		);
+		expect(html).toContain("&lt;img");
+		expect(html).not.toContain("<img");
+	});
 });
 
 describe("buildImageSlide", () => {
