@@ -65,3 +65,4 @@ output/
 
 # (duplicate Python block removed — consolidated above)
 .qodo/
+.playwright-mcp/
