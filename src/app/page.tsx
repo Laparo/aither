@@ -1,3 +1,5 @@
+import fs from "node:fs/promises";
+import path from "node:path";
 import { HemeraClient } from "@/lib/hemera/client";
 import {
 	type ServiceCourseDetail,
@@ -8,6 +10,7 @@ import { getTokenManager } from "@/lib/hemera/token-manager";
 import { selectNextCourse } from "@/lib/sync/course-selector";
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
+import Chip from "@mui/material/Chip";
 import Paper from "@mui/material/Paper";
 import Table from "@mui/material/Table";
 import TableBody from "@mui/material/TableBody";
@@ -16,6 +19,7 @@ import TableContainer from "@mui/material/TableContainer";
 import TableHead from "@mui/material/TableHead";
 import TableRow from "@mui/material/TableRow";
 import Typography from "@mui/material/Typography";
+import { CameraSnapshot } from "./components/camera-snapshot";
 
 const levelLabels: Record<string, string> = {
 	BEGINNER: "Grundkurs",
@@ -54,6 +58,45 @@ function createClient(): HemeraClient | null {
 	});
 }
 
+interface SlideStatus {
+	status: "generated" | "not-generated";
+	slideCount: number;
+	lastUpdated: string | null;
+}
+
+async function fetchSlideStatus(courseId: string | null): Promise<SlideStatus> {
+	const notGenerated: SlideStatus = { status: "not-generated", slideCount: 0, lastUpdated: null };
+	const outputDir = process.env.SLIDES_OUTPUT_DIR || "output/slides";
+	if (!courseId || !/^[A-Za-z0-9_.-]+$/.test(courseId)) return notGenerated;
+
+	const baseDir = path.resolve(process.cwd(), outputDir);
+	const courseDir = path.resolve(baseDir, courseId);
+	if (!courseDir.startsWith(baseDir + path.sep)) return notGenerated;
+
+	try {
+		const entries = await fs.readdir(courseDir);
+		const htmlFiles = entries.filter((f) => f.endsWith(".html"));
+
+		if (htmlFiles.length === 0) {
+			return { status: "not-generated", slideCount: 0, lastUpdated: null };
+		}
+
+		let latestMtime = 0;
+		for (const file of htmlFiles) {
+			const stat = await fs.stat(path.join(courseDir, file));
+			if (stat.mtimeMs > latestMtime) latestMtime = stat.mtimeMs;
+		}
+
+		return {
+			status: "generated",
+			slideCount: htmlFiles.length,
+			lastUpdated: new Date(latestMtime).toISOString(),
+		};
+	} catch {
+		return { status: "not-generated", slideCount: 0, lastUpdated: null };
+	}
+}
+
 /** Fetch next course with participants, or null on failure. */
 async function fetchNextCourseDetail(): Promise<ServiceCourseDetail | null> {
 	const client = createClient();
@@ -81,6 +124,8 @@ export default async function Home() {
 		console.error("Fehler beim Laden der Kursdaten:", error);
 		fetchError = true;
 	}
+
+	const slideStatus = await fetchSlideStatus(courseDetail?.id ?? null);
 
 	return (
 		<Box component="main" sx={{ maxWidth: 960, mx: "auto", p: 3 }}>
@@ -148,6 +193,41 @@ export default async function Home() {
 						</Table>
 					</TableContainer>
 
+					{/* --- Slide Status --- */}
+					<Typography variant="h5" sx={{ mt: 4, mb: 1 }}>
+						Seminarmaterial
+					</Typography>
+					<TableContainer component={Paper} data-testid="slide-status-table">
+						<Table size="small">
+							<TableBody>
+								<TableRow>
+									<TableCell component="th" sx={{ fontWeight: 600, width: "30%" }}>
+										Status
+									</TableCell>
+									<TableCell>
+										<Chip
+											label={slideStatus.status === "generated" ? "Generiert" : "Nicht generiert"}
+											color={slideStatus.status === "generated" ? "success" : "default"}
+											size="small"
+										/>
+									</TableCell>
+								</TableRow>
+								<TableRow>
+									<TableCell component="th" sx={{ fontWeight: 600 }}>
+										Letzte Aktualisierung
+									</TableCell>
+									<TableCell>{formatDate(slideStatus.lastUpdated)}</TableCell>
+								</TableRow>
+								<TableRow>
+									<TableCell component="th" sx={{ fontWeight: 600 }}>
+										Anzahl Seiten
+									</TableCell>
+									<TableCell>{slideStatus.slideCount}</TableCell>
+								</TableRow>
+							</TableBody>
+						</Table>
+					</TableContainer>
+
 					{/* --- Participants Table (T023) --- */}
 					<Typography variant="h5" sx={{ mt: 4, mb: 1 }}>
 						Teilnehmer &amp; Vorbereitungen
@@ -186,6 +266,12 @@ export default async function Home() {
 							</Table>
 						</TableContainer>
 					)}
+
+					{/* --- Camera Status --- */}
+					<Typography variant="h5" sx={{ mt: 4, mb: 1 }}>
+						Kamera
+					</Typography>
+					<CameraSnapshot />
 				</>
 			)}
 		</Box>
