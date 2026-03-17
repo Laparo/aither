@@ -9,7 +9,7 @@ import { auth } from "@clerk/nextjs/server";
  * Retrieve session auth context in a route handler.
  *
  * Delegates to Clerk's `auth()` which reads session state
- * set by `clerkMiddleware` (src/middleware.ts).
+ * set by `clerkMiddleware` (src/proxy.ts).
  *
  * Returns `null` when no user is signed in, otherwise the
  * full Clerk session object including `sessionClaims`.
