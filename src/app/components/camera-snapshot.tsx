@@ -53,15 +53,18 @@ export function CameraSnapshot() {
 	}
 
 	if (!src) {
-		return <Box sx={{ color: "text.secondary", py: 2 }}>Kamera wird geprüft…</Box>;
+		return <Box sx={{ color: "text.secondary", py: 2 }}>Video wird aufgenommen…</Box>;
 	}
 
 	return (
 		<Box
-			component="img"
+			component="video"
 			src={src}
-			alt="Kamera-Snapshot"
-			data-testid="camera-snapshot"
+			autoPlay
+			muted
+			loop
+			controls
+			data-testid="camera-clip"
 			sx={{ maxWidth: "100%", borderRadius: 1, border: "1px solid", borderColor: "divider" }}
 		/>
 	);
