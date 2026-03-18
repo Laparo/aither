@@ -23,8 +23,10 @@ export function _resetState() {
 // ── POST /api/slides — Trigger slide generation ──────────────────────────
 
 export async function POST(_req: NextRequest) {
-	// In development, skip auth for local dashboard usage
-	if (process.env.NODE_ENV !== "development") {
+	// In development with explicit opt-in, skip auth for local dashboard usage
+	if (process.env.NODE_ENV === "development" && process.env.SKIP_AUTH_FOR_DEV === "true") {
+		console.warn("⚠ Auth bypass active (SKIP_AUTH_FOR_DEV=true) — route is unprotected");
+	} else {
 		const authData = await getRouteAuth();
 		const authResult = requireAdmin(authData);
 		if (authResult.status !== 200) {

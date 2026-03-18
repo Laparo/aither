@@ -77,35 +77,35 @@ Expected response:
 ls -la output/slides/<course-id>/
 
 # Inspect a Mode A slide (section iteration)
-head -30 output/slides/<course-id>/03_material_<topicIdx>_<section>_01.html
+head -30 output/slides/<course-id>/<NN>_preparation-sheet_anna.html
 
 # Inspect a Mode B slide (identifier distribution)
-head -30 output/slides/<course-id>/video-analysis-01.html
+head -30 output/slides/<course-id>/<NN>_video-analysis_alice.html
 ```
 
 ### Mode A Output Structure
 
-Mode A produces files named by topic/section/iteration index:
+Mode A produces files named by global sequence, identifier, and participant first name:
 
 ```text
 output/slides/<course-id>/
 ├── 01_intro.html
-├── 02_curriculum.html
-├── 03_material_01_01_01.html   # Topic 1, Section 1, Participant 1
-├── 03_material_01_01_02.html   # Topic 1, Section 1, Participant 2
-├── 03_material_01_02_01.html   # Topic 1, Section 2 (static)
+├── 02_kommunikation.html
+├── 03_preparation-sheet_anna.html   # Participant 1
+├── 04_preparation-sheet_ben.html    # Participant 2
+├── 05_agenda.html                   # Scalar-only (no participant)
 └── ...
 ```
 
 ### Mode B Output Structure
 
-Mode B produces files named by identifier + sequential number:
+Mode B produces files named by global sequence, identifier, and participant first name:
 
 ```text
 output/slides/<course-id>/
-├── video-analysis-01.html      # Participant 1 (Alice)
-├── video-analysis-02.html      # Participant 2 (Bob)
-├── video-analysis-03.html      # Participant 3 (Charlie)
+├── 06_video-analysis_alice.html     # Participant 1 (Alice)
+├── 07_video-analysis_bob.html       # Participant 2 (Bob)
+├── 08_video-analysis_charlie.html   # Participant 3 (Charlie)
 └── ...
 ```
 
@@ -128,7 +128,7 @@ ls output/slides/<course-id>/ | wc -l
 ```bash
 # Check a material that contains only scalar placeholders (no {participant:*})
 # e.g., a title slide with just {courseTitle} and {courseDate}
-cat output/slides/<course-id>/03_material_02_01_01.html | grep -i "kurs\|datum\|course"
+cat output/slides/<course-id>/<NN>_agenda.html | grep -i "kurs\|datum\|course"
 ```
 
 Expected: Scalar placeholders replaced with actual values, no iteration.

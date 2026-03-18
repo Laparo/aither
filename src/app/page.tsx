@@ -49,7 +49,7 @@ function dash(value: string | null | undefined): string {
 function createClient(): HemeraClient | null {
 	const baseUrl = process.env.HEMERA_API_BASE_URL;
 	if (!baseUrl) {
-		console.error("HEMERA_API_BASE_URL nicht gesetzt");
+		console.warn("HEMERA_API_BASE_URL nicht gesetzt");
 		return null;
 	}
 	const tokenManager = getTokenManager();
@@ -57,7 +57,9 @@ function createClient(): HemeraClient | null {
 		baseUrl,
 		getToken: () => tokenManager.getToken(),
 		rateLimit: 2,
-		maxRetries: 3,
+		maxRetries: 0,
+		fetchFn: (input, init) =>
+			fetch(input, { ...init, signal: AbortSignal.timeout(5_000), cache: "no-store" }),
 	});
 }
 
@@ -66,6 +68,7 @@ interface SlideStatus {
 	slideCount: number;
 	lastUpdated: string | null;
 	files: string[];
+	courseId: string | null;
 }
 
 async function fetchSlideStatus(courseId: string | null): Promise<SlideStatus> {
@@ -74,6 +77,7 @@ async function fetchSlideStatus(courseId: string | null): Promise<SlideStatus> {
 		slideCount: 0,
 		lastUpdated: null,
 		files: [],
+		courseId: null,
 	};
 	const outputDir = process.env.SLIDES_OUTPUT_DIR || "output/slides";
 	if (!courseId || !/^[A-Za-z0-9_.-]+$/.test(courseId)) return notGenerated;
@@ -87,7 +91,7 @@ async function fetchSlideStatus(courseId: string | null): Promise<SlideStatus> {
 		const htmlFiles = entries.filter((f) => f.endsWith(".html"));
 
 		if (htmlFiles.length === 0) {
-			return { status: "not-generated", slideCount: 0, lastUpdated: null, files: [] };
+			return { status: "not-generated", slideCount: 0, lastUpdated: null, files: [], courseId };
 		}
 
 		let latestMtime = 0;
@@ -101,9 +105,30 @@ async function fetchSlideStatus(courseId: string | null): Promise<SlideStatus> {
 			slideCount: htmlFiles.length,
 			lastUpdated: new Date(latestMtime).toISOString(),
 			files: htmlFiles.sort(),
+			courseId,
 		};
 	} catch {
-		return { status: "not-generated", slideCount: 0, lastUpdated: null, files: [] };
+		return { status: "not-generated", slideCount: 0, lastUpdated: null, files: [], courseId };
+	}
+}
+
+/** Detect the most recently modified course directory in output/slides/. */
+async function detectSlideCourseId(): Promise<string | null> {
+	const outputDir = process.env.SLIDES_OUTPUT_DIR || "output/slides";
+	const baseDir = path.resolve(process.cwd(), outputDir);
+	try {
+		const entries = await fs.readdir(baseDir, { withFileTypes: true });
+		const dirs = entries.filter((e) => e.isDirectory() && /^[A-Za-z0-9_.-]+$/.test(e.name));
+		let latest: { name: string; mtime: number } | null = null;
+		for (const dir of dirs) {
+			const stat = await fs.stat(path.join(baseDir, dir.name));
+			if (!latest || stat.mtimeMs > latest.mtime) {
+				latest = { name: dir.name, mtime: stat.mtimeMs };
+			}
+		}
+		return latest?.name ?? null;
+	} catch {
+		return null;
 	}
 }
 
@@ -130,12 +155,12 @@ export default async function Home() {
 
 	try {
 		courseDetail = await fetchNextCourseDetail();
-	} catch (error) {
-		console.error("Fehler beim Laden der Kursdaten:", error);
+	} catch {
 		fetchError = true;
 	}
 
-	const slideStatus = await fetchSlideStatus(courseDetail?.id ?? null);
+	const slideCourseId = courseDetail?.id ?? (await detectSlideCourseId());
+	const slideStatus = await fetchSlideStatus(slideCourseId);
 
 	return (
 		<Box component="main" sx={{ maxWidth: 960, mx: "auto", p: 3 }}>
@@ -202,47 +227,51 @@ export default async function Home() {
 							</TableBody>
 						</Table>
 					</TableContainer>
+				</>
+			)}
 
-					{/* --- Slide Status --- */}
-					<Typography variant="h5" sx={{ mt: 4, mb: 1 }}>
-						Seminarmaterial
-					</Typography>
-					<TableContainer component={Paper} data-testid="slide-status-table">
-						<Table size="small">
-							<TableBody>
-								<TableRow>
-									<TableCell component="th" sx={{ fontWeight: 600, width: "30%" }}>
-										Status
-									</TableCell>
-									<TableCell>
-										<Chip
-											label={slideStatus.status === "generated" ? "Generiert" : "Nicht generiert"}
-											color={slideStatus.status === "generated" ? "success" : "default"}
-											size="small"
-										/>
-									</TableCell>
-								</TableRow>
-								<TableRow>
-									<TableCell component="th" sx={{ fontWeight: 600 }}>
-										Letzte Aktualisierung
-									</TableCell>
-									<TableCell>{formatDate(slideStatus.lastUpdated)}</TableCell>
-								</TableRow>
-								<TableRow>
-									<TableCell component="th" sx={{ fontWeight: 600 }}>
-										Anzahl Seiten
-									</TableCell>
-									<TableCell>{slideStatus.slideCount}</TableCell>
-								</TableRow>
-							</TableBody>
-						</Table>
-					</TableContainer>
-					{slideStatus.files.length > 0 && courseDetail && (
-						<SlideThumbnails courseId={courseDetail.id} files={slideStatus.files} />
-					)}
-					<SlideGenerateButton />
+			{/* --- Slide Status --- */}
+			<Typography variant="h5" sx={{ mt: 4, mb: 1 }}>
+				Seminarmaterial
+			</Typography>
+			<TableContainer component={Paper} data-testid="slide-status-table">
+				<Table size="small">
+					<TableBody>
+						<TableRow>
+							<TableCell component="th" sx={{ fontWeight: 600, width: "30%" }}>
+								Status
+							</TableCell>
+							<TableCell>
+								<Chip
+									label={slideStatus.status === "generated" ? "Generiert" : "Nicht generiert"}
+									color={slideStatus.status === "generated" ? "success" : "default"}
+									size="small"
+								/>
+							</TableCell>
+						</TableRow>
+						<TableRow>
+							<TableCell component="th" sx={{ fontWeight: 600 }}>
+								Letzte Aktualisierung
+							</TableCell>
+							<TableCell>{formatDate(slideStatus.lastUpdated)}</TableCell>
+						</TableRow>
+						<TableRow>
+							<TableCell component="th" sx={{ fontWeight: 600 }}>
+								Anzahl Seiten
+							</TableCell>
+							<TableCell>{slideStatus.slideCount}</TableCell>
+						</TableRow>
+					</TableBody>
+				</Table>
+			</TableContainer>
+			{slideStatus.files.length > 0 && slideStatus.courseId && (
+				<SlideThumbnails courseId={slideStatus.courseId} files={slideStatus.files} />
+			)}
+			<SlideGenerateButton />
 
-					{/* --- Participants Table (T023) --- */}
+			{/* --- Participants Table (T023) --- */}
+			{courseDetail && (
+				<>
 					<Typography variant="h5" sx={{ mt: 4, mb: 1 }}>
 						Teilnehmer &amp; Vorbereitungen
 					</Typography>
@@ -280,8 +309,12 @@ export default async function Home() {
 							</Table>
 						</TableContainer>
 					)}
+				</>
+			)}
 
-					{/* --- Camera Status --- */}
+			{/* --- Camera Status --- */}
+			{courseDetail && (
+				<>
 					<Typography variant="h5" sx={{ mt: 4, mb: 1 }}>
 						Kamera
 					</Typography>

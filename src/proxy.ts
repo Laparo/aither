@@ -3,15 +3,17 @@
 // Task: T016 — Protect /api/sync, /api/recordings, /(dashboard)/** routes
 // ---------------------------------------------------------------------------
 
-import type { NextRequest } from "next/server";
+import type { NextFetchEvent, NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 
 const hasClerkKey = !!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY?.startsWith("pk_");
 
 // Cache clerk handler to avoid re-importing and re-creating on every request
-let _clerkHandler: ((req: NextRequest) => Promise<Response>) | null = null;
+let _clerkHandler: ((req: NextRequest, ev: NextFetchEvent) => Promise<Response>) | null = null;
 
-async function getClerkHandler(): Promise<(req: NextRequest) => Promise<Response>> {
+async function getClerkHandler(): Promise<
+	(req: NextRequest, ev: NextFetchEvent) => Promise<Response>
+> {
 	if (_clerkHandler) return _clerkHandler;
 
 	const { clerkMiddleware, createRouteMatcher } = await import("@clerk/nextjs/server");
@@ -32,16 +34,16 @@ async function getClerkHandler(): Promise<(req: NextRequest) => Promise<Response
 		}
 	});
 
-	_clerkHandler = (r) => handler(r, {} as never);
+	_clerkHandler = (r: NextRequest, ev: NextFetchEvent) => handler(r, ev) as Promise<Response>;
 	return _clerkHandler;
 }
 
-export default async function middleware(req: NextRequest) {
+export default async function middleware(req: NextRequest, ev: NextFetchEvent) {
 	if (!hasClerkKey) {
 		return NextResponse.next();
 	}
 	const handler = await getClerkHandler();
-	return handler(req);
+	return handler(req, ev);
 }
 
 export const config = {

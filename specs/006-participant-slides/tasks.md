@@ -105,7 +105,7 @@
 
 **Goal**: Detect when a template is linked multiple times in the curriculum and distribute participants sequentially across instances
 
-**Independent Test**: Given a template `video-analysis` with 3 curriculum links and 3 participants, verify 3 output files `video-analysis-01.html` through `video-analysis-03.html`, each with one participant's data
+**Independent Test**: Given a template `video-analysis` with 3 curriculum links and 3 participants, verify 3 output files like `05_video-analysis_anna.html`, `06_video-analysis_ben.html`, `07_video-analysis_clara.html`, each with one participant's data
 
 ### Tests for US7
 
@@ -115,7 +115,7 @@
 ### Implementation for US7
 
 - [x] T017 [US7] Implement `detectMode()` and `groupMaterialsByIdentifier()` in `src/lib/slides/mode-detector.ts` — three-step detection (sections then link count then collection placeholders), material grouping by `materialId` across topics (see research R3, R5)
-- [x] T019 [US7] Implement `distributeByIdentifier()` in `src/lib/slides/identifier-distributor.ts` — sequential participant assignment, `{identifier}-{nn}.html` naming with zero-padding, scalar + collection replacement per instance, Rollbar warning on 1:1 mismatch
+- [x] T019 [US7] Implement `distributeByIdentifier()` in `src/lib/slides/identifier-distributor.ts` — sequential participant assignment, `{NN}_{identifier}_{firstName}.html` naming via global sequence counter in generator, scalar + collection replacement per instance, Rollbar warning on 1:1 mismatch
 
 **Checkpoint**: Mode B complete — identifier-distributed templates produce correctly named per-participant files
 
@@ -135,7 +135,7 @@
 
 - [x] T021 [US4] Add materials fetch step to `SlideGenerator.generate()` in `src/lib/slides/generator.ts` — call `GET /api/service/courses/{id}/materials` via HemeraClient with `ServiceMaterialsResponseSchema` validation, wrap in try/catch for skip+log on failure (research R10 step 5)
 - [x] T022 [US4] Integrate mode detection and template processing into `generate()` in `src/lib/slides/generator.ts` — for each material: `groupMaterialsByIdentifier()` then `detectMode()` then branch to `parseSections()`+`replaceCollection()`/`replaceScalars()` (Mode A) or `distributeByIdentifier()` (Mode B)
-- [x] T023 [US4] Add file writing with correct naming in `src/lib/slides/generator.ts` — Mode A: `03_material_{topicIdx}_{sectionIdx}_{iterationIdx}.html` via `wrapInLayout()`, Mode B: `{identifier}-{nn}.html` via `wrapInLayout()` (research R8)
+- [x] T023 [US4] Add file writing with correct naming in `src/lib/slides/generator.ts` — All slides: `{NN}_{identifier}[_{firstName}].html` via global `seqFilename()`, Mode A/B append participant first name (research R8)
 - [x] T024 [US4] Emit `slides.generated` structured event via `serverInstance.info()` in `src/lib/slides/generator.ts` — populate `SlideGenerationEvent` fields: `totalSlides`, `materialSlides`, `modeACount`, `modeBCount`, `skippedSections`, `durationMs`, `errors` (research R6)
 
 **Checkpoint**: Full pipeline works end-to-end — `generate()` fetches materials, detects modes, processes templates, writes files, logs structured event

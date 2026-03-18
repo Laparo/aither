@@ -20,7 +20,7 @@ As a system operator, I want Aither to automatically determine the next upcoming
 
 **Why this priority**: The intro slide is the entry point for every course presentation. Without identifying the correct course and generating the intro, no other slides can be produced.
 
-**Independent Test**: Can be fully tested by triggering slide generation and verifying that `01_intro.html` exists in `output/slides/` with the correct course name and dates.
+**Independent Test**: Can be fully tested by triggering slide generation and verifying that `001_intro.html` exists in `output/slides/{courseId}/` with the correct course name and dates.
 
 **Acceptance Scenarios**:
 
@@ -37,11 +37,11 @@ As a system operator, I want Aither to generate one HTML slide per curriculum it
 
 **Why this priority**: The curriculum slides provide the structural overview of the course. Together with the intro slide, they form the minimum viable presentation.
 
-**Independent Test**: Can be fully tested by triggering slide generation and verifying that `02_curriculum_{n}.html` files exist for each lesson, sorted by sequence.
+**Independent Test**: Can be fully tested by triggering slide generation and verifying that `{NN}_{slugifiedTitle}.html` files exist for each lesson, sorted by sequence.
 
 **Acceptance Scenarios**:
 
-1. **Given** the next course has 5 lessons, **When** slide generation is triggered, **Then** 5 curriculum slides are generated (`02_curriculum_1.html` through `02_curriculum_5.html`), each containing the lesson title centered on the page.
+1. **Given** the next course has 5 lessons, **When** slide generation is triggered, **Then** 5 curriculum slides are generated (e.g., `02_introduction.html` through `06_final-review.html`), each containing the lesson title centered on the page.
 2. **Given** lessons are returned from the API in arbitrary order, **When** curriculum slides are generated, **Then** they are numbered according to the lesson `sequence` field, not API response order.
 3. **Given** the API returns lessons for multiple seminars, **When** curriculum slides are generated, **Then** only lessons belonging to the identified next course are included.
 
@@ -53,11 +53,11 @@ As a system operator, I want Aither to generate HTML slides for each piece of co
 
 **Why this priority**: Material slides complete the presentation but depend on the curriculum structure (P1) being in place first. The course can be presented with just intro + curriculum slides in a minimal scenario.
 
-**Independent Test**: Can be fully tested by triggering slide generation and verifying that `03_material_{lessonSeq}_{idx}.html` files exist with correct content for each material item.
+**Independent Test**: Can be fully tested by triggering slide generation and verifying that `{NN}_{slugifiedDescriptor}.html` files exist with correct content for each material item.
 
 **Acceptance Scenarios**:
 
-1. **Given** lesson 1 has 2 text content items and 1 image, **When** material slides are generated, **Then** 3 slides are created: `03_material_1_1.html`, `03_material_1_2.html`, `03_material_1_3.html`.
+1. **Given** lesson 1 has 2 text content items and 1 image, **When** material slides are generated, **Then** 3 slides are created with sequential numbers reflecting global order (e.g., `07_basics-text-1.html`, `08_basics-text-2.html`, `09_photo.html`).
 2. **Given** a material item is a text content block, **When** its slide is generated, **Then** the text body is rendered as HTML centered on the page.
 3. **Given** a material item is an image, **When** its slide is generated, **Then** an `<img>` tag with the source URL and alt text is rendered centered on the page.
 4. **Given** a material item is a video, **When** its slide is generated, **Then** a `<video>` tag with playback controls is rendered centered on the page.
@@ -71,7 +71,7 @@ As a system operator, I want to trigger slide generation via a dedicated API end
 
 **Why this priority**: A dedicated trigger mechanism is needed for operational use but depends on the slide generation logic (P1) being in place first.
 
-**Independent Test**: Can be fully tested by sending a POST request to `/api/slides` and verifying that slides are generated in `output/slides/`.
+**Independent Test**: Can be fully tested by sending a POST request to `/api/slides` and verifying that slides are generated in `output/slides/{courseId}/`.
 
 **Acceptance Scenarios**:
 
@@ -87,7 +87,7 @@ As a system operator, I want to trigger slide generation via a dedicated API end
 - What happens when a lesson has no associated course material? No material slides are generated for that lesson; curriculum slide is still generated.
 - What happens when the API returns no lessons for the identified course? Only the intro slide is generated; a warning is logged.
 - What happens when a media URL from hemera.academy is invalid or unreachable? The slide is still generated with the URL as-is; the HTML will show a broken image/video (graceful degradation at display time).
-- What happens when the `output/slides/` directory contains slides from a previous run? The directory is cleared before generating new slides.
+- What happens when the `output/slides/{courseId}/` directory contains slides from a previous run? The course-specific directory is cleared before generating new slides (see FR-006).
 
 ## Requirements *(mandatory)*
 
@@ -95,10 +95,16 @@ As a system operator, I want to trigger slide generation via a dedicated API end
 
 - **FR-001**: System MUST fetch all seminars from the Hemera API and identify the seminar whose start date is the next one in the future.
 - **FR-002**: System MUST generate an intro slide (`01_intro.html`) containing the course name and formatted dates (start date always; end date only if different from start date). Dates MUST be formatted in German (de-CH locale) using `Intl.DateTimeFormat`.
-- **FR-003**: System MUST fetch lessons for the identified course and generate one curriculum slide per lesson (`02_curriculum_{sequence}.html`), sorted by the lesson `sequence` field.
-- **FR-004**: System MUST fetch text content and media assets for each lesson and generate one material slide per item (`03_material_{lessonSequence}_{materialIndex}.html`).
+- **FR-003**: System MUST fetch lessons for the identified course and generate one curriculum slide per lesson (`{NN}_{slugifiedTitle}.html`), sorted by the lesson `sequence` field.
+- **FR-004a** *(Descriptor patterns)*: System MUST fetch text content and media assets for each lesson and generate one material slide per item (`{NN}_{slugifiedDescriptor}.html`). Descriptor patterns by type:
+  - **Text**: `{slugifiedLessonTitle}-text-{index}` (index is 1-based per lesson)
+  - **Image**: `{slugifiedImageTitle}` if the image has a title, otherwise `{slugifiedLessonTitle}-image-{index}`
+  - **Video**: `{slugifiedVideoTitle}` if the video has a title, otherwise `{slugifiedLessonTitle}-video-{index}`
+- **FR-004b** *(Global sequence counter)*: The `{NN}` prefix is a monotonically incrementing global counter shared across all slide types (intro, curriculum, material). It starts at 1, increments by 1 per slide, and is zero-padded to at least 3 digits. Every slide receives a unique `{NN}`.
+- **FR-004c** *(Slug-collision safety)*: Because `{NN}` is unique per slide (FR-004b), filenames remain distinct even when two descriptors produce the same slug. E.g., a curriculum lesson "Architektur" (`003_architektur.html`) and an image titled "Architektur" (`009_architektur.html`) never collide.
+  - *Example*: A course with 1 intro slide (`001_intro.html`), 5 curriculum slides (`002`–`006`), then lesson "Grundlagen" with 2 texts and 1 image (titled "Architektur") → `007_grundlagen-text-1.html`, `008_grundlagen-text-2.html`, `009_architektur.html` (FR-004a descriptors, FR-004b sequence).
 - **FR-005**: System MUST support client-side filtering of API responses (lessons by `seminarId`, texts/media by `entityRef`) as a fallback if the Hemera API does not support server-side query parameters. Server-side filtering SHOULD be used if available.
-- **FR-006**: System MUST clear the `output/slides/` directory before generating new slides. The directory MUST be created automatically if it does not exist.
+- **FR-006**: System MUST clear the course-specific `output/slides/{courseId}/` directory before generating slides for that course. The directory MUST be created automatically if it does not exist.
 - **FR-007**: All generated slides MUST use a consistent HTML layout optimized for 1920×1080 (Full HD) resolution with centered content and CSS custom properties for future branding.
 - **FR-008**: System MUST expose a dedicated API endpoint (`POST /api/slides`) to trigger slide generation, separate from the data sync endpoint.
 - **FR-009**: The slides endpoint MUST require Clerk authentication with admin role (consistent with Spec 001 access control).
@@ -186,6 +192,21 @@ All slides use a consistent base layout optimized for 1920×1080:
 </html>
 ```
 
+### Slugification Rules
+
+All `{slugifiedTitle}` and `{slugifiedDescriptor}` values are derived using the following algorithm:
+
+1. Convert to lowercase
+2. Replace German special characters: `ä→ae`, `ö→oe`, `ü→ue`, `ß→ss` (explicit pre-mapping before normalization)
+3. Unicode NFD normalize, then strip remaining combining marks (handles other diacritics, e.g., é→e, ñ→n)
+4. Replace non-alphanumeric characters with hyphens
+5. Collapse consecutive hyphens to a single hyphen
+6. Trim leading/trailing hyphens
+
+Note: Step 2 is required because NFD decomposition of umlauts strips the diacritic (ä→a) rather than producing the German transliteration (ä→ae). The ß character has no NFD decomposition at all.
+
+Example: "Einführung in TypeScript" → `einfuehrung-in-typescript`
+
 ### Data Flow
 
 ```
@@ -193,11 +214,11 @@ All slides use a consistent base layout optimized for 1920×1080:
 2. GET /seminars → determine next upcoming seminar
 3. Seminar data → generate 01_intro.html
 4. GET /lessons → filter by seminarId → sort by sequence
-5. Per lesson → generate 02_curriculum_{n}.html
+5. Per lesson → generate {NN}_{slugifiedTitle}.html
 6. Per lesson:
    a. GET /texts → filter by entityRef
    b. GET /media → filter by entityRef
-   c. Per material → generate 03_material_{lessonSeq}_{idx}.html
+   c. Per material → generate {NN}_{slugifiedDescriptor}.html
 7. Return success response with slide count
 ```
 
@@ -206,12 +227,11 @@ All slides use a consistent base layout optimized for 1920×1080:
 ```
 output/
   slides/
-    01_intro.html
-    02_curriculum_1.html
-    02_curriculum_2.html
-    02_curriculum_3.html
-    03_material_1_1.html
-    03_material_1_2.html
-    03_material_2_1.html
-    ...
+    {courseId}/
+      01_intro.html
+      02_einfuehrung.html
+      03_fortgeschrittene-typen.html
+      04_grundlagen-text.html
+      05_architektur-photo.html
+      ...
 ```

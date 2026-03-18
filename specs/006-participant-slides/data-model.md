@@ -120,7 +120,7 @@ Represents a single output slide produced by Mode B distribution.
 
 ```typescript
 interface DistributedSlide {
-  /** Output filename, e.g., "video-analysis-01.html" */
+  /** Output filename, e.g., "05_video-analysis_anna.html" */
   filename: string;
   /** Processed HTML with all placeholders replaced */
   html: string;

@@ -68,12 +68,17 @@ async function ensureFfmpegAvailable(): Promise<void> {
 			reject(new Error(`ffmpeg nicht verfügbar: ${err.message}`));
 		});
 
-		proc.on("close", () => {
+		proc.on("close", (code) => {
 			if (settled) return;
 			settled = true;
 			clearTimeout(to);
-			_ffmpegChecked = true;
-			resolve();
+			if (code === 0) {
+				_ffmpegChecked = true;
+				resolve();
+			} else {
+				_ffmpegChecked = false;
+				reject(new Error(`ffmpeg exited with code ${code}`));
+			}
 		});
 	});
 }
@@ -89,7 +94,7 @@ function validateStreamUrl(streamUrl: string): URL {
 	const allowed = ["rtsp:", "http:", "https:"];
 	if (!allowed.includes(url.protocol)) throw new Error("Nicht unterstütztes URL-Protokoll");
 	if (!url.hostname) throw new Error("Stream-URL muss einen Hostnamen haben");
-	if (url.username || url.password)
+	if (url.protocol !== "rtsp:" && (url.username || url.password))
 		throw new Error("Zugangsdaten in der Stream-URL sind nicht erlaubt");
 	if (streamUrl.length > 2048) throw new Error("Stream-URL zu lang");
 
@@ -134,24 +139,24 @@ export async function recordClip(streamUrl: string): Promise<Buffer> {
 		});
 
 		// Timeout: try graceful termination first, then force kill
+		let killForce: ReturnType<typeof setTimeout> | null = null;
 		const timeout = setTimeout(() => {
 			try {
 				child.kill("SIGTERM");
 			} catch {}
 
-			const killForce = setTimeout(() => {
+			killForce = setTimeout(() => {
 				try {
 					child.kill("SIGKILL");
 				} catch {}
 			}, 1000);
 
-			// Reject immediately; child close handler will clear timers
 			reject(new Error("Aufnahme-Timeout nach 15s"));
-			clearTimeout(killForce);
 		}, 15_000);
 
 		child.on("close", (code) => {
 			clearTimeout(timeout);
+			if (killForce) clearTimeout(killForce);
 
 			const output = Buffer.concat(chunks);
 
@@ -168,6 +173,7 @@ export async function recordClip(streamUrl: string): Promise<Buffer> {
 
 		child.on("error", (err) => {
 			clearTimeout(timeout);
+			if (killForce) clearTimeout(killForce);
 			reject(new Error(`ffmpeg-Startfehler: ${err.message}`));
 		});
 	});

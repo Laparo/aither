@@ -24,14 +24,26 @@ export function SlideGenerateButton() {
 
 		try {
 			const res = await fetch("/api/slides", { method: "POST" });
-			const body = await res.json();
+			const text = await res.text();
+			let body: Record<string, unknown> = {};
+			try {
+				body = JSON.parse(text);
+			} catch {
+				setState("error");
+				setResult({ error: `HTTP ${res.status}: ${text.slice(0, 200)}` });
+				return;
+			}
 
 			if (res.ok) {
 				setState("success");
-				setResult({ slidesGenerated: body.slidesGenerated, courseTitle: body.courseTitle });
+				setResult({
+					slidesGenerated:
+						typeof body.slidesGenerated === "number" ? body.slidesGenerated : undefined,
+					courseTitle: typeof body.courseTitle === "string" ? body.courseTitle : undefined,
+				});
 			} else {
 				setState("error");
-				setResult({ error: body.error ?? body.message ?? `HTTP ${res.status}` });
+				setResult({ error: String(body.error ?? body.message ?? `HTTP ${res.status}`) });
 			}
 		} catch (err) {
 			setState("error");
@@ -53,7 +65,7 @@ export function SlideGenerateButton() {
 
 			{state === "success" && result && (
 				<Alert severity="success" sx={{ mt: 1 }}>
-					{result.slidesGenerated} Folien für „{result.courseTitle}" generiert.
+					{result.slidesGenerated ?? 0} Folien für „{result.courseTitle ?? "—"}" generiert.
 				</Alert>
 			)}
 

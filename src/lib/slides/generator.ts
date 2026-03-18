@@ -30,6 +30,36 @@ import { buildSlideContext } from "./slide-context";
 import { parsePlaceholders, replaceCollection, replaceScalars } from "./template-engine";
 import type { GeneratedSlide, SlideGenerationEvent, SlideGenerationResult } from "./types";
 
+/** German special character mappings applied before NFD normalization. */
+const GERMAN_MAP: Record<string, string> = {
+	ä: "ae",
+	ö: "oe",
+	ü: "ue",
+	ß: "ss",
+	Ä: "Ae",
+	Ö: "Oe",
+	Ü: "Ue",
+};
+const GERMAN_RE = /[äöüßÄÖÜ]/g;
+
+/** Convert text to a URL/filename-safe slug: lowercase, diacritics stripped, hyphens. */
+function slugify(text: string): string {
+	return text
+		.toLowerCase()
+		.replace(GERMAN_RE, (ch) => GERMAN_MAP[ch] ?? ch)
+		.normalize("NFD")
+		.replace(/\p{M}/gu, "")
+		.replace(/[^a-z0-9]+/g, "-")
+		.replace(/^-|-$/g, "");
+}
+
+/** Extract the first name from a full name and slugify it. */
+function extractFirstName(fullName: string | undefined): string {
+	if (!fullName) return "unbekannt";
+	const first = fullName.trim().split(/\s+/)[0];
+	return first ? slugify(first) : "unbekannt";
+}
+
 export interface SlideGeneratorOptions {
 	client: HemeraClient;
 	outputDir: string;
@@ -62,6 +92,17 @@ export class SlideGenerator {
 		const startMs = Date.now();
 		const slides: GeneratedSlide[] = [];
 
+		// Global slide sequence counter — determines presentation order via filename.
+		let slideSeq = 1;
+		const seqFilename = (identifier: string, participantName?: string): string => {
+			const seq = String(slideSeq++).padStart(3, "0");
+			const slug = slugify(identifier);
+			if (participantName) {
+				return `${seq}_${slug}_${extractFirstName(participantName)}.html`;
+			}
+			return `${seq}_${slug}.html`;
+		};
+
 		// Step 1: Resolve next course via Service API
 		const courseDetail = await getNextCourseWithParticipants(this.client);
 		if (!courseDetail) {
@@ -72,6 +113,9 @@ export class SlideGenerator {
 		const courseTitle = courseDetail.title;
 
 		// Step 2: Clear and prepare course-specific output directory
+		if (!/^[A-Za-z0-9_-]+$/.test(courseId)) {
+			throw new Error(`Invalid courseId: ${courseId}`);
+		}
 		const courseOutputDir = path.join(this.outputDir, courseId);
 		await this.clearDir(courseOutputDir);
 
@@ -80,15 +124,25 @@ export class SlideGenerator {
 		let seminar: Awaited<ReturnType<typeof getNextCourse>> | null = null;
 		try {
 			seminar = await getNextCourse(this.client);
-		} catch {
-			serverInstance.info(
-				"Legacy /seminars endpoint not available — skipping intro/curriculum slides",
-			);
+		} catch (err) {
+			const isExpected =
+				err instanceof Error &&
+				(err.message.includes("404") ||
+					err.message.includes("not supported") ||
+					err.message.includes("not available"));
+			if (isExpected) {
+				serverInstance.info(
+					"Legacy /seminars endpoint not available — skipping intro/curriculum slides",
+					{ error: err.message },
+				);
+			} else {
+				throw err;
+			}
 		}
 
 		if (seminar) {
 			const introHtml = buildIntroSlide(seminar);
-			const introFilename = "01_intro.html";
+			const introFilename = seqFilename("intro");
 			await this.writeSlide(courseOutputDir, introFilename, introHtml);
 			slides.push({ filename: introFilename, type: "intro", title: seminar.title });
 
@@ -100,7 +154,7 @@ export class SlideGenerator {
 
 				for (const lesson of courseLessons) {
 					const html = buildCurriculumSlide(lesson);
-					const filename = `02_curriculum_${lesson.sequence}.html`;
+					const filename = seqFilename(lesson.title);
 					await this.writeSlide(courseOutputDir, filename, html);
 					slides.push({ filename, type: "curriculum", title: lesson.title });
 				}
@@ -120,7 +174,7 @@ export class SlideGenerator {
 
 					for (const text of lessonTexts) {
 						const html = buildTextSlide(text);
-						const filename = `03_material_${lesson.sequence}_${materialIdx}.html`;
+						const filename = seqFilename(`${lesson.title}-text-${materialIdx}`);
 						await this.writeSlide(courseOutputDir, filename, html);
 						slides.push({ filename, type: "material", title: "Text Content" });
 						materialIdx++;
@@ -129,15 +183,23 @@ export class SlideGenerator {
 					for (const media of lessonMedia) {
 						const html =
 							media.mediaType === "image" ? buildImageSlide(media) : buildVideoSlide(media);
-						const filename = `03_material_${lesson.sequence}_${materialIdx}.html`;
+						const filename = seqFilename(media.altText ?? `${lesson.title}-${media.mediaType}`);
 						await this.writeSlide(courseOutputDir, filename, html);
 						slides.push({ filename, type: "material", title: media.altText ?? media.mediaType });
 						materialIdx++;
 					}
 				}
 			} catch (err) {
-				const msg = err instanceof Error ? err.message : String(err);
-				serverInstance.info(`Legacy content endpoints not available: ${msg}`);
+				const isExpected =
+					err instanceof Error &&
+					(err.message.includes("404") ||
+						err.message.includes("not supported") ||
+						err.message.includes("not available"));
+				if (isExpected) {
+					serverInstance.info(`Legacy content endpoints not available: ${err.message}`);
+				} else {
+					throw err;
+				}
 			}
 		}
 
@@ -199,10 +261,12 @@ export class SlideGenerator {
 							material.curriculumLinkCount,
 						);
 						for (const dist of distributed) {
+							const participantName = records[dist.participantIndex]?.name;
+							const filename = seqFilename(material.identifier, participantName);
 							const wrapped = wrapInLayout(material.title, dist.html);
-							await this.writeSlide(courseOutputDir, dist.filename, wrapped);
+							await this.writeSlide(courseOutputDir, filename, wrapped);
 							slides.push({
-								filename: dist.filename,
+								filename,
 								type: "material",
 								title: material.title,
 							});
@@ -233,10 +297,9 @@ export class SlideGenerator {
 									records,
 									context.scalars,
 								);
-								const padWidth = Math.max(2, String(rendered.length).length);
 								for (let ri = 0; ri < rendered.length; ri++) {
-									const paddedIdx = String(ri + 1).padStart(padWidth, "0");
-									const filename = `03_material_t${material.materialId}_s${section.index}_p${paddedIdx}.html`;
+									const participantName = records[ri]?.name;
+									const filename = seqFilename(material.identifier, participantName);
 									const wrapped = wrapInLayout(material.title, rendered[ri]);
 									await this.writeSlide(courseOutputDir, filename, wrapped);
 									slides.push({
@@ -249,7 +312,7 @@ export class SlideGenerator {
 							} else {
 								// Scalar-only section: apply scalars only
 								const rendered = replaceScalars(section.body, context.scalars);
-								const filename = `03_material_t${material.materialId}_s${section.index}.html`;
+								const filename = seqFilename(material.identifier);
 								const wrapped = wrapInLayout(material.title, rendered);
 								await this.writeSlide(courseOutputDir, filename, wrapped);
 								slides.push({
@@ -264,7 +327,7 @@ export class SlideGenerator {
 					} else {
 						// scalar-only: single output file
 						const rendered = replaceScalars(material.htmlContent, context.scalars);
-						const filename = `03_material_t${material.materialId}.html`;
+						const filename = seqFilename(material.identifier);
 						const wrapped = wrapInLayout(material.title, rendered);
 						await this.writeSlide(courseOutputDir, filename, wrapped);
 						slides.push({

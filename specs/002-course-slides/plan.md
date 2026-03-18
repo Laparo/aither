@@ -98,9 +98,9 @@ flowchart TD
     K --> L[Generate 01_intro.html]
     L --> M[HemeraClient.get /lessons]
     M --> N[Filter by seminarId + sort by sequence]
-    N --> O[Generate 02_curriculum_n.html per lesson]
+    N --> O[Generate {NN}_{title}.html per lesson]
     O --> P[Per lesson: fetch texts + media]
-    P --> Q[Generate 03_material_n_m.html per item]
+    P --> Q[Generate {NN}_{descriptor}.html per item]
     Q --> R[Return success + slide count]
 ```
 

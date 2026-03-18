@@ -23,7 +23,7 @@ const endpoints: EndpointDef[] = [
 	{ label: "Folien generieren", path: "/api/slides", method: "POST", group: "Präsentation" },
 	{
 		label: "Folien-Status",
-		path: "/api/slides/status?courseId=test",
+		path: "/api/slides/status",
 		method: "GET",
 		group: "Präsentation",
 	},
@@ -75,10 +75,14 @@ interface EndpointResult {
  */
 async function checkEndpoint(ep: EndpointDef): Promise<EndpointResult> {
 	try {
+		const controller = new AbortController();
+		const timer = setTimeout(() => controller.abort(), 5000);
 		const res = await fetch(ep.path, {
 			method: ep.method === "GET" ? "GET" : "HEAD",
 			cache: "no-store",
+			signal: controller.signal,
 		});
+		clearTimeout(timer);
 		// For GET: 2xx/4xx = reachable; for HEAD on POST routes: 405 = reachable
 		const ok = res.status < 500;
 		return { status: ok ? "erreichbar" : "fehler", code: res.status };

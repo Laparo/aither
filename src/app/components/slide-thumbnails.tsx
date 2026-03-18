@@ -20,7 +20,7 @@ export function SlideThumbnails({ courseId, files }: SlideThumbnailsProps) {
 				mt: 2,
 			}}
 		>
-			{files.map((file, idx) => {
+			{files.map((file, _idx) => {
 				const src = `/api/slides/view?courseId=${encodeURIComponent(courseId)}&file=${encodeURIComponent(file)}`;
 				const label = file.replace(/\.html$/, "").replace(/_/g, " ");
 				return (
@@ -82,7 +82,7 @@ export function SlideThumbnails({ courseId, files }: SlideThumbnailsProps) {
 								whiteSpace: "nowrap",
 							}}
 						>
-							{idx + 1}. {label}
+							{label}
 						</Typography>
 					</Box>
 				);

@@ -26,6 +26,7 @@ export async function GET(req: Request) {
 	const notGenerated: SlideStatus = { status: "not-generated", slideCount: 0, lastUpdated: null };
 
 	if (!courseId || !/^[A-Za-z0-9_.-]+$/.test(courseId)) return NextResponse.json(notGenerated);
+	if (courseId === "." || courseId === "..") return NextResponse.json(notGenerated);
 	if (courseId.length > 128) return NextResponse.json(notGenerated);
 
 	const outputDir = process.env.SLIDES_OUTPUT_DIR || DEFAULT_OUTPUT;
