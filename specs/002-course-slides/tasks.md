@@ -55,7 +55,7 @@
 
 **Goal**: Generate one HTML slide per lesson of the next course, sorted by sequence
 
-**Independent Test**: Trigger slide generation → verify `02_curriculum_{n}.html` files exist for each lesson
+**Independent Test**: Trigger slide generation → verify `{NN}_{slugifiedTitle}.html` files exist for each lesson, where `{NN}` is a zero-padded (minimum 3-digit) global sequence number (001, 002, …) and `{slugifiedTitle}` is the lesson `title` field slugified (lowercase, diacritics stripped, non-alphanumeric → hyphens). Example: lesson title "Introduction to Foo" → `001_introduction-to-foo.html`.
 
 ### Tests for User Story 2 ⚠️
 
@@ -76,7 +76,7 @@
 
 **Goal**: Generate HTML slides for text content, images, and videos linked to each lesson
 
-**Independent Test**: Trigger slide generation → verify `03_material_{lessonSeq}_{idx}.html` files exist with correct content
+**Independent Test**: Trigger slide generation → verify `{NN}_{slugifiedDescriptor}.html` files exist with correct content
 
 ### Tests for User Story 3 ⚠️
 

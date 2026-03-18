@@ -83,11 +83,42 @@ const mockMedia: MediaAsset[] = [
 
 function createMockClient() {
 	return {
-		get: vi.fn().mockImplementation((path: string) => {
-			if (path === "/seminars") return Promise.resolve([mockSeminar]);
-			if (path === "/lessons") return Promise.resolve(mockLessons);
-			if (path === "/texts") return Promise.resolve(mockTexts);
-			if (path === "/media") return Promise.resolve(mockMedia);
+		get: vi.fn().mockImplementation((p: string) => {
+			if (p === "/seminars") return Promise.resolve([mockSeminar]);
+			if (p === "/lessons") return Promise.resolve(mockLessons);
+			if (p === "/texts") return Promise.resolve(mockTexts);
+			if (p === "/media") return Promise.resolve(mockMedia);
+			if (p === "/api/service/courses")
+				return Promise.resolve({
+					success: true,
+					data: [
+						{
+							id: "sem-1",
+							title: mockSeminar.title,
+							slug: "typescript-masterclass",
+							level: "ADVANCED",
+							startDate: mockSeminar.dates[0].start,
+							endDate: mockSeminar.dates[0].end,
+							participantCount: 0,
+						},
+					],
+					meta: { requestId: "r", timestamp: new Date().toISOString(), version: "1.0" },
+				});
+			if (p === "/api/service/courses/sem-1")
+				return Promise.resolve({
+					success: true,
+					data: {
+						id: "sem-1",
+						title: mockSeminar.title,
+						slug: "typescript-masterclass",
+						level: "ADVANCED",
+						startDate: mockSeminar.dates[0].start,
+						endDate: mockSeminar.dates[0].end,
+						participants: [],
+					},
+				});
+			if (p === "/api/service/courses/sem-1/materials")
+				return Promise.resolve({ success: true, data: { courseId: "sem-1", topics: [] } });
 			return Promise.resolve([]);
 		}),
 		put: vi.fn(),
@@ -128,11 +159,11 @@ describe("SlideGenerator", () => {
 
 		const courseDir = path.join(outputDir, "sem-1");
 		const files = await fs.readdir(courseDir);
-		expect(files).toContain("01_intro.html");
-		expect(files).toContain("02_curriculum_1.html");
-		expect(files).toContain("02_curriculum_2.html");
-		expect(files).toContain("03_material_1_1.html");
-		expect(files).toContain("03_material_2_1.html");
+		expect(files).toContain("001_intro.html");
+		expect(files).toContain("002_introduction.html");
+		expect(files).toContain("003_advanced-types.html");
+		expect(files).toContain("004_photo.html");
+		expect(files).toContain("005_advanced-types-text-1.html");
 	});
 
 	it("clears the course subdirectory before generating", async () => {
@@ -187,8 +218,39 @@ describe("SlideGenerator", () => {
 
 	it("handles course with no lessons — only intro slide generated", async () => {
 		const noLessonClient = {
-			get: vi.fn().mockImplementation((path: string) => {
-				if (path === "/seminars") return Promise.resolve([mockSeminar]);
+			get: vi.fn().mockImplementation((p: string) => {
+				if (p === "/seminars") return Promise.resolve([mockSeminar]);
+				if (p === "/api/service/courses")
+					return Promise.resolve({
+						success: true,
+						data: [
+							{
+								id: "sem-1",
+								title: mockSeminar.title,
+								slug: "typescript-masterclass",
+								level: "ADVANCED",
+								startDate: mockSeminar.dates[0].start,
+								endDate: mockSeminar.dates[0].end,
+								participantCount: 0,
+							},
+						],
+						meta: { requestId: "r", timestamp: new Date().toISOString(), version: "1.0" },
+					});
+				if (p === "/api/service/courses/sem-1")
+					return Promise.resolve({
+						success: true,
+						data: {
+							id: "sem-1",
+							title: mockSeminar.title,
+							slug: "typescript-masterclass",
+							level: "ADVANCED",
+							startDate: mockSeminar.dates[0].start,
+							endDate: mockSeminar.dates[0].end,
+							participants: [],
+						},
+					});
+				if (p.includes("/materials"))
+					return Promise.resolve({ success: true, data: { courseId: "sem-1", topics: [] } });
 				return Promise.resolve([]);
 			}),
 			put: vi.fn(),
@@ -209,7 +271,7 @@ describe("SlideGenerator", () => {
 
 		const intro = result.slides.find((s) => s.type === "intro");
 		expect(intro).toBeDefined();
-		if (intro) expect(intro.filename).toBe("01_intro.html");
+		if (intro) expect(intro.filename).toBe("001_intro.html");
 
 		const materials = result.slides.filter((s) => s.type === "material");
 		expect(materials.length).toBe(2);
@@ -400,12 +462,11 @@ describe("SlideGenerator — Material Templates (US4)", () => {
 		const result = await generator.generate();
 
 		// Mode A: 1 section × 2 participants = 2 material template slides
-		const materialSlides = result.slides.filter(
-			(s) => s.type === "material" && s.filename.startsWith("03_material_"),
-		);
-		// Existing legacy material slides + new template-based material slides
-		// Template slides count: 2 (one per participant)
-		expect(materialSlides.length).toBeGreaterThanOrEqual(2);
+		// Mode A: 1 section × 2 participants = 2 template slides with participant names
+		const modeASlides = result.slides.filter((s) => s.filename.includes("preparation-sheet"));
+		expect(modeASlides).toHaveLength(2);
+		expect(modeASlides[0].filename).toMatch(/^\d{3}_preparation-sheet_anna\.html$/);
+		expect(modeASlides[1].filename).toMatch(/^\d{3}_preparation-sheet_ben\.html$/);
 	});
 
 	it("generates Mode B slides from multi-linked template", async () => {
@@ -415,10 +476,10 @@ describe("SlideGenerator — Material Templates (US4)", () => {
 		const result = await generator.generate();
 
 		// Mode B: 2 curriculum links, 2 participants = 2 distributed slides
-		const modeBSlides = result.slides.filter((s) => s.filename.startsWith("video-analysis-"));
+		const modeBSlides = result.slides.filter((s) => s.filename.includes("video-analysis"));
 		expect(modeBSlides).toHaveLength(2);
-		expect(modeBSlides[0].filename).toBe("video-analysis-01.html");
-		expect(modeBSlides[1].filename).toBe("video-analysis-02.html");
+		expect(modeBSlides[0].filename).toMatch(/^\d{3}_video-analysis_anna\.html$/);
+		expect(modeBSlides[1].filename).toMatch(/^\d{3}_video-analysis_ben\.html$/);
 	});
 
 	it("generates scalar-only slides without iteration", async () => {
@@ -427,11 +488,10 @@ describe("SlideGenerator — Material Templates (US4)", () => {
 
 		await generator.generate();
 
-		// Scalar-only: 1 material, no collection → 1 slide
-		const courseDir = path.join(outputDir, "sem-1");
+		// Scalar-only: 1 material, no collection → 1 slide with identifier as name
+		const courseDir = path.join(outputDir, "course-1");
 		const files = await fs.readdir(courseDir);
-		// Should contain a scalar material slide
-		const scalarSlide = files.find((f) => f.includes("material") && !f.startsWith("video"));
+		const scalarSlide = files.find((f) => f.includes("agenda"));
 		expect(scalarSlide).toBeDefined();
 	});
 
@@ -472,7 +532,25 @@ describe("SlideGenerator — Material Templates (US4)", () => {
 				if (p === "/lessons") return Promise.resolve(mockLessons);
 				if (p === "/texts") return Promise.resolve(mockTexts);
 				if (p === "/media") return Promise.resolve(mockMedia);
-				if (p === "/api/service/courses") return Promise.reject(new Error("Service API down"));
+				if (p === "/api/service/courses")
+					return Promise.resolve({
+						success: true,
+						data: [
+							{
+								id: "course-1",
+								title: mockCourseDetail.title,
+								slug: mockCourseDetail.slug,
+								level: mockCourseDetail.level,
+								startDate: mockCourseDetail.startDate,
+								endDate: mockCourseDetail.endDate,
+								participantCount: mockCourseDetail.participants.length,
+							},
+						],
+						meta: { requestId: "r", timestamp: new Date().toISOString(), version: "1.0" },
+					});
+				if (p === "/api/service/courses/course-1")
+					return Promise.resolve({ success: true, data: mockCourseDetail });
+				if (p.includes("/materials")) return Promise.reject(new Error("Materials API down"));
 				return Promise.resolve([]);
 			}),
 			put: vi.fn(),
@@ -481,7 +559,7 @@ describe("SlideGenerator — Material Templates (US4)", () => {
 		const generator = new SlideGenerator({ client: failClient, outputDir });
 		const result = await generator.generate();
 
-		// Legacy slides should still be generated
+		// Legacy slides should still be generated despite materials pipeline failure
 		expect(result.slidesGenerated).toBeGreaterThan(0);
 		expect(result.slides.some((s) => s.type === "intro")).toBe(true);
 	});

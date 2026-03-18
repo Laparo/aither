@@ -222,19 +222,18 @@ This is called at the start of `generate()` with the course-specific output dire
 
 ### Rationale
 
-**Mode A** (extends existing pattern):
-- `03_material_{topicIdx}_{sectionIdx}_{iterationIdx}.html`
-- Example: `03_material_01_02_03.html` (topic 1, section 2, iteration 3)
-- Fits within existing `01_intro`, `02_curriculum_*`, `03_material_*` sorting
+**Mode A** (unified naming):
+- `{NN}_{identifier}[_{firstName}].html`
+- Example: `05_preparation-sheet_anna.html` (sequence 5, identifier, participant)
+- Global sequence number ensures unique sort order across all slide types
 
-**Mode B** (new identifier-based pattern):
-- `{identifier}-{nn}.html` with zero-padded sequential number
-- Example: `video-analysis-01.html`, `video-analysis-02.html`
-- No prefix number needed — identifier is the grouping key
-- Sorted after `03_material_*` files alphabetically
+**Mode B** (unified naming):
+- `{NN}_{identifier}_{firstName}.html`
+- Example: `06_video-analysis_anna.html`, `07_video-analysis_ben.html`
+- Same format as Mode A — global sequence replaces old `{identifier}-{nn}` pattern
 
 ### Consideration
-Mode B files don't use the `03_` prefix because they are identified and grouped by their `identifier`, not by lesson position. This is intentional per spec.
+All slides (intro, curriculum, material) now share the same `{NN}_{identifier}[_{firstName}].html` convention. The `{identifier}` portion is slugified (lowercase, diacritics stripped, non-alphanumeric → hyphens). In participant-specific slides (Mode A with collection data, Mode B), `_{firstName}` is always appended. In non-participant slides (intro, curriculum, scalar-only), `_{firstName}` is omitted. Alphabetical sort by filename equals presentation order.
 
 ---
 
