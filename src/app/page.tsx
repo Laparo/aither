@@ -20,6 +20,9 @@ import TableHead from "@mui/material/TableHead";
 import TableRow from "@mui/material/TableRow";
 import Typography from "@mui/material/Typography";
 import { CameraSnapshot } from "./components/camera-snapshot";
+import { EndpointStatus } from "./components/endpoint-status";
+import { SlideGenerateButton } from "./components/slide-generate-button";
+import { SlideThumbnails } from "./components/slide-thumbnails";
 
 const levelLabels: Record<string, string> = {
 	BEGINNER: "Grundkurs",
@@ -62,10 +65,16 @@ interface SlideStatus {
 	status: "generated" | "not-generated";
 	slideCount: number;
 	lastUpdated: string | null;
+	files: string[];
 }
 
 async function fetchSlideStatus(courseId: string | null): Promise<SlideStatus> {
-	const notGenerated: SlideStatus = { status: "not-generated", slideCount: 0, lastUpdated: null };
+	const notGenerated: SlideStatus = {
+		status: "not-generated",
+		slideCount: 0,
+		lastUpdated: null,
+		files: [],
+	};
 	const outputDir = process.env.SLIDES_OUTPUT_DIR || "output/slides";
 	if (!courseId || !/^[A-Za-z0-9_.-]+$/.test(courseId)) return notGenerated;
 
@@ -78,7 +87,7 @@ async function fetchSlideStatus(courseId: string | null): Promise<SlideStatus> {
 		const htmlFiles = entries.filter((f) => f.endsWith(".html"));
 
 		if (htmlFiles.length === 0) {
-			return { status: "not-generated", slideCount: 0, lastUpdated: null };
+			return { status: "not-generated", slideCount: 0, lastUpdated: null, files: [] };
 		}
 
 		let latestMtime = 0;
@@ -91,9 +100,10 @@ async function fetchSlideStatus(courseId: string | null): Promise<SlideStatus> {
 			status: "generated",
 			slideCount: htmlFiles.length,
 			lastUpdated: new Date(latestMtime).toISOString(),
+			files: htmlFiles.sort(),
 		};
 	} catch {
-		return { status: "not-generated", slideCount: 0, lastUpdated: null };
+		return { status: "not-generated", slideCount: 0, lastUpdated: null, files: [] };
 	}
 }
 
@@ -227,6 +237,10 @@ export default async function Home() {
 							</TableBody>
 						</Table>
 					</TableContainer>
+					{slideStatus.files.length > 0 && courseDetail && (
+						<SlideThumbnails courseId={courseDetail.id} files={slideStatus.files} />
+					)}
+					<SlideGenerateButton />
 
 					{/* --- Participants Table (T023) --- */}
 					<Typography variant="h5" sx={{ mt: 4, mb: 1 }}>
@@ -274,6 +288,12 @@ export default async function Home() {
 					<CameraSnapshot />
 				</>
 			)}
+
+			{/* --- Steuerung (endpoint health) --- */}
+			<Typography variant="h5" sx={{ mt: 4, mb: 1 }}>
+				Steuerung
+			</Typography>
+			<EndpointStatus />
 		</Box>
 	);
 }

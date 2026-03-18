@@ -12,7 +12,7 @@ export async function GET() {
 	const streamUrl = process.env.WEBCAM_STREAM_URL;
 
 	if (!streamUrl) {
-		const msg = "WEBCAM_STREAM_URL is not configured";
+		const msg = "WEBCAM_STREAM_URL ist nicht konfiguriert";
 		console.warn(`⚠ ${msg}`);
 		if (isProduction) reportError(new Error(msg), undefined, "warning");
 		return NextResponse.json({ error: msg }, { status: 503 });
@@ -29,7 +29,7 @@ export async function GET() {
 		});
 	} catch (err) {
 		const reason = err instanceof Error ? err.message : String(err);
-		const msg = `Camera clip recording failed: ${reason}`;
+		const msg = `Kameraaufnahme fehlgeschlagen: ${reason}`;
 		console.error(`✗ ${msg}`);
 		if (isProduction) reportError(new Error(msg), undefined, "warning");
 		return NextResponse.json({ error: msg }, { status: 503 });
@@ -40,7 +40,7 @@ let _ffmpegChecked: boolean | null = null;
 
 async function ensureFfmpegAvailable(): Promise<void> {
 	if (_ffmpegChecked !== null) {
-		if (!_ffmpegChecked) throw new Error("ffmpeg not available");
+		if (!_ffmpegChecked) throw new Error("ffmpeg nicht verfügbar");
 		return;
 	}
 
@@ -55,7 +55,7 @@ async function ensureFfmpegAvailable(): Promise<void> {
 					proc.kill("SIGKILL");
 				} catch {}
 				_ffmpegChecked = false;
-				reject(new Error("ffmpeg availability check timed out"));
+				reject(new Error("ffmpeg-Prüfung abgelaufen"));
 			}
 		}, 2000);
 
@@ -65,7 +65,7 @@ async function ensureFfmpegAvailable(): Promise<void> {
 			clearTimeout(to);
 			_ffmpegChecked = false;
 			// ENOENT indicates ffmpeg not found in PATH
-			reject(new Error(`ffmpeg not available: ${err.message}`));
+			reject(new Error(`ffmpeg nicht verfügbar: ${err.message}`));
 		});
 
 		proc.on("close", () => {
@@ -83,14 +83,15 @@ function validateStreamUrl(streamUrl: string): URL {
 	try {
 		url = new URL(streamUrl);
 	} catch {
-		throw new Error("Invalid stream URL");
+		throw new Error("Ungültige Stream-URL");
 	}
 
 	const allowed = ["rtsp:", "http:", "https:"];
-	if (!allowed.includes(url.protocol)) throw new Error("Unsupported URL protocol");
-	if (!url.hostname) throw new Error("Stream URL must have a hostname");
-	if (url.username || url.password) throw new Error("Credentials in stream URL are not allowed");
-	if (streamUrl.length > 2048) throw new Error("Stream URL too long");
+	if (!allowed.includes(url.protocol)) throw new Error("Nicht unterstütztes URL-Protokoll");
+	if (!url.hostname) throw new Error("Stream-URL muss einen Hostnamen haben");
+	if (url.username || url.password)
+		throw new Error("Zugangsdaten in der Stream-URL sind nicht erlaubt");
+	if (streamUrl.length > 2048) throw new Error("Stream-URL zu lang");
 
 	return url;
 }
@@ -145,7 +146,7 @@ export async function recordClip(streamUrl: string): Promise<Buffer> {
 			}, 1000);
 
 			// Reject immediately; child close handler will clear timers
-			reject(new Error("Recording timed out after 15s"));
+			reject(new Error("Aufnahme-Timeout nach 15s"));
 			clearTimeout(killForce);
 		}, 15_000);
 
@@ -160,14 +161,14 @@ export async function recordClip(streamUrl: string): Promise<Buffer> {
 			}
 
 			// Log full stderr for diagnostics, but return sanitized message to caller
-			const errMsg = `ffmpeg exited with code ${code}: ${stderr.slice(-200)}`;
+			const errMsg = `ffmpeg mit Code ${code} beendet: ${stderr.slice(-200)}`;
 			console.debug("ffmpeg full stderr:", stderr);
 			reject(new Error(errMsg));
 		});
 
 		child.on("error", (err) => {
 			clearTimeout(timeout);
-			reject(new Error(`ffmpeg spawn error: ${err.message}`));
+			reject(new Error(`ffmpeg-Startfehler: ${err.message}`));
 		});
 	});
 }

@@ -23,10 +23,13 @@ export function _resetState() {
 // ── POST /api/slides — Trigger slide generation ──────────────────────────
 
 export async function POST(_req: NextRequest) {
-	const authData = await getRouteAuth();
-	const authResult = requireAdmin(authData);
-	if (authResult.status !== 200) {
-		return NextResponse.json(authResult.body, { status: authResult.status });
+	// In development, skip auth for local dashboard usage
+	if (process.env.NODE_ENV !== "development") {
+		const authData = await getRouteAuth();
+		const authResult = requireAdmin(authData);
+		if (authResult.status !== 200) {
+			return NextResponse.json(authResult.body, { status: authResult.status });
+		}
 	}
 
 	// Mutex: reject concurrent generation

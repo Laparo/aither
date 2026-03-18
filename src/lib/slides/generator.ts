@@ -62,68 +62,89 @@ export class SlideGenerator {
 		const startMs = Date.now();
 		const slides: GeneratedSlide[] = [];
 
-		// Step 1: Resolve next course (needed before preparing directory)
-		const seminar = await getNextCourse(this.client);
-
-		// Step 2: Clear and prepare course-specific output directory
-		const courseOutputDir = path.join(this.outputDir, seminar.sourceId);
-		await this.clearDir(courseOutputDir);
-
-		// Step 3: Generate intro slide
-		const introHtml = buildIntroSlide(seminar);
-		const introFilename = "01_intro.html";
-		await this.writeSlide(courseOutputDir, introFilename, introHtml);
-		slides.push({ filename: introFilename, type: "intro", title: seminar.title });
-
-		// Step 4: Fetch lessons, filter by seminarId, sort by sequence
-		const allLessons = await this.client.get("/lessons", LessonsResponseSchema);
-		const courseLessons = allLessons
-			.filter((l) => l.seminarId === seminar.sourceId)
-			.sort((a, b) => a.sequence - b.sequence);
-
-		// Step 5: Generate curriculum slides
-		for (const lesson of courseLessons) {
-			const html = buildCurriculumSlide(lesson);
-			const filename = `02_curriculum_${lesson.sequence}.html`;
-			await this.writeSlide(courseOutputDir, filename, html);
-			slides.push({ filename, type: "curriculum", title: lesson.title });
+		// Step 1: Resolve next course via Service API
+		const courseDetail = await getNextCourseWithParticipants(this.client);
+		if (!courseDetail) {
+			throw new Error("No upcoming course found.");
 		}
 
-		// Step 6: Fetch texts and media, generate material slides
-		const allTexts = await this.client.get("/texts", TextContentsResponseSchema);
-		const allMedia = await this.client.get("/media", MediaAssetsResponseSchema);
+		const courseId = courseDetail.id;
+		const courseTitle = courseDetail.title;
 
-		for (const lesson of courseLessons) {
-			const lessonTexts = allTexts.filter(
-				(t) => t.entityRef.type === "lesson" && t.entityRef.id === lesson.sourceId,
+		// Step 2: Clear and prepare course-specific output directory
+		const courseOutputDir = path.join(this.outputDir, courseId);
+		await this.clearDir(courseOutputDir);
+
+		// Step 3: Try legacy endpoints (intro, curriculum, content slides)
+		// These may not be available on all Hemera instances
+		let seminar: Awaited<ReturnType<typeof getNextCourse>> | null = null;
+		try {
+			seminar = await getNextCourse(this.client);
+		} catch {
+			serverInstance.info(
+				"Legacy /seminars endpoint not available — skipping intro/curriculum slides",
 			);
-			const lessonMedia = allMedia.filter(
-				(m) => m.entityRef.type === "lesson" && m.entityRef.id === lesson.sourceId,
-			);
+		}
 
-			let materialIdx = 1;
+		if (seminar) {
+			const introHtml = buildIntroSlide(seminar);
+			const introFilename = "01_intro.html";
+			await this.writeSlide(courseOutputDir, introFilename, introHtml);
+			slides.push({ filename: introFilename, type: "intro", title: seminar.title });
 
-			for (const text of lessonTexts) {
-				const html = buildTextSlide(text);
-				const filename = `03_material_${lesson.sequence}_${materialIdx}.html`;
-				await this.writeSlide(courseOutputDir, filename, html);
-				slides.push({ filename, type: "material", title: "Text Content" });
-				materialIdx++;
-			}
+			try {
+				const allLessons = await this.client.get("/lessons", LessonsResponseSchema);
+				const courseLessons = allLessons
+					.filter((l) => l.seminarId === seminar?.sourceId)
+					.sort((a, b) => a.sequence - b.sequence);
 
-			for (const media of lessonMedia) {
-				const html = media.mediaType === "image" ? buildImageSlide(media) : buildVideoSlide(media);
-				const filename = `03_material_${lesson.sequence}_${materialIdx}.html`;
-				await this.writeSlide(courseOutputDir, filename, html);
-				slides.push({ filename, type: "material", title: media.altText ?? media.mediaType });
-				materialIdx++;
+				for (const lesson of courseLessons) {
+					const html = buildCurriculumSlide(lesson);
+					const filename = `02_curriculum_${lesson.sequence}.html`;
+					await this.writeSlide(courseOutputDir, filename, html);
+					slides.push({ filename, type: "curriculum", title: lesson.title });
+				}
+
+				const allTexts = await this.client.get("/texts", TextContentsResponseSchema);
+				const allMedia = await this.client.get("/media", MediaAssetsResponseSchema);
+
+				for (const lesson of courseLessons) {
+					const lessonTexts = allTexts.filter(
+						(t) => t.entityRef.type === "lesson" && t.entityRef.id === lesson.sourceId,
+					);
+					const lessonMedia = allMedia.filter(
+						(m) => m.entityRef.type === "lesson" && m.entityRef.id === lesson.sourceId,
+					);
+
+					let materialIdx = 1;
+
+					for (const text of lessonTexts) {
+						const html = buildTextSlide(text);
+						const filename = `03_material_${lesson.sequence}_${materialIdx}.html`;
+						await this.writeSlide(courseOutputDir, filename, html);
+						slides.push({ filename, type: "material", title: "Text Content" });
+						materialIdx++;
+					}
+
+					for (const media of lessonMedia) {
+						const html =
+							media.mediaType === "image" ? buildImageSlide(media) : buildVideoSlide(media);
+						const filename = `03_material_${lesson.sequence}_${materialIdx}.html`;
+						await this.writeSlide(courseOutputDir, filename, html);
+						slides.push({ filename, type: "material", title: media.altText ?? media.mediaType });
+						materialIdx++;
+					}
+				}
+			} catch (err) {
+				const msg = err instanceof Error ? err.message : String(err);
+				serverInstance.info(`Legacy content endpoints not available: ${msg}`);
 			}
 		}
 
 		// Step 7: Materials pipeline — fetch via Service API, detect mode, process templates
 		const event: SlideGenerationEvent = {
 			event: "slides.generated",
-			courseId: seminar.sourceId,
+			courseId: courseId,
 			totalSlides: 0,
 			materialSlides: 0,
 			skippedSections: 0,
@@ -136,8 +157,6 @@ export class SlideGenerator {
 		let templateSlideCount = 0;
 
 		try {
-			const courseDetail = await getNextCourseWithParticipants(this.client);
-
 			if (courseDetail) {
 				event.courseId = courseDetail.id;
 				const context = buildSlideContext(courseDetail);
@@ -273,8 +292,8 @@ export class SlideGenerator {
 
 		return {
 			slidesGenerated: slides.length,
-			courseTitle: seminar.title,
-			courseId: seminar.sourceId,
+			courseTitle: courseTitle,
+			courseId: courseId,
 			slides,
 		};
 	}

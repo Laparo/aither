@@ -3,7 +3,7 @@
 // Provides a single mockable entry point for all API routes.
 // ---------------------------------------------------------------------------
 
-import { auth } from "@clerk/nextjs/server";
+const hasClerkKey = !!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY?.startsWith("pk_");
 
 /**
  * Retrieve session auth context in a route handler.
@@ -13,8 +13,19 @@ import { auth } from "@clerk/nextjs/server";
  *
  * Returns `null` when no user is signed in, otherwise the
  * full Clerk session object including `sessionClaims`.
+ *
+ * In development without a valid Clerk key, returns a mock admin session
+ * so local dashboard routes work without authentication.
  */
 export async function getRouteAuth(): Promise<unknown> {
+	if (!hasClerkKey && process.env.NODE_ENV === "development") {
+		return {
+			userId: "dev-user",
+			sessionClaims: { metadata: { role: "admin" } },
+		};
+	}
+
+	const { auth } = await import("@clerk/nextjs/server");
 	const session = await auth();
 	return session?.userId ? session : null;
 }

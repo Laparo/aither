@@ -31,6 +31,7 @@ export function createHemeraClient(): HemeraClient {
 	return new HemeraClient({
 		baseUrl: config.HEMERA_API_BASE_URL,
 		getToken: () => tokenManager.getToken(),
+		allowedPathPrefix: "/",
 		rateLimit: 2, // 2 requests per second
 		maxRetries: 5,
 	});
