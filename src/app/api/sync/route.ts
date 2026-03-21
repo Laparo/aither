@@ -164,7 +164,7 @@ export async function POST(_req: NextRequest) {
 		const cfg = loadConfig();
 		const outputDir = cfg.HTML_OUTPUT_DIR;
 
-		const client = createHemeraClient();
+		const client = await createHemeraClient();
 		const orchestrator = new SyncOrchestrator({
 			client,
 			outputDir,

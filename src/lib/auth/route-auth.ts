@@ -18,7 +18,12 @@ const hasClerkKey = !!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY?.startsWith(
  * so local dashboard routes work without authentication.
  */
 export async function getRouteAuth(): Promise<unknown> {
-	if (!hasClerkKey && process.env.NODE_ENV === "development") {
+	if (
+		!hasClerkKey &&
+		process.env.NODE_ENV === "development" &&
+		process.env.ENABLE_DEV_AUTH_BYPASS === "true"
+	) {
+		console.warn("[route-auth] Dev auth bypass is active — returning mock admin session");
 		return {
 			userId: "dev-user",
 			sessionClaims: { metadata: { role: "admin" } },

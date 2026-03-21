@@ -259,7 +259,7 @@ Add to `tests/unit/slide-builder.spec.ts`:
 - Text content slide: HTML body centered in `<div>`
 - Image slide: `<img>` with `src` and `alt` text
 - Video slide: `<video>` with `controls` attribute
-- Correct filename pattern (`{NN}_{slugifiedDescriptor}`) — where `{NN}` is a zero-padded (minimum 3-digit) global sequence number (001, 002, …) across all slides, and `slugifiedDescriptor` is the descriptor transformed to lowercase, spaces/special characters replaced by hyphens, diacritics transliterated (ä→ae, ö→oe, ü→ue, ß→ss), e.g. "Einführung in TypeScript" → `001_einfuehrung-in-typescript.html`
+- Correct filename pattern (`03_material_{lessonSeq}_{idx}`)
 - Materials ordered by lesson sequence, then by index within each lesson
 
 ### Step 14: Text & Media Fetching
@@ -281,14 +281,14 @@ for (const lesson of courseLessons) {
   let materialIdx = 1;
   for (const text of lessonTexts) {
     const html = buildTextSlide(text);
-    const filename = seqFilename(`${lesson.title}-text-${materialIdx}`);
+    const filename = `03_material_${lesson.sequence}_${materialIdx}.html`;
     await this.writeSlide(courseOutputDir, filename, html);
     slides.push({ filename, type: "material", title: "Text Content" });
     materialIdx++;
   }
   for (const media of lessonMedia) {
     const html = media.mediaType === "image" ? buildImageSlide(media) : buildVideoSlide(media);
-    const filename = seqFilename(media.altText ?? `${lesson.title}-${media.mediaType}`);
+    const filename = `03_material_${lesson.sequence}_${materialIdx}.html`;
     await this.writeSlide(courseOutputDir, filename, html);
     slides.push({ filename, type: "material", title: media.altText ?? media.mediaType });
     materialIdx++;
@@ -360,13 +360,12 @@ export class SlideGenerator {
 
     // 3. Generate intro slide
     const introHtml = buildIntroSlide(seminar);
-    const introFilename = seqFilename("intro");
-    await this.writeSlide(courseOutputDir, introFilename, introHtml);
-    slides.push({ filename: introFilename, type: "intro", title: seminar.title });
+    await this.writeSlide(courseOutputDir, "01_intro.html", introHtml);
+    slides.push({ filename: "01_intro.html", type: "intro", title: seminar.title });
 
     // 4. Fetch lessons, filter by seminarId, sort by sequence
-    // 5–6. Generate curriculum + material slides
-    //       (see Steps 11–15 for the full generate() implementation)
+    // 5. Generate curriculum slides (02_curriculum_{n}.html)
+    // 6. Fetch texts + media, generate material slides (03_material_{seq}_{idx}.html)
 
     return {
       slidesGenerated: slides.length,
@@ -461,11 +460,11 @@ Update `specs/002-course-slides/spec.md` status from Draft to Complete.
 2. GET /seminars → filter for future start dates → pick nearest
 3. Seminar data → generate output/slides/{courseId}/01_intro.html
 4. GET /lessons → filter by seminarId → sort by sequence
-5. Per lesson → generate output/slides/{courseId}/{NN}_{slugifiedTitle}.html
+5. Per lesson → generate output/slides/{courseId}/02_curriculum_{n}.html
 6. Per lesson:
    a. GET /texts → filter by entityRef (type=lesson, id=lessonSourceId)
    b. GET /media → filter by entityRef (type=lesson, id=lessonSourceId)
-   c. Per material → generate output/slides/{courseId}/{NN}_{slugifiedDescriptor}.html
+   c. Per material → generate output/slides/{courseId}/03_material_{seq}_{idx}.html
 7. Return { status: "success", slidesGenerated, courseTitle, courseId }
 ```
 
@@ -476,10 +475,12 @@ output/
   slides/
     {courseId}/
       01_intro.html
-      02_einfuehrung.html
-      03_fortgeschrittene-typen.html
-      04_grundlagen-text.html
-      05_architektur-photo.html
+      02_curriculum_1.html
+      02_curriculum_2.html
+      02_curriculum_3.html
+      03_material_1_1.html
+      03_material_1_2.html
+      03_material_2_1.html
       ...
 ```
 

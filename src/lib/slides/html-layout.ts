@@ -3,6 +3,7 @@
 // Task: T002 — wrapInLayout(title, content)
 // ---------------------------------------------------------------------------
 
+import { tokensToCssVars } from "./design-tokens";
 import { escapeHtml } from "./utils";
 
 /**
@@ -18,14 +19,11 @@ export function wrapInLayout(title: string, content: string): string {
 <html lang="de">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=1920">
+  <meta name="viewport" content="width=1920, initial-scale=1">
   <title>${escapeHtml(title)}</title>
   <style>
     :root {
-      --primary-color: #1a1a2e;
-      --text-color: #ffffff;
-      --font-family: system-ui, -apple-system, sans-serif;
-      --bg-color: #16213e;
+${tokensToCssVars()}
     }
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -34,9 +32,14 @@ export function wrapInLayout(title: string, content: string): string {
       align-items: center;
       width: 1920px;
       height: 1080px;
-      font-family: var(--font-family);
-      background: var(--bg-color);
-      color: var(--text-color);
+      font-family: var(--font-body);
+      background: var(--hemera-beige);
+      color: var(--hemera-light-black);
+    }
+    h1, h2, h3, h4, h5, h6 {
+      font-family: var(--font-heading);
+      font-weight: 700;
+      color: var(--hemera-marsala);
     }
     .slide-content {
       text-align: center;

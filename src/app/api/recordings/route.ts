@@ -52,7 +52,19 @@ export async function POST(request: Request): Promise<NextResponse> {
 	}
 
 	// Create Hemera client
-	const client = createHemeraClient();
+	let client: Awaited<ReturnType<typeof createHemeraClient>>;
+	try {
+		client = await createHemeraClient();
+	} catch (err) {
+		console.error("createHemeraClient failed", { err });
+		return NextResponse.json(
+			{
+				error: "Internal Server Error",
+				message: "Failed to initialize Hemera API client",
+			},
+			{ status: 500 },
+		);
+	}
 
 	// Transmit to hemera.academy — catch and handle unexpected errors
 	let result: TransmitResult;

@@ -21,14 +21,22 @@ const SECTION_OPEN_RE = /<section\s[^>]*class="slide"[^>]*>/gi;
 const SECTION_RE = /<section\s[^>]*class="slide"[^>]*>([\s\S]*?)<\/section>/gi;
 
 /**
+ * Regex to strip HTML comments before section parsing.
+ * Prevents comment content (e.g. documentation mentioning <section class="slide">)
+ * from interfering with section extraction.
+ */
+const HTML_COMMENT_RE = /<!--[\s\S]*?-->/g;
+
+/**
  * Check whether the HTML contains any `<section class="slide">` tags.
  *
  * @param html  Raw HTML string
  * @returns     `true` if at least one slide section tag is found
  */
 export function hasSectionTags(html: string): boolean {
+	const cleaned = html.replace(HTML_COMMENT_RE, "");
 	SECTION_OPEN_RE.lastIndex = 0;
-	return SECTION_OPEN_RE.test(html);
+	return SECTION_OPEN_RE.test(cleaned);
 }
 
 /**
@@ -42,13 +50,18 @@ export function hasSectionTags(html: string): boolean {
  * @returns     Array of TemplateSection objects in document order
  */
 export function parseSections(html: string): TemplateSection[] {
+	// Strip HTML comments before parsing to prevent comment content
+	// (e.g. documentation mentioning <section class="slide">) from being
+	// matched as real section tags.
+	const cleaned = html.replace(HTML_COMMENT_RE, "");
+
 	// Reset regex lastIndex since we use the `g` flag
 	SECTION_RE.lastIndex = 0;
 	SECTION_OPEN_RE.lastIndex = 0;
 
-	if (!hasSectionTags(html)) {
+	if (!hasSectionTags(cleaned)) {
 		// Implicit section: the entire HTML is a single section
-		return [buildSection(html, 0)];
+		return [buildSection(cleaned, 0)];
 	}
 
 	// Reset after hasSectionTags consumed the regex
@@ -59,7 +72,7 @@ export function parseSections(html: string): TemplateSection[] {
 	let index = 0;
 
 	// biome-ignore lint/suspicious/noAssignInExpressions: standard regex exec loop pattern
-	while ((match = SECTION_RE.exec(html)) !== null) {
+	while ((match = SECTION_RE.exec(cleaned)) !== null) {
 		const body = match[1];
 		sections.push(buildSection(body, index));
 		index++;

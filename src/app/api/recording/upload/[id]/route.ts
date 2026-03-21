@@ -82,7 +82,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 		let transmissionError: string | null = null;
 
 		try {
-			const client = createHemeraClient();
+			const client = await createHemeraClient();
 			const transmitResult = await transmitRecording(client, {
 				seminarSourceId,
 				muxAssetId: muxResult.muxAssetId,

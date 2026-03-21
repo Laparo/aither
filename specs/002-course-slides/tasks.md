@@ -32,7 +32,7 @@
 
 **Goal**: Determine the next upcoming course and generate an intro slide with course name and dates
 
-**Independent Test**: Trigger slide generation → verify `01_intro.html` exists with correct course name and formatted dates
+**Independent Test**: Trigger slide generation → verify `001_intro.html` exists with correct course name and formatted dates
 
 ### Tests for User Story 1 ⚠️
 
@@ -76,7 +76,7 @@
 
 **Goal**: Generate HTML slides for text content, images, and videos linked to each lesson
 
-**Independent Test**: Trigger slide generation → verify `{NN}_{slugifiedDescriptor}.html` files exist with correct content
+**Independent Test**: Trigger slide generation → verify `{NN}_{slugifiedDescriptor}.html` files exist with correct content. Descriptor source per material type: **Text** → `{slugifiedLessonTitle}-text-{index}`, **Image** → `{slugifiedImageTitle}` (fallback `{slugifiedLessonTitle}-image-{index}`), **Video** → `{slugifiedVideoTitle}` (fallback `{slugifiedLessonTitle}-video-{index}`). See spec.md FR-004a for full rules.
 
 ### Tests for User Story 3 ⚠️
 

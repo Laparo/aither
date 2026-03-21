@@ -1,0 +1,75 @@
+# Dependencies
+node_modules/
+.pnp/
+.pnp.js
+
+# Build artifacts
+.next/
+dist/
+build/
+out/
+output/
+*.tsbuildinfo
+
+# Environment (secrets!)
+.env
+.env.local
+.env.*.local
+.env.backup
+.env.local.backup
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+
+# IDE / Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Test / Coverage
+coverage/
+test-results/
+playwright-report/
+.playwright-mcp/
+
+# Git
+.git/
+.gitignore
+
+# Docker self-reference
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Docs / Specs (nicht zur Laufzeit nötig)
+docs/
+specs/
+plans/
+tmp/
+README.md
+CONTRIBUTING.md
+
+# CI / Tooling configs
+.github/
+.husky/
+.coderabbit.yaml
+.qodo/
+.kilocode/
+.specify/
+.freddy-copilot-error.log
+cspell.config.json
+biome.json
+vitest.config.ts

@@ -30,7 +30,7 @@ import { buildSlideContext } from "./slide-context";
 import { parsePlaceholders, replaceCollection, replaceScalars } from "./template-engine";
 import type { GeneratedSlide, SlideGenerationEvent, SlideGenerationResult } from "./types";
 
-/** German special character mappings applied before NFD normalization. */
+/** German umlaut / special-char transliteration map */
 const GERMAN_MAP: Record<string, string> = {
 	ä: "ae",
 	ö: "oe",
@@ -40,13 +40,13 @@ const GERMAN_MAP: Record<string, string> = {
 	Ö: "Oe",
 	Ü: "Ue",
 };
-const GERMAN_RE = /[äöüßÄÖÜ]/g;
+const GERMAN_RE = new RegExp(`[${Object.keys(GERMAN_MAP).join("")}]`, "g");
 
-/** Convert text to a URL/filename-safe slug: lowercase, diacritics stripped, hyphens. */
+/** Convert text to a URL/filename-safe slug: lowercase, German transliteration, diacritics stripped, hyphens. */
 function slugify(text: string): string {
 	return text
-		.toLowerCase()
 		.replace(GERMAN_RE, (ch) => GERMAN_MAP[ch] ?? ch)
+		.toLowerCase()
 		.normalize("NFD")
 		.replace(/\p{M}/gu, "")
 		.replace(/[^a-z0-9]+/g, "-")
@@ -112,11 +112,20 @@ export class SlideGenerator {
 		const courseId = courseDetail.id;
 		const courseTitle = courseDetail.title;
 
-		// Step 2: Clear and prepare course-specific output directory
-		if (!/^[A-Za-z0-9_-]+$/.test(courseId)) {
-			throw new Error(`Invalid courseId: ${courseId}`);
+		// Validate courseId before using it in filesystem paths
+		if (!courseId || typeof courseId !== "string" || !/^[\w-]+$/.test(courseId)) {
+			throw new Error(
+				`Invalid courseId: must be alphanumeric/hyphens/underscores only, got "${String(courseId)}"`,
+			);
 		}
+
+		// Step 2: Clear and prepare course-specific output directory
 		const courseOutputDir = path.join(this.outputDir, courseId);
+		const resolvedOutput = path.resolve(courseOutputDir);
+		const resolvedBase = path.resolve(this.outputDir);
+		if (!resolvedOutput.startsWith(resolvedBase + path.sep)) {
+			throw new Error(`Path traversal detected: courseId "${courseId}" escapes output directory`);
+		}
 		await this.clearDir(courseOutputDir);
 
 		// Step 3: Try legacy endpoints (intro, curriculum, content slides)
@@ -124,20 +133,10 @@ export class SlideGenerator {
 		let seminar: Awaited<ReturnType<typeof getNextCourse>> | null = null;
 		try {
 			seminar = await getNextCourse(this.client);
-		} catch (err) {
-			const isExpected =
-				err instanceof Error &&
-				(err.message.includes("404") ||
-					err.message.includes("not supported") ||
-					err.message.includes("not available"));
-			if (isExpected) {
-				serverInstance.info(
-					"Legacy /seminars endpoint not available — skipping intro/curriculum slides",
-					{ error: err.message },
-				);
-			} else {
-				throw err;
-			}
+		} catch {
+			serverInstance.info(
+				"Legacy /seminars endpoint not available — skipping intro/curriculum slides",
+			);
 		}
 
 		if (seminar) {
@@ -190,16 +189,8 @@ export class SlideGenerator {
 					}
 				}
 			} catch (err) {
-				const isExpected =
-					err instanceof Error &&
-					(err.message.includes("404") ||
-						err.message.includes("not supported") ||
-						err.message.includes("not available"));
-				if (isExpected) {
-					serverInstance.info(`Legacy content endpoints not available: ${err.message}`);
-				} else {
-					throw err;
-				}
+				const msg = err instanceof Error ? err.message : String(err);
+				serverInstance.info(`Legacy content endpoints not available: ${msg}`);
 			}
 		}
 
@@ -276,6 +267,8 @@ export class SlideGenerator {
 					} else if (mode === "section-iteration") {
 						// Mode A: iterate sections × participants
 						const sections = parseSections(material.htmlContent);
+						const hasAnySectionWithCollections = sections.some((s) => s.collections.size > 0);
+
 						for (const section of sections) {
 							const collectionName = section.collections.keys().next().value ?? "participant";
 							const records = context.collections[collectionName] ?? [];
@@ -309,8 +302,16 @@ export class SlideGenerator {
 									});
 									templateSlideCount++;
 								}
+							} else if (hasAnySectionWithCollections) {
+								// Skip scalar-only sections when the material also has collection sections.
+								// These are typically title/closing slides that aren't needed individually.
+								event.skippedSections++;
+								serverInstance.info(
+									`Skipping scalar-only section ${section.index} of "${material.identifier}" — material has collection sections`,
+									{ materialId: material.materialId },
+								);
 							} else {
-								// Scalar-only section: apply scalars only
+								// Pure scalar-only material with section tags: apply scalars only
 								const rendered = replaceScalars(section.body, context.scalars);
 								const filename = seqFilename(material.identifier);
 								const wrapped = wrapInLayout(material.title, rendered);

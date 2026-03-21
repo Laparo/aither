@@ -23,10 +23,10 @@ export function _resetState() {
 // ── POST /api/slides — Trigger slide generation ──────────────────────────
 
 export async function POST(_req: NextRequest) {
-	// In development with explicit opt-in, skip auth for local dashboard usage
-	if (process.env.NODE_ENV === "development" && process.env.SKIP_AUTH_FOR_DEV === "true") {
-		console.warn("⚠ Auth bypass active (SKIP_AUTH_FOR_DEV=true) — route is unprotected");
-	} else {
+	// Skip auth only when explicitly opted in for local dev usage
+	const skipAuth =
+		process.env.NODE_ENV === "development" && process.env.SKIP_AUTH_IN_DEV === "true";
+	if (!skipAuth) {
 		const authData = await getRouteAuth();
 		const authResult = requireAdmin(authData);
 		if (authResult.status !== 200) {
@@ -51,7 +51,7 @@ export async function POST(_req: NextRequest) {
 		const cfg = loadConfig();
 		const outputDir = cfg.SLIDES_OUTPUT_DIR;
 
-		const client = createHemeraClient();
+		const client = await createHemeraClient();
 		const generator = new SlideGenerator({ client, outputDir });
 
 		const result = await generator.generate();

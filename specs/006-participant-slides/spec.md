@@ -5,7 +5,7 @@
 Extension of the existing slide pipeline (`src/lib/slides/`) with a **template engine supporting placeholder variables**. The engine supports **two replacement modes**:
 
 - **Mode A — Section Iteration**: An HTML page contains `<section class="slide">` blocks. Each section is an independent slide template. Collection placeholders (e.g., `{participant:name}`) trigger iteration: with 6 participants, one section produces 6 slides.
-- **Mode B — Identifier Distribution**: A template (e.g., `video-analysis`) is **linked multiple times** in the curriculum (via `CurriculumTopicMaterial`). The number of links = number of participants (1:1). Each instance is assigned one participant sequentially — Instance 1 → Participant A, Instance 2 → Participant B, etc. Output: `{NN}_video-analysis_{firstName}.html` (e.g., `05_video-analysis_anna.html`, `06_video-analysis_ben.html`).
+- **Mode B — Identifier Distribution**: A template (e.g., `video-analysis`) is **linked multiple times** in the curriculum (via `CurriculumTopicMaterial`). The number of links = number of participants (1:1). Each instance is assigned one participant sequentially — Instance 1 → Participant A, Instance 2 → Participant B, etc. Output: `{NN}_video-analysis_{firstName}.html` (e.g., `005_video-analysis_anna.html`, `006_video-analysis_ben.html`).
 
 Participant data (name, preparation intent, desired results, line manager profile) is loaded from the hemera Service API. The existing Handlebars-based `populateTemplate()` in `lib/html/populator.ts` uses `{{}}` for data-sync output — the slide pipeline gets its own **lightweight template engine** with `{}`-syntax that natively supports both section-based iteration and identifier-based distribution.
 
@@ -22,7 +22,7 @@ Participant data (name, preparation intent, desired results, line manager profil
 - Q: How should the pipeline react to Materials API errors (abort, skip, retry)? → A: **Skip + Log** — skip material slides, generate intro/curriculum slides normally, log error via Rollbar.
 - Q: What information should the slide generation output via structured log? → A: **`slides.generated`** event with: `courseId`, `totalSlides`, `materialSlides`, `skippedSections`, `modeACount`, `modeBCount`, `durationMs`, `errors` — analogous to `sync.completed` from 005.
 - Q: What should happen during re-generation with existing files in `output/slides/{courseId}/`? → A: **Clean + Regenerate** — delete all existing slides in the course folder before each generation, then regenerate completely. Prevents orphaned slides when participant count changes.
-- Q: How should material grouping work for Mode B — topicId, identifier prefix, or dedicated slug field? → A: **Identifier via curriculum links**. A template (e.g., `video-analysis`) is linked multiple times in the curriculum (via `CurriculumTopicMaterial`). The number of links always equals the participant count (1:1). All instances with the same `identifier` form a group. Each instance is assigned one participant sequentially. Output: `{NN}_video-analysis_{firstName}.html` (e.g., `05_video-analysis_anna.html`, `06_video-analysis_ben.html`).
+- Q: How should material grouping work for Mode B — topicId, identifier prefix, or dedicated slug field? → A: **Identifier via curriculum links**. A template (e.g., `video-analysis`) is linked multiple times in the curriculum (via `CurriculumTopicMaterial`). The number of links always equals the participant count (1:1). All instances with the same `identifier` form a group. Each instance is assigned one participant sequentially. Output: `{NN}_video-analysis_{firstName}.html` (e.g., `005_video-analysis_anna.html`, `006_video-analysis_ben.html`).
 
 ## Two Replacement Modes
 
@@ -49,7 +49,7 @@ The number of curriculum links for the same material always equals the number of
 - Instance 3 → Participant C
 - ...
 
-Output files are named with a global sequence number, the identifier, and the participant's first name: `{NN}_{identifier}_{firstName}.html` (e.g., `05_video-analysis_anna.html`, `06_video-analysis_ben.html`).
+Output files are named with a global sequence number, the identifier, and the participant's first name: `{NN}_{identifier}_{firstName}.html` (e.g., `005_video-analysis_anna.html`, `006_video-analysis_ben.html`).
 
 ### Mode Detection Logic
 
@@ -164,9 +164,9 @@ The template `video-analysis` (a single `CourseMaterial` record) is linked **3 t
 
 3 participants (Anna Müller, Ben Fischer, Clara Hofmann) →
 
-- Instance 1 → Anna Müller's data → `05_video-analysis_anna.html`
-- Instance 2 → Ben Fischer's data → `06_video-analysis_ben.html`
-- Instance 3 → Clara Hofmann's data → `07_video-analysis_clara.html`
+- Instance 1 → Anna Müller's data → `005_video-analysis_anna.html`
+- Instance 2 → Ben Fischer's data → `006_video-analysis_ben.html`
+- Instance 3 → Clara Hofmann's data → `007_video-analysis_clara.html`
 
 → **3 slides**, each with the same layout but different participant data.
 
@@ -175,8 +175,8 @@ The template `video-analysis` (a single `CourseMaterial` record) is linked **3 t
 The template `video-analysis` is linked 4 times (4 participants), the template `feedback-sheet` is also linked 4 times. Both templates contain `{participant:*}` placeholders.
 
 Result:
-- `{NN}_video-analysis_{firstName}.html` (e.g., `05_video-analysis_alice.html` through `08_video-analysis_diana.html`, one participant each)
-- `{NN}_feedback-sheet_{firstName}.html` (e.g., `09_feedback-sheet_alice.html` through `12_feedback-sheet_diana.html`, one participant each)
+- `{NN}_video-analysis_{firstName}.html` (e.g., `005_video-analysis_alice.html` through `008_video-analysis_diana.html`, one participant each)
+- `{NN}_feedback-sheet_{firstName}.html` (e.g., `009_feedback-sheet_alice.html` through `012_feedback-sheet_diana.html`, one participant each)
 
 → **8 slides** total from 2 templates × 4 participants.
 
@@ -312,7 +312,7 @@ A section may contain both simple and object placeholders:
 - Each HTML string has all `{participant:*}` placeholders replaced with the respective participant's data
 - Scalar placeholders in the same section are replaced identically in each iteration
 - With 0 entities in the collection, no slide is generated from this section (empty array)
-- Filename includes the global sequence and participant's first name: `{NN}_{identifier}_{firstName}.html` (e.g., `05_preparation-sheet_anna.html`)
+- Filename includes the global sequence and participant's first name: `{NN}_{identifier}_{firstName}.html` (e.g., `005_preparation-sheet_anna.html`)
 
 ### US4: Integration into the Generator Pipeline
 
@@ -365,7 +365,7 @@ A section may contain both simple and object placeholders:
 - Each instance receives one record from the collection in order (instance[0] → record[0], instance[1] → record[1], ...)
 - Scalar placeholders in each instance are replaced identically (same course data)
 - Each distributed instance produces exactly 1 slide
-- File naming: `{NN}_{identifier}_{firstName}.html` (e.g., `05_video-analysis_anna.html`, `06_video-analysis_ben.html`)
+- File naming: `{NN}_{identifier}_{firstName}.html` (e.g., `005_video-analysis_anna.html`, `006_video-analysis_ben.html`)
 
 ## Data Sources
 
@@ -391,7 +391,11 @@ A section may contain both simple and object placeholders:
 - **Output Format**: HTML 1920×1080 via `wrapInLayout()` from `html-layout.ts`
 - **Output Directory**: `output/slides/{courseId}/` (existing)
 - **Styling**: CSS Custom Properties (`--primary-color`, `--text-color`, `--bg-color`) from existing layout
-- **Filename Convention**: All slides use a unified naming scheme: `{NN}_{identifier}[_{firstName}].html`. A global sequence counter (`NN`) determines presentation order. The `identifier` is a slugified descriptor (title, material identifier, or media alt-text). For collection slides (Mode A/B), the participant's first name is appended. Examples: `01_intro.html`, `02_einfuehrung.html`, `05_video-analysis_anna.html`. All sequence numbers are 1-based and zero-padded (2-digit minimum). Alphabetical sort by filename equals presentation order.
+- **Filename Convention**: All slides use a unified naming scheme: `{NN}_{identifier}[_{firstName}].html`. A global sequence counter (`NN`) determines presentation order. The `identifier` is a slugified descriptor (title, material identifier, or media alt-text). For collection slides (Mode A/B), the participant's first name is appended. Examples: `001_intro.html`, `002_einfuehrung.html`, `005_video-analysis_anna.html`. All sequence numbers are 1-based and zero-padded (3-digit minimum per FR-004b). Alphabetical sort by filename equals presentation order.
+  - **Identifier slugification**: Lowercase, replace `ä→ae`/`ö→oe`/`ü→ue`/`ß→ss`, Unicode NFD normalize + strip combining marks, replace non-alphanumeric with hyphens, collapse consecutive hyphens, trim leading/trailing hyphens.
+  - **firstName extraction**: Source is `participant.name`. Extract the first word (split on whitespace). Normalize to lowercase. Transliterate German umlauts (`ä→ae`, `ö→oe`, `ü→ue`, `ß→ss`). Remove apostrophes and special characters (e.g., `O'Brien → obrien`). Hyphens in names are preserved (e.g., `Jean-Pierre → jean-pierre`). **Null/empty name fallback**: Use `participant-{index}` (1-based). Examples: `"Anna Müller" → "anna"`, `"Jean-Pierre Dupont" → "jean-pierre"`, `null → "participant-1"`.
+  - **Collision handling**: If two identifiers produce the same slug (unlikely due to unique `{NN}`), the global sequence number guarantees uniqueness. If multiple materials share the same identifier string, append `-{n}` (e.g., `agenda-2`).
+  - **Null firstName fallback**: When `participant.name` is null or empty, use `participant-{index}` where `{index}` is the 1-based position in the participants array.
 - **No Browser Rendering**: Pure HTML files, no Puppeteer/Playwright for PDF
 - **Escaping**: All inserted user data is HTML-escaped (XSS protection)
 - **Materials API Errors**: On error (500, timeout, empty response) from `GET /api/service/courses/{id}/materials`, material slides are skipped. Intro and curriculum slides are generated independently. The error is logged via Rollbar (`slides.materials.fetchError`).

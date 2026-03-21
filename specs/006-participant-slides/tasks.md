@@ -105,7 +105,7 @@
 
 **Goal**: Detect when a template is linked multiple times in the curriculum and distribute participants sequentially across instances
 
-**Independent Test**: Given a template `video-analysis` with 3 curriculum links and 3 participants, verify 3 output files like `05_video-analysis_anna.html`, `06_video-analysis_ben.html`, `07_video-analysis_clara.html`, each with one participant's data
+**Independent Test**: Given a template `video-analysis` with 3 curriculum links and 3 participants, verify 3 output files like `005_video-analysis_anna.html`, `006_video-analysis_ben.html`, `007_video-analysis_clara.html`, each with one participant's data
 
 ### Tests for US7
 

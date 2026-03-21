@@ -224,16 +224,28 @@ This is called at the start of `generate()` with the course-specific output dire
 
 **Mode A** (unified naming):
 - `{NN}_{identifier}[_{firstName}].html`
-- Example: `05_preparation-sheet_anna.html` (sequence 5, identifier, participant)
+- Example: `005_preparation-sheet_anna.html` (sequence 5, identifier, participant)
 - Global sequence number ensures unique sort order across all slide types
 
 **Mode B** (unified naming):
 - `{NN}_{identifier}_{firstName}.html`
-- Example: `06_video-analysis_anna.html`, `07_video-analysis_ben.html`
+- Example: `006_video-analysis_anna.html`, `007_video-analysis_ben.html`
 - Same format as Mode A — global sequence replaces old `{identifier}-{nn}` pattern
 
 ### Consideration
-All slides (intro, curriculum, material) now share the same `{NN}_{identifier}[_{firstName}].html` convention. The `{identifier}` portion is slugified (lowercase, diacritics stripped, non-alphanumeric → hyphens). In participant-specific slides (Mode A with collection data, Mode B), `_{firstName}` is always appended. In non-participant slides (intro, curriculum, scalar-only), `_{firstName}` is omitted. Alphabetical sort by filename equals presentation order.
+All slides (intro, curriculum, material) now share the same `{NN}_{identifier}[_{firstName}].html` convention. The `{NN}` portion is a zero-padded three-digit decimal (e.g., `001`, `002`, … `010`, `099`) to guarantee correct alphabetical ordering. The `{identifier}` portion is slugified (lowercase, diacritics stripped, non-alphanumeric → hyphens). The `{firstName}` token is derived from `participant.name` and normalized as follows:
+1. Trim `participant.name`; if empty or whitespace-only, treat as missing (→ step 7 fallback)
+2. Extract the first word (split on whitespace)
+3. Unicode NFKD decomposition to strip diacritics
+4. Lowercase and ASCII transliteration where possible (e.g., `ä→ae`, `ö→oe`, `ü→ue`, `ß→ss`)
+5. Remove apostrophes (`'`) and all non-alphanumeric characters except hyphens (`-`); hyphens are preserved (e.g., `O'Brien → obrien`, `Jean-Pierre → jean-pierre`). This implicitly strips path-traversal characters (`/`, `\`, `.`) as well.
+6. Collapse consecutive hyphens to a single hyphen and trim hyphens at start/end
+7. If the result is empty after normalization, use fallback `"unknown"`
+8. Truncate to `MAX_FILENAME_LENGTH` (50 characters) at a hyphen boundary if possible, ensuring no trailing hyphen
+
+**Examples**: `María → maria`, `O'Brien → obrien`, `Anna Müller → anna`, `Jean-Pierre Dupont → jean-pierre`, `"   " → unknown`, `null → unknown`
+
+In participant-specific slides (Mode A with collection data, Mode B), `_{firstName}` is always appended. In non-participant slides (intro, curriculum, scalar-only), `_{firstName}` is omitted. Alphabetical sort by filename equals presentation order.
 
 ---
 

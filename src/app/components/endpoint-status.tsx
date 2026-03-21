@@ -74,20 +74,21 @@ interface EndpointResult {
  * confirms the route exists and is reachable.
  */
 async function checkEndpoint(ep: EndpointDef): Promise<EndpointResult> {
+	const controller = new AbortController();
+	const timer = setTimeout(() => controller.abort(), 5000);
 	try {
-		const controller = new AbortController();
-		const timer = setTimeout(() => controller.abort(), 5000);
 		const res = await fetch(ep.path, {
 			method: ep.method === "GET" ? "GET" : "HEAD",
 			cache: "no-store",
 			signal: controller.signal,
 		});
-		clearTimeout(timer);
 		// For GET: 2xx/4xx = reachable; for HEAD on POST routes: 405 = reachable
 		const ok = res.status < 500;
 		return { status: ok ? "erreichbar" : "fehler", code: res.status };
 	} catch {
 		return { status: "fehler" };
+	} finally {
+		clearTimeout(timer);
 	}
 }
 

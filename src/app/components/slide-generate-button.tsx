@@ -4,6 +4,7 @@ import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import CircularProgress from "@mui/material/CircularProgress";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 type State = "idle" | "running" | "success" | "error";
@@ -15,6 +16,7 @@ interface Result {
 }
 
 export function SlideGenerateButton() {
+	const router = useRouter();
 	const [state, setState] = useState<State>("idle");
 	const [result, setResult] = useState<Result | null>(null);
 
@@ -24,26 +26,36 @@ export function SlideGenerateButton() {
 
 		try {
 			const res = await fetch("/api/slides", { method: "POST" });
+
 			const text = await res.text();
-			let body: Record<string, unknown> = {};
-			try {
-				body = JSON.parse(text);
-			} catch {
+			let body: Record<string, unknown> | null = null;
+			const contentType = res.headers.get("content-type") ?? "";
+			if (contentType.includes("application/json")) {
+				try {
+					body = JSON.parse(text);
+				} catch {
+					/* JSON parse failure handled below */
+				}
+			}
+
+			if (!body) {
 				setState("error");
-				setResult({ error: `HTTP ${res.status}: ${text.slice(0, 200)}` });
+				setResult({ error: text || `HTTP ${res.status}` });
 				return;
 			}
 
 			if (res.ok) {
 				setState("success");
 				setResult({
-					slidesGenerated:
-						typeof body.slidesGenerated === "number" ? body.slidesGenerated : undefined,
-					courseTitle: typeof body.courseTitle === "string" ? body.courseTitle : undefined,
+					slidesGenerated: body.slidesGenerated as number | undefined,
+					courseTitle: body.courseTitle as string | undefined,
 				});
+				router.refresh();
 			} else {
 				setState("error");
-				setResult({ error: String(body.error ?? body.message ?? `HTTP ${res.status}`) });
+				setResult({
+					error: (body.error as string) ?? (body.message as string) ?? `HTTP ${res.status}`,
+				});
 			}
 		} catch (err) {
 			setState("error");
@@ -65,7 +77,7 @@ export function SlideGenerateButton() {
 
 			{state === "success" && result && (
 				<Alert severity="success" sx={{ mt: 1 }}>
-					{result.slidesGenerated ?? 0} Folien für „{result.courseTitle ?? "—"}" generiert.
+					{result.slidesGenerated ?? 0} Folien für „{result.courseTitle ?? "Unbekannt"}" generiert.
 				</Alert>
 			)}
 

@@ -25,10 +25,10 @@ describe("wrapInLayout", () => {
 	it("includes CSS custom properties for branding", () => {
 		const html = wrapInLayout("Test", "<p>Content</p>");
 
-		expect(html).toContain("--primary-color:");
-		expect(html).toContain("--text-color:");
-		expect(html).toContain("--font-family:");
-		expect(html).toContain("--bg-color:");
+		expect(html).toContain("--hemera-marsala:");
+		expect(html).toContain("--hemera-beige:");
+		expect(html).toContain("--font-heading:");
+		expect(html).toContain("--font-body:");
 	});
 
 	it("injects the title into the <title> tag", () => {
@@ -54,7 +54,7 @@ describe("wrapInLayout", () => {
 	it("sets viewport width to 1920", () => {
 		const html = wrapInLayout("Test", "<p>Content</p>");
 
-		expect(html).toContain('content="width=1920"');
+		expect(html).toContain('content="width=1920, initial-scale=1"');
 	});
 
 	it("uses UTF-8 charset", () => {

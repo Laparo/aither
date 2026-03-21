@@ -24,7 +24,7 @@ As a system operator, I want Aither to automatically determine the next upcoming
 
 **Acceptance Scenarios**:
 
-1. **Given** the Hemera API contains future seminars, **When** slide generation is triggered, **Then** the system identifies the seminar whose start date is next in the future and generates `01_intro.html` with the course name centered on the page.
+1. **Given** the Hemera API contains future seminars, **When** slide generation is triggered, **Then** the system identifies the seminar whose start date is next in the future and generates `001_intro.html` with the course name centered on the page.
 2. **Given** the identified seminar has a start date and a different end date, **When** the intro slide is generated, **Then** both dates are displayed in human-readable German format (de-CH locale).
 3. **Given** the identified seminar starts and ends on the same day, **When** the intro slide is generated, **Then** only the start date is displayed (no redundant end date).
 4. **Given** no future seminars exist in the Hemera API, **When** slide generation is triggered, **Then** the system returns an error indicating no upcoming course was found.
@@ -41,7 +41,7 @@ As a system operator, I want Aither to generate one HTML slide per curriculum it
 
 **Acceptance Scenarios**:
 
-1. **Given** the next course has 5 lessons, **When** slide generation is triggered, **Then** 5 curriculum slides are generated (e.g., `02_introduction.html` through `06_final-review.html`), each containing the lesson title centered on the page.
+1. **Given** the next course has 5 lessons, **When** slide generation is triggered, **Then** 5 curriculum slides are generated (e.g., `002_introduction.html` through `006_final-review.html`), each containing the lesson title centered on the page.
 2. **Given** lessons are returned from the API in arbitrary order, **When** curriculum slides are generated, **Then** they are numbered according to the lesson `sequence` field, not API response order.
 3. **Given** the API returns lessons for multiple seminars, **When** curriculum slides are generated, **Then** only lessons belonging to the identified next course are included.
 
@@ -57,7 +57,7 @@ As a system operator, I want Aither to generate HTML slides for each piece of co
 
 **Acceptance Scenarios**:
 
-1. **Given** lesson 1 has 2 text content items and 1 image, **When** material slides are generated, **Then** 3 slides are created with sequential numbers reflecting global order (e.g., `07_basics-text-1.html`, `08_basics-text-2.html`, `09_photo.html`).
+1. **Given** lesson 1 has 2 text content items and 1 image, **When** material slides are generated, **Then** 3 slides are created with sequential numbers reflecting global order (e.g., `007_basics-text-1.html`, `008_basics-text-2.html`, `009_photo.html`).
 2. **Given** a material item is a text content block, **When** its slide is generated, **Then** the text body is rendered as HTML centered on the page.
 3. **Given** a material item is an image, **When** its slide is generated, **Then** an `<img>` tag with the source URL and alt text is rendered centered on the page.
 4. **Given** a material item is a video, **When** its slide is generated, **Then** a `<video>` tag with playback controls is rendered centered on the page.
@@ -94,12 +94,12 @@ As a system operator, I want to trigger slide generation via a dedicated API end
 ### Functional Requirements
 
 - **FR-001**: System MUST fetch all seminars from the Hemera API and identify the seminar whose start date is the next one in the future.
-- **FR-002**: System MUST generate an intro slide (`01_intro.html`) containing the course name and formatted dates (start date always; end date only if different from start date). Dates MUST be formatted in German (de-CH locale) using `Intl.DateTimeFormat`.
+- **FR-002**: System MUST generate an intro slide (`001_intro.html`) containing the course name and formatted dates (start date always; end date only if different from start date). Dates MUST be formatted in German (de-CH locale) using `Intl.DateTimeFormat`.
 - **FR-003**: System MUST fetch lessons for the identified course and generate one curriculum slide per lesson (`{NN}_{slugifiedTitle}.html`), sorted by the lesson `sequence` field.
 - **FR-004a** *(Descriptor patterns)*: System MUST fetch text content and media assets for each lesson and generate one material slide per item (`{NN}_{slugifiedDescriptor}.html`). Descriptor patterns by type:
   - **Text**: `{slugifiedLessonTitle}-text-{index}` (index is 1-based per lesson)
-  - **Image**: `{slugifiedImageTitle}` if the image has a title, otherwise `{slugifiedLessonTitle}-image-{index}`
-  - **Video**: `{slugifiedVideoTitle}` if the video has a title, otherwise `{slugifiedLessonTitle}-video-{index}`
+  - **Image**: `{slugifiedImageTitle}` if the image has a title **and** `slugify(title)` produces a non-empty string, otherwise `{slugifiedLessonTitle}-image-{index}`
+  - **Video**: `{slugifiedVideoTitle}` if the video has a title **and** `slugify(title)` produces a non-empty string, otherwise `{slugifiedLessonTitle}-video-{index}`
 - **FR-004b** *(Global sequence counter)*: The `{NN}` prefix is a monotonically incrementing global counter shared across all slide types (intro, curriculum, material). It starts at 1, increments by 1 per slide, and is zero-padded to at least 3 digits. Every slide receives a unique `{NN}`.
 - **FR-004c** *(Slug-collision safety)*: Because `{NN}` is unique per slide (FR-004b), filenames remain distinct even when two descriptors produce the same slug. E.g., a curriculum lesson "Architektur" (`003_architektur.html`) and an image titled "Architektur" (`009_architektur.html`) never collide.
   - *Example*: A course with 1 intro slide (`001_intro.html`), 5 curriculum slides (`002`–`006`), then lesson "Grundlagen" with 2 texts and 1 image (titled "Architektur") → `007_grundlagen-text-1.html`, `008_grundlagen-text-2.html`, `009_architektur.html` (FR-004a descriptors, FR-004b sequence).
@@ -212,7 +212,7 @@ Example: "Einführung in TypeScript" → `einfuehrung-in-typescript`
 ```
 1. POST /api/slides → authenticate → check mutex
 2. GET /seminars → determine next upcoming seminar
-3. Seminar data → generate 01_intro.html
+3. Seminar data → generate 001_intro.html
 4. GET /lessons → filter by seminarId → sort by sequence
 5. Per lesson → generate {NN}_{slugifiedTitle}.html
 6. Per lesson:
@@ -228,10 +228,10 @@ Example: "Einführung in TypeScript" → `einfuehrung-in-typescript`
 output/
   slides/
     {courseId}/
-      01_intro.html
-      02_einfuehrung.html
-      03_fortgeschrittene-typen.html
-      04_grundlagen-text.html
-      05_architektur-photo.html
+      001_intro.html
+      002_einfuehrung.html
+      003_fortgeschrittene-typen.html
+      004_grundlagen-text-1.html
+      005_architektur-photo.html
       ...
 ```

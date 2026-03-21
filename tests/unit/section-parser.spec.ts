@@ -123,4 +123,30 @@ describe("hasSectionTags", () => {
 		const html = '<section class="content"><p>Content</p></section>';
 		expect(hasSectionTags(html)).toBe(false);
 	});
+
+	it("ignores section tags inside HTML comments", () => {
+		const html = '<!-- <section class="slide">docs</section> --><div>no sections</div>';
+		expect(hasSectionTags(html)).toBe(false);
+	});
+});
+
+// --- Comment stripping ---
+
+describe("parseSections — HTML comment stripping", () => {
+	it("ignores section tags inside HTML comments", () => {
+		const html = [
+			'<!-- documentation mentioning <section class="slide">-Blöcke',
+			"     {participant:name}, {participant:status} -->",
+			'<section class="slide"><h1>{courseTitle}</h1></section>',
+			'<section class="slide"><p>{participant:name}</p></section>',
+		].join("\n");
+
+		const result = parseSections(html);
+
+		// Should find exactly 2 sections (the real ones), not 3
+		expect(result).toHaveLength(2);
+		expect(result[0].scalars).toContain("courseTitle");
+		expect(result[0].collections.size).toBe(0);
+		expect(result[1].collections.has("participant")).toBe(true);
+	});
 });
