@@ -364,8 +364,20 @@ export class SlideGenerator {
     slides.push({ filename: "01_intro.html", type: "intro", title: seminar.title });
 
     // 4. Fetch lessons, filter by seminarId, sort by sequence
-    // 5. Generate curriculum slides (02_curriculum_{n}.html)
-    // 6. Fetch texts + media, generate material slides (03_material_{seq}_{idx}.html)
+    const allLessons = await this.client.get("/lessons", LessonsResponseSchema);
+    const courseLessons = allLessons
+      .filter((l) => l.seminarId === seminar.sourceId)
+      .sort((a, b) => a.sequence - b.sequence);
+
+    // 5. Generate curriculum slides ({NN}_{slugifiedTitle}.html)
+    for (const lesson of courseLessons) {
+      const html = buildCurriculumSlide(lesson);
+      const filename = seqFilename(lesson.title);
+      await this.writeSlide(courseOutputDir, filename, html);
+      slides.push({ filename, type: "curriculum", title: lesson.title });
+    }
+
+    // 6. Fetch texts + media, generate material slides ({NN}_{slugifiedDescriptor}.html)
 
     return {
       slidesGenerated: slides.length,

@@ -15,7 +15,7 @@ const protectedPatterns = [
 	"/sync(.*)",
 	"/recording(.*)",
 	"/api/service/(.*)",
-	"/(dashboard)(.*)",
+	"/dashboard(.*)",
 ];
 
 const protectedRegexes = protectedPatterns.map((p) => new RegExp(`^${p}$`));
