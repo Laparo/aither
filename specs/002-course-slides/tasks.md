@@ -32,7 +32,7 @@
 
 **Goal**: Determine the next upcoming course and generate an intro slide with course name and dates
 
-**Independent Test**: Trigger slide generation → verify `01_intro.html` exists with correct course name and formatted dates
+**Independent Test**: Trigger slide generation → verify `001_intro.html` exists with correct course name and formatted dates
 
 ### Tests for User Story 1 ⚠️
 
@@ -76,7 +76,12 @@
 
 **Goal**: Generate HTML slides for text content, images, and videos linked to each lesson
 
-**Independent Test**: Trigger slide generation → verify `{NN}_{slugifiedDescriptor}.html` files exist with correct content
+**Independent Test**: Trigger slide generation → verify `{NN}_{slugifiedDescriptor}.html` files exist with correct content. `{NN}` is a 3-digit zero-padded 1-based global sequence number (e.g., `001`, `002`, `010`). Descriptor rules per material type:
+- **Text** → `{slugifiedLessonTitle}-text-{index}` (index 1-based per lesson)
+- **Image** → `{slugifiedImageTitle}` if the image title produces a non-empty slug; otherwise fallback `{slugifiedLessonTitle}-image-{index}`
+- **Video** → `{slugifiedVideoTitle}` if the video title produces a non-empty slug; otherwise fallback `{slugifiedLessonTitle}-video-{index}`
+- **lessonTitle fallback**: `slugifiedLessonTitle = slugify(lessonTitle) || 'lesson-{lessonIndex}'` (1-based) — ensures no leading dash when title slugifies to empty.
+See spec.md FR-004a for full rules.
 
 ### Tests for User Story 3 ⚠️
 

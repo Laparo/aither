@@ -95,7 +95,7 @@ flowchart TD
     H --> I[Filter: next future seminar]
     I -->|None found| J[Error: No upcoming course]
     I -->|Found| K[Clear output/slides/]
-    K --> L[Generate 01_intro.html]
+    K --> L[Generate 001_intro.html]
     L --> M[HemeraClient.get /lessons]
     M --> N[Filter by seminarId + sort by sequence]
     N --> O[Generate {NN}_{title}.html per lesson]
@@ -103,6 +103,34 @@ flowchart TD
     P --> Q[Generate {NN}_{descriptor}.html per item]
     Q --> R[Return success + slide count]
 ```
+
+### Filename Sanitization & Uniqueness Rules
+
+Both `{title}` in `{NN}_{title}.html` (curriculum slides) and `{descriptor}` in `{NN}_{descriptor}.html` (material slides) follow the same slugification rules defined in the spec (see spec.md "Slugification Rules"):
+
+1. Convert to lowercase
+2. Replace German special characters: `ä→ae`, `ö→oe`, `ü→ue`, `ß→ss`
+3. Unicode NFD normalize, then strip remaining combining marks (e.g., `é→e`, `ñ→n`)
+4. Replace all filesystem-invalid and non-alphanumeric characters (`/ \ : * ? " < > |` and others) with hyphens
+5. Collapse consecutive hyphens to a single hyphen
+6. Trim leading/trailing hyphens
+
+**Descriptor source fields**:
+- **Curriculum slides**: `{title}` = `lesson.title` → slugified
+- **Material slides (TextContent)**: `{descriptor}` = `{slugifiedLessonTitle}-text-{index}` if `slugify(lesson.title)` produces a non-empty string; otherwise `lesson-{lessonSequence}-text-{index}` — where `{index}` is a 1-based counter that resets per lesson
+- **Material slides (MediaAsset — image)**: `{descriptor}` = `slugify(media.title)` if present **and** produces a non-empty string; otherwise `{slugifiedLessonTitle}-image-{index}` where `{index}` is a 1-based counter that resets per image type per lesson
+- **Material slides (MediaAsset — video)**: `{descriptor}` = `slugify(media.title)` if present **and** produces a non-empty string; otherwise `{slugifiedLessonTitle}-video-{index}` where `{index}` is a 1-based counter that resets per video type per lesson
+
+**Uniqueness**: The global `{NN}` sequence counter (zero-padded 3-digit minimum, per FR-004b) guarantees uniqueness. Even if two descriptors produce the same slug, different `{NN}` prefixes prevent collisions.
+
+**Maximum length**: The `{title}` / `{descriptor}` slug portion is truncated to 200 characters (at the nearest hyphen boundary) to ensure the total filename stays well under the 255-character filesystem limit.
+
+**Empty/invalid slugs — ordered fallback chain**:
+1. Attempt `slugify(descriptor)` (e.g., `media.title` for images/videos)
+2. If empty → fall back to `{slugifiedLessonTitle}-{type}-{index}` (e.g., `grundlagen-image-1`)
+3. If `slugify(lesson.title)` is also empty → fall back to `lesson-{lessonSequence}-{type}-{index}` using the lesson's `sequence` field from the API (e.g., `lesson-3-image-1`)
+
+The global `{NN}` prefix is always prepended, guaranteeing uniqueness regardless of which fallback level is reached.
 
 ## Key Design Decisions
 

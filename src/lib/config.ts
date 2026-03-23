@@ -65,15 +65,17 @@ const EnvSchema = z
 		// Hemera Academy API
 		// Base URL must include the full origin (e.g. https://hemera-academy.vercel.app)
 		HEMERA_API_BASE_URL: z.string().url(),
+		// Fallback URL for hybrid setups (e.g., container + network access)
+		HEMERA_API_FALLBACK_URL: z.string().url().optional(),
 		// API key for service-to-service authentication (min 32 chars)
 		HEMERA_API_KEY: z.string().min(32, "HEMERA_API_KEY must be at least 32 characters"),
 
-		// Context7 API key (optional) — use secret key starting with ctx7sk_
+		// Context7 API key (optional) — use secret key starting with ctx7sk_ or ctx7sk-
 		CONTEXT7_API_KEY: z
 			.string()
 			.optional()
-			.refine((v) => !v || v.startsWith("ctx7sk_"), {
-				message: "CONTEXT7_API_KEY must start with 'ctx7sk_'",
+			.refine((v) => !v || v.startsWith("ctx7sk_") || v.startsWith("ctx7sk-"), {
+				message: "CONTEXT7_API_KEY must start with 'ctx7sk_' or 'ctx7sk-'",
 			}),
 
 		// Clerk Authentication

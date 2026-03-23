@@ -462,7 +462,6 @@ describe("SlideGenerator — Material Templates (US4)", () => {
 		const result = await generator.generate();
 
 		// Mode A: 1 section × 2 participants = 2 material template slides
-		// Mode A: 1 section × 2 participants = 2 template slides with participant names
 		const modeASlides = result.slides.filter((s) => s.filename.includes("preparation-sheet"));
 		expect(modeASlides).toHaveLength(2);
 		expect(modeASlides[0].filename).toMatch(/^\d{3}_preparation-sheet_anna\.html$/);
@@ -562,5 +561,46 @@ describe("SlideGenerator — Material Templates (US4)", () => {
 		// Legacy slides should still be generated despite materials pipeline failure
 		expect(result.slidesGenerated).toBeGreaterThan(0);
 		expect(result.slides.some((s) => s.type === "intro")).toBe(true);
+	});
+
+	it("skips scalar-only sections in Mode A when material has mixed sections", async () => {
+		// Template with 3 sections: title (scalar), participant (collection), closing (scalar)
+		const mixedSectionsMaterials: ServiceMaterialsResponse = {
+			success: true,
+			data: {
+				courseId: "course-1",
+				topics: [
+					{
+						topicId: "topic-1",
+						topicTitle: "Vorstellung",
+						materials: [
+							{
+								materialId: "mat-mixed",
+								identifier: "vorstellung-projekte",
+								title: "Vorstellung Projekte",
+								sortOrder: 1,
+								htmlContent: [
+									'<section class="slide"><h1>{courseTitle}</h1><p>{participantCount} Teilnehmer</p></section>',
+									'<section class="slide"><h2>{participant:name}</h2><p>{participant:preparationIntent}</p></section>',
+									'<section class="slide"><h2>Viel Erfolg!</h2><p>{courseTitle}</p></section>',
+								].join("\n"),
+							},
+						],
+					},
+				],
+			},
+		};
+
+		const client = createServiceMockClient(mixedSectionsMaterials);
+		const generator = new SlideGenerator({ client, outputDir });
+
+		const result = await generator.generate();
+
+		// Only collection sections should produce slides (1 section × 2 participants = 2 slides)
+		// The 2 scalar-only sections (title + closing) should be skipped
+		const materialSlides = result.slides.filter((s) => s.filename.includes("vorstellung-projekte"));
+		expect(materialSlides).toHaveLength(2);
+		expect(materialSlides[0].filename).toContain("anna");
+		expect(materialSlides[1].filename).toContain("ben");
 	});
 });

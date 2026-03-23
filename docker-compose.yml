@@ -1,0 +1,49 @@
+# aither — Docker Compose
+# Compose v2 schema (kein 'version'-Feld nötig)
+#
+# Dev-Modus (Hot-Reload):  docker compose up aither-dev
+# Prod-Modus:              docker compose up aither
+
+services:
+  # ── Dev: Bind-Mount + Hot-Reload ───────────────────────────
+  aither-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: dev
+    container_name: aither-dev
+    ports:
+      - "3500:3000"
+    volumes:
+      - .:/app
+      - /app/node_modules        # node_modules aus dem Image nutzen
+      - /app/.next               # .next Cache im Container isolieren (Turbopack Deadlock-Fix)
+      - ./output:/app/output     # generierte HTML-Slides persistent
+    env_file:
+      - .env.local
+    environment:
+      - NEXT_TELEMETRY_DISABLED=1
+      - WATCHPACK_POLLING=true   # File-Watching in Docker
+      - HEMERA_API_BASE_URL=http://host.docker.internal:3000
+    restart: unless-stopped
+
+  # ── Prod: Standalone Next.js ───────────────────────────────
+  aither:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runner
+    container_name: aither
+    ports:
+      - "3501:3000"
+    volumes:
+      - aither-output:/app/output
+    env_file:
+      - .env.local
+    environment:
+      - NODE_ENV=production
+      - NEXT_TELEMETRY_DISABLED=1
+    restart: unless-stopped
+
+volumes:
+  aither-output:

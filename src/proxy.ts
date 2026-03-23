@@ -8,38 +8,62 @@ import { NextResponse } from "next/server";
 
 const hasClerkKey = !!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY?.startsWith("pk_");
 
-// Cache clerk handler to avoid re-importing and re-creating on every request
-let _clerkHandler: ((req: NextRequest, ev: NextFetchEvent) => Promise<Response>) | null = null;
+const protectedPatterns = [
+	"/api/sync(.*)",
+	"/api/recordings(.*)",
+	"/api/recording(.*)",
+	"/sync(.*)",
+	"/recording(.*)",
+	"/api/service/(.*)",
+	"/dashboard(.*)",
+];
+
+const protectedRegexes = protectedPatterns.map((p) => new RegExp(`^${p}$`));
+
+function isProtectedPath(pathname: string): boolean {
+	return protectedRegexes.some((re) => re.test(pathname));
+}
+
+// Cache clerk handler promise to deduplicate concurrent initialization
+let _clerkHandlerPromise: Promise<
+	(req: NextRequest, ev: NextFetchEvent) => Promise<Response>
+> | null = null;
 
 async function getClerkHandler(): Promise<
 	(req: NextRequest, ev: NextFetchEvent) => Promise<Response>
 > {
-	if (_clerkHandler) return _clerkHandler;
+	if (!_clerkHandlerPromise) {
+		_clerkHandlerPromise = (async () => {
+			try {
+				const { clerkMiddleware, createRouteMatcher } = await import("@clerk/nextjs/server");
 
-	const { clerkMiddleware, createRouteMatcher } = await import("@clerk/nextjs/server");
+				const isProtectedRoute = createRouteMatcher(protectedPatterns);
 
-	const isProtectedRoute = createRouteMatcher([
-		"/api/sync(.*)",
-		"/api/recordings(.*)",
-		"/api/recording(.*)",
-		"/sync(.*)",
-		"/recording(.*)",
-		"/api/service/(.*)",
-		"/(dashboard)(.*)",
-	]);
+				const handler = clerkMiddleware(async (auth, r) => {
+					if (isProtectedRoute(r)) {
+						await auth.protect();
+					}
+				});
 
-	const handler = clerkMiddleware(async (auth, r) => {
-		if (isProtectedRoute(r)) {
-			await auth.protect();
-		}
-	});
-
-	_clerkHandler = (r: NextRequest, ev: NextFetchEvent) => handler(r, ev) as Promise<Response>;
-	return _clerkHandler;
+				return (r: NextRequest, ev: NextFetchEvent) => handler(r, ev) as Promise<Response>;
+			} catch (err) {
+				_clerkHandlerPromise = null;
+				throw err;
+			}
+		})();
+	}
+	return _clerkHandlerPromise;
 }
 
 export default async function middleware(req: NextRequest, ev: NextFetchEvent) {
 	if (!hasClerkKey) {
+		if (isProtectedPath(req.nextUrl.pathname)) {
+			console.error(
+				"[proxy] NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY is missing — blocking protected route %s",
+				req.nextUrl.pathname,
+			);
+			return NextResponse.json({ error: "Authentication service unavailable" }, { status: 503 });
+		}
 		return NextResponse.next();
 	}
 	const handler = await getClerkHandler();

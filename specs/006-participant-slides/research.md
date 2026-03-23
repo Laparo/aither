@@ -224,16 +224,28 @@ This is called at the start of `generate()` with the course-specific output dire
 
 **Mode A** (unified naming):
 - `{NN}_{identifier}[_{firstName}].html`
-- Example: `05_preparation-sheet_anna.html` (sequence 5, identifier, participant)
+- Example: `005_preparation-sheet_anna.html` (sequence 5, identifier, participant)
 - Global sequence number ensures unique sort order across all slide types
 
 **Mode B** (unified naming):
 - `{NN}_{identifier}_{firstName}.html`
-- Example: `06_video-analysis_anna.html`, `07_video-analysis_ben.html`
+- Example: `006_video-analysis_anna.html`, `007_video-analysis_ben.html`
 - Same format as Mode A — global sequence replaces old `{identifier}-{nn}` pattern
 
 ### Consideration
-All slides (intro, curriculum, material) now share the same `{NN}_{identifier}[_{firstName}].html` convention. The `{identifier}` portion is slugified (lowercase, diacritics stripped, non-alphanumeric → hyphens). In participant-specific slides (Mode A with collection data, Mode B), `_{firstName}` is always appended. In non-participant slides (intro, curriculum, scalar-only), `_{firstName}` is omitted. Alphabetical sort by filename equals presentation order.
+All slides (intro, curriculum, material) now share the same `{NN}_{identifier}[_{firstName}].html` convention. The `{NN}` portion is a zero-padded three-digit decimal (e.g., `001`, `002`, … `010`, `099`) to guarantee correct alphabetical ordering. The `{identifier}` portion is slugified (lowercase, diacritics stripped, non-alphanumeric → hyphens). The `{firstName}` token is derived from `participant.name` and normalized as follows:
+1. Trim `participant.name`; if empty or whitespace-only, treat as missing (→ step 7 fallback)
+2. Extract the first word (split on whitespace)
+3. German-specific transliteration: replace `ä→ae`, `ö→oe`, `ü→ue`, `ß→ss` (and uppercase variants `Ä→Ae`, `Ö→Oe`, `Ü→Ue`) **before** any Unicode normalization. This preserves German phonetic conventions.
+4. Lowercase, then apply Unicode NFD normalization and strip combining marks (`\p{M}`) to handle remaining diacritics (e.g., `María → maria`, `é→e`). Note: German umlauts are already transliterated in step 3, so NFD stripping does not affect them.
+5. Remove apostrophes (`'`) and all non-alphanumeric characters except hyphens (`-`); hyphens are preserved (e.g., `O'Brien → obrien`, `Jean-Pierre → jean-pierre`). This implicitly strips path-traversal characters (`/`, `\`, `.`) as well.
+6. Collapse consecutive hyphens to a single hyphen and trim hyphens at start/end
+7. If the result is empty after normalization, use fallback `"unknown"`
+8. Truncate to `MAX_FILENAME_LENGTH` (50 characters) using breakpoint-aware truncation: (a) find the last hyphen within the first `MAX_FILENAME_LENGTH` characters and cut there; (b) if no hyphen exists, hard-cut at `MAX_FILENAME_LENGTH`; (c) trim any trailing hyphen from the result. No ellipsis (`...`) is appended. The final result is guaranteed to be ≤ `MAX_FILENAME_LENGTH` characters with no trailing hyphen.
+
+**Examples**: `Anna Müller → anna` (step 2 extracts "Anna", step 3 no-op, step 4 lowercase → "anna"), `María → maria` (step 3 no-op, step 4 NFD strips accent → "maria"), `O'Brien → obrien` (step 5 strips apostrophe), `Jean-Pierre Dupont → jean-pierre` (step 2 extracts "Jean-Pierre", hyphens preserved), `"   " → unknown` (step 1 → empty → step 7 fallback), `null → unknown`
+
+In participant-specific slides (Mode A with collection data, Mode B), `_{firstName}` is always appended. In non-participant slides (intro, curriculum, scalar-only), `_{firstName}` is omitted. Alphabetical sort by filename equals presentation order.
 
 ---
 
