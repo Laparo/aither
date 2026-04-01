@@ -94,8 +94,6 @@ function validateStreamUrl(streamUrl: string): URL {
 	const allowed = ["rtsp:", "http:", "https:"];
 	if (!allowed.includes(url.protocol)) throw new Error("Nicht unterstütztes URL-Protokoll");
 	if (!url.hostname) throw new Error("Stream-URL muss einen Hostnamen haben");
-	if (url.username || url.password)
-		throw new Error("Zugangsdaten in der Stream-URL sind nicht erlaubt");
 	if (streamUrl.length > 2048) throw new Error("Stream-URL zu lang");
 
 	return url;

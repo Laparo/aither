@@ -81,7 +81,7 @@ export const serverInstance: Rollbar | RollbarTestInstance = isTestMode
 			accessToken: isE2EMode ? "dummy-token-for-e2e" : process.env.ROLLBAR_SERVER_TOKEN,
 			...baseConfig,
 			payload: {
-				server: { root: process.cwd() },
+				server: { root: typeof process !== "undefined" && typeof process.cwd === "function" ? process.cwd() : "/" },
 			},
 			// PII filtering: always scrub secrets; scrub user-identifying fields when consent is not granted
 			scrubFields: [

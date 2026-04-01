@@ -5,10 +5,15 @@
 
 import { requireAdmin } from "@/lib/auth/role-check";
 import { getRouteAuth } from "@/lib/auth/route-auth";
-import { createHemeraClient } from "@/lib/hemera/factory";
+import {
+	createHemeraClient,
+	HemeraConfigurationError,
+	HemeraUnreachableError,
+} from "@/lib/hemera/factory";
 import { transmitRecording } from "@/lib/sync/recording-transmitter";
 import type { TransmitResult } from "@/lib/sync/recording-transmitter";
 import { RecordingTransmitRequestSchema } from "@/lib/sync/schemas";
+import { getOrCreateRequestIdFromHeaders } from "@/lib/utils/request-id";
 import { NextResponse } from "next/server";
 
 /**
@@ -19,6 +24,8 @@ import { NextResponse } from "next/server";
  * Response: 200 on success, 400 on validation error, 502 on Hemera API failure
  */
 export async function POST(request: Request): Promise<NextResponse> {
+	const requestId = getOrCreateRequestIdFromHeaders(request.headers);
+
 	const authData = await getRouteAuth();
 	const authResult = requireAdmin(authData);
 	if (authResult.status !== 200) {
@@ -54,15 +61,26 @@ export async function POST(request: Request): Promise<NextResponse> {
 	// Create Hemera client
 	let client: Awaited<ReturnType<typeof createHemeraClient>>;
 	try {
-		client = await createHemeraClient();
+		client = await createHemeraClient({
+			requestId,
+			route: "/api/recordings",
+			method: "POST",
+		});
 	} catch (err) {
-		console.error("createHemeraClient failed", { err });
+		const isTransient = err instanceof HemeraUnreachableError;
+		const isConfiguration = err instanceof HemeraConfigurationError;
 		return NextResponse.json(
 			{
-				error: "Internal Server Error",
-				message: "Failed to initialize Hemera API client",
+				error: isTransient ? "Service Unavailable" : "Internal Server Error",
+				code: isTransient
+					? "HEMERA_UNREACHABLE"
+					: isConfiguration
+						? "HEMERA_CONFIGURATION_ERROR"
+						: "HEMERA_CLIENT_INIT_FAILED",
+				message: err instanceof Error ? err.message : "Failed to initialize Hemera API client",
+				requestId,
 			},
-			{ status: 500 },
+			{ status: isTransient ? 503 : 500 },
 		);
 	}
 

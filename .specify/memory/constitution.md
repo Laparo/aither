@@ -1,10 +1,10 @@
 <!--
   Sync Impact Report
   ===================
-  Version change: 2.5.0 → 2.6.0
-  Modified principles: N/A
+  Version change: 2.6.0 → 2.7.0
+  Modified principles: V. Component Architecture
   Added sections:
-    - Hemera API Port
+    - Hemera Design System (under Principle V)
   Removed sections: N/A
   Templates requiring updates: N/A (all compatible)
   Follow-up TODOs: N/A
@@ -90,7 +90,24 @@ and irreversible. Defence-in-depth protects users and reputation.
 Modular, reusable component design principles:
 
 - **Material-UI Integration**: All UI components MUST follow the Material-UI
-  design system.
+  (MUI 7) design system.
+- **Hemera Design System**: Aither MUST apply the same design system used by
+  the Hemera project. This includes:
+  - **Design Tokens** (`lib/design-tokens.ts` in Hemera): The canonical color
+    palette (marsala `#884143`, bronze `#926A49`, rosyBrown `#bc8f8f`, beige
+    `#EBE2D3`, lightBlack `#2D2D2D`, infoMain/sage `#5B9A8B`), typography
+    scales, and spacing values MUST be replicated or imported.
+  - **MUI Theme Configuration** (`lib/theme.ts` in Hemera): The MUI theme
+    (palette, typography with Playfair Display headings and Inter body,
+    component overrides, 8 px border-radius) MUST be adopted as the base
+    theme for all Aither UI surfaces.
+  - **ThemeRegistry Pattern** (`components/ThemeRegistry.tsx` in Hemera): The
+    Emotion-based `CacheProvider` → `ThemeProvider` → `CssBaseline` wrapper
+    pattern MUST be used for SSR-safe CSS-in-JS rendering.
+  - **CSS Variables**: The `--hemera-*` CSS custom properties defined in
+    `globals.css` MUST be available for non-MUI styling.
+  - **Font Stack**: Google Fonts imports for Inter (400–700) and Playfair
+    Display (400–700) MUST be included.
 - **Theme Consistency**: Centralized theme management for dark/light mode
   support is required.
 - **Component Testing**: Each UI component MUST have dedicated unit tests for
@@ -101,7 +118,8 @@ Modular, reusable component design principles:
   optimization MUST be applied.
 
 **Rationale**: A consistent component model accelerates development, reduces
-cognitive load, and delivers predictable UX.
+cognitive load, and delivers predictable UX. Sharing the Hemera design system
+ensures visual coherence across both applications.
 
 ### VII. Stateless Architecture (NON-NEGOTIABLE)
 
@@ -495,4 +513,4 @@ followed strictly:
 - **Performance Benchmarks**: Authentication flows MUST meet sub-100 ms
   response requirements.
 
-**Version**: 2.6.0 | **Ratified**: 2026-02-10 | **Last Amended**: 2026-02-13
+**Version**: 2.7.0 | **Ratified**: 2026-02-10 | **Last Amended**: 2026-02-13

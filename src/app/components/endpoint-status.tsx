@@ -11,11 +11,13 @@ import TableRow from "@mui/material/TableRow";
 import Typography from "@mui/material/Typography";
 import { useEffect, useState } from "react";
 
-interface EndpointDef {
+export interface EndpointDef {
 	label: string;
 	path: string;
 	method: "GET" | "POST";
 	group: string;
+	probeMethod?: "HEAD" | "GET";
+	fallbackToGetOnHeadUnsupported?: boolean;
 }
 
 const endpoints: EndpointDef[] = [
@@ -63,28 +65,63 @@ const endpoints: EndpointDef[] = [
 
 type Status = "prüfe" | "erreichbar" | "fehler";
 
-interface EndpointResult {
+export interface EndpointResult {
 	status: Status;
 	code?: number;
+	probeMethod?: "HEAD" | "GET";
 }
 
-/**
- * For GET endpoints: fetch and check for a non-5xx response.
- * For POST endpoints: send a HEAD request — a 405 (Method Not Allowed)
- * confirms the route exists and is reachable.
- */
-async function checkEndpoint(ep: EndpointDef): Promise<EndpointResult> {
+function isRedirectStatus(status: number): boolean {
+	return status >= 300 && status < 400;
+}
+
+function isHeadUnsupported(status: number): boolean {
+	return status === 405 || status === 501;
+}
+
+function isReachableStatus(status: number): boolean {
+	if (isRedirectStatus(status)) return false;
+	return status < 500;
+}
+
+export async function checkEndpoint(ep: EndpointDef): Promise<EndpointResult> {
 	const controller = new AbortController();
 	const timer = setTimeout(() => controller.abort(), 5000);
 	try {
+		const primaryMethod = ep.probeMethod ?? "HEAD";
 		const res = await fetch(ep.path, {
-			method: ep.method === "GET" ? "GET" : "HEAD",
+			method: primaryMethod,
 			cache: "no-store",
+			redirect: "manual",
 			signal: controller.signal,
 		});
-		// For GET: 2xx/4xx = reachable; for HEAD on POST routes: 405 = reachable
-		const ok = res.status < 500;
-		return { status: ok ? "erreichbar" : "fehler", code: res.status };
+
+		if (
+			primaryMethod === "HEAD" &&
+			ep.fallbackToGetOnHeadUnsupported !== false &&
+			isHeadUnsupported(res.status)
+		) {
+			const fallbackRes = await fetch(ep.path, {
+				method: "GET",
+				cache: "no-store",
+				redirect: "manual",
+				signal: controller.signal,
+			});
+
+			const fallbackOk = isReachableStatus(fallbackRes.status);
+			return {
+				status: fallbackOk ? "erreichbar" : "fehler",
+				code: fallbackRes.status,
+				probeMethod: "GET",
+			};
+		}
+
+		const ok = isReachableStatus(res.status);
+		return {
+			status: ok ? "erreichbar" : "fehler",
+			code: res.status,
+			probeMethod: primaryMethod,
+		};
 	} catch {
 		return { status: "fehler" };
 	} finally {
@@ -150,7 +187,7 @@ export function EndpointStatus() {
 															status === "prüfe"
 																? "Prüfe…"
 																: status === "erreichbar"
-																	? `Erreichbar${r?.code ? ` (${r.code})` : ""}`
+																	? `Erreichbar${r?.code ? ` (${r.code})` : ""}${r?.probeMethod ? ` • ${r.probeMethod}` : ""}`
 																	: `Fehler${r?.code ? ` (${r.code})` : ""}`
 														}
 														color={

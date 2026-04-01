@@ -6,9 +6,14 @@
 import { requireAdmin } from "@/lib/auth/role-check";
 import { getRouteAuth } from "@/lib/auth/route-auth";
 import { loadConfig } from "@/lib/config";
-import { createHemeraClient } from "@/lib/hemera/factory";
+import {
+	createHemeraClient,
+	HemeraConfigurationError,
+	HemeraUnreachableError,
+} from "@/lib/hemera/factory";
 import { reportError } from "@/lib/monitoring/rollbar-official";
 import { SlideGenerator } from "@/lib/slides/generator";
+import { getOrCreateRequestIdFromHeaders } from "@/lib/utils/request-id";
 import { type NextRequest, NextResponse } from "next/server";
 
 // ── In-memory state (transient, Constitution VII) ─────────────────────────
@@ -22,7 +27,9 @@ export function _resetState() {
 
 // ── POST /api/slides — Trigger slide generation ──────────────────────────
 
-export async function POST(_req: NextRequest) {
+export async function POST(req: NextRequest) {
+	const requestId = getOrCreateRequestIdFromHeaders(req.headers);
+
 	// Skip auth only when explicitly opted in for local dev usage
 	const skipAuth =
 		process.env.NODE_ENV === "development" && process.env.SKIP_AUTH_IN_DEV === "true";
@@ -51,7 +58,11 @@ export async function POST(_req: NextRequest) {
 		const cfg = loadConfig();
 		const outputDir = cfg.SLIDES_OUTPUT_DIR;
 
-		const client = await createHemeraClient();
+		const client = await createHemeraClient({
+			requestId,
+			route: "/api/slides",
+			method: "POST",
+		});
 		const generator = new SlideGenerator({ client, outputDir });
 
 		const result = await generator.generate();
@@ -66,17 +77,33 @@ export async function POST(_req: NextRequest) {
 			{ status: 200 },
 		);
 	} catch (err) {
+		const isTransient = err instanceof HemeraUnreachableError;
+		const isConfiguration = err instanceof HemeraConfigurationError;
+		const status = isTransient ? 503 : 500;
+		const code = isTransient
+			? "HEMERA_UNREACHABLE"
+			: isConfiguration
+				? "HEMERA_CONFIGURATION_ERROR"
+				: "SLIDES_GENERATION_FAILED";
+
 		reportError(err instanceof Error ? err : new Error(String(err)), {
+			requestId,
 			route: "/api/slides",
 			method: "POST",
-			additionalData: { feature: "slide-generation" },
+			additionalData: {
+				feature: "slide-generation",
+				code,
+				failureType: isTransient ? "network" : isConfiguration ? "configuration" : "unknown",
+			},
 		});
 		return NextResponse.json(
 			{
 				status: "failed",
+				code,
+				requestId,
 				error: err instanceof Error ? err.message : String(err),
 			},
-			{ status: 500 },
+			{ status },
 		);
 	} finally {
 		isGenerating = false;

@@ -18,9 +18,25 @@ const protectedPatterns = [
 	"/dashboard(.*)",
 ];
 
+// Public routes that match a protected pattern but should bypass auth
+const publicPaths = new Set([
+	"/api/recording/snapshot",
+	"/api/recording/start",
+	"/api/recording/stop",
+	"/api/recording/status",
+	"/api/recording/list",
+	"/api/recording/events",
+	"/api/recording/playback/play",
+	"/api/recording/playback/stop",
+	"/api/recording/playback/rewind",
+	"/api/recording/playback/forward",
+	"/api/recording/playback/state",
+]);
+
 const protectedRegexes = protectedPatterns.map((p) => new RegExp(`^${p}$`));
 
 function isProtectedPath(pathname: string): boolean {
+	if (publicPaths.has(pathname)) return false;
 	return protectedRegexes.some((re) => re.test(pathname));
 }
 
@@ -40,7 +56,7 @@ async function getClerkHandler(): Promise<
 				const isProtectedRoute = createRouteMatcher(protectedPatterns);
 
 				const handler = clerkMiddleware(async (auth, r) => {
-					if (isProtectedRoute(r)) {
+					if (isProtectedRoute(r) && !publicPaths.has(r.nextUrl.pathname)) {
 						await auth.protect();
 					}
 				});
