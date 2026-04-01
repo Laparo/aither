@@ -35,7 +35,7 @@ services:
       target: runner
     container_name: aither
     ports:
-      - "3501:3000"
+      - "3500:3000"
     volumes:
       - aither-output:/app/output
     env_file:

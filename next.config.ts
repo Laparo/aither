@@ -1,5 +1,7 @@
 import type { NextConfig } from "next";
 
-const nextConfig: NextConfig = {};
+const nextConfig: NextConfig = {
+	transpilePackages: ["@mui/material", "@mui/material-nextjs"],
+};
 
 export default nextConfig;

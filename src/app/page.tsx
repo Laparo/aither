@@ -313,14 +313,10 @@ export default async function Home() {
 			)}
 
 			{/* --- Camera Status --- */}
-			{courseDetail && (
-				<>
-					<Typography variant="h5" sx={{ mt: 4, mb: 1 }}>
-						Kamera
-					</Typography>
-					<CameraSnapshot />
-				</>
-			)}
+			<Typography variant="h5" sx={{ mt: 4, mb: 1 }}>
+				Kamera
+			</Typography>
+			<CameraSnapshot />
 
 			{/* --- Steuerung (endpoint health) --- */}
 			<Typography variant="h5" sx={{ mt: 4, mb: 1 }}>

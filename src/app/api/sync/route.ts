@@ -7,7 +7,11 @@
 import { requireAdmin } from "@/lib/auth/role-check";
 import { getRouteAuth } from "@/lib/auth/route-auth";
 import { loadConfig } from "@/lib/config";
-import { createHemeraClient } from "@/lib/hemera/factory";
+import {
+	createHemeraClient,
+	HemeraConfigurationError,
+	HemeraUnreachableError,
+} from "@/lib/hemera/factory";
 import { rollbar } from "@/lib/monitoring/rollbar-official";
 import { SyncOrchestrator } from "@/lib/sync/orchestrator";
 import type { DataSyncJob } from "@/lib/sync/types";
@@ -164,7 +168,40 @@ export async function POST(_req: NextRequest) {
 		const cfg = loadConfig();
 		const outputDir = cfg.HTML_OUTPUT_DIR;
 
-		const client = await createHemeraClient();
+		let client: Awaited<ReturnType<typeof createHemeraClient>>;
+		try {
+			client = await createHemeraClient({
+				requestId,
+				route: "/api/sync",
+				method: "POST",
+			});
+		} catch (err) {
+			console.error("[Sync] createHemeraClient failed", { err });
+			isSyncRunning = false;
+			syncStartedAt = null;
+			currentJob = null;
+
+			const isTransient = err instanceof HemeraUnreachableError;
+			const isConfiguration = err instanceof HemeraConfigurationError;
+			const status = isTransient ? 503 : isConfiguration ? 500 : 502;
+			const code = isTransient
+				? "HEMERA_UNREACHABLE"
+				: isConfiguration
+					? "HEMERA_CONFIGURATION_ERROR"
+					: "HEMERA_UNAVAILABLE";
+			return NextResponse.json(
+				{
+					success: false,
+					error: {
+						code,
+						message: err instanceof Error ? err.message : "Failed to connect to Hemera API",
+					},
+					meta: buildMeta(requestId),
+				},
+				{ status },
+			);
+		}
+
 		const orchestrator = new SyncOrchestrator({
 			client,
 			outputDir,

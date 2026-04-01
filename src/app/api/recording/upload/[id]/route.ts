@@ -7,7 +7,11 @@
 
 import { requireAdmin } from "@/lib/auth/role-check";
 import { getRouteAuth } from "@/lib/auth/route-auth";
-import { createHemeraClient } from "@/lib/hemera/factory";
+import {
+	createHemeraClient,
+	HemeraConfigurationError,
+	HemeraUnreachableError,
+} from "@/lib/hemera/factory";
 import { reportError } from "@/lib/monitoring/rollbar-official";
 import { getRecordingById } from "@/lib/recording/file-manager";
 import { uploadToMux } from "@/lib/recording/mux-uploader";
@@ -15,10 +19,13 @@ import { MuxUploadRequestSchema } from "@/lib/recording/schemas";
 import { isRecording } from "@/lib/recording/session-manager";
 import { transmitRecording } from "@/lib/sync/recording-transmitter";
 import { ErrorCodes, createErrorResponse, createSuccessResponse } from "@/lib/utils/api-response";
+import { getOrCreateRequestIdFromHeaders } from "@/lib/utils/request-id";
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+	const requestId = getOrCreateRequestIdFromHeaders(req.headers);
+
 	const authData = await getRouteAuth();
 	const authResult = requireAdmin(authData);
 	if (authResult.status !== 200) {
@@ -82,7 +89,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 		let transmissionError: string | null = null;
 
 		try {
-			const client = await createHemeraClient();
+			const client = await createHemeraClient({
+				requestId,
+				route: `/api/recording/upload/${id}`,
+				method: "POST",
+			});
 			const transmitResult = await transmitRecording(client, {
 				seminarSourceId,
 				muxAssetId: muxResult.muxAssetId,
@@ -95,9 +106,22 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 				transmissionError = transmitResult.error ?? "Unknown transmission error";
 			}
 		} catch (err) {
+			const isTransient = err instanceof HemeraUnreachableError;
+			const isConfiguration = err instanceof HemeraConfigurationError;
 			const message = err instanceof Error ? err.message : String(err);
 			transmissionError = message;
-			reportError(err instanceof Error ? err : new Error(message), undefined, "error");
+			reportError(
+				err instanceof Error ? err : new Error(message),
+				{
+					requestId,
+					route: `/api/recording/upload/${id}`,
+					method: "POST",
+					additionalData: {
+						failureType: isTransient ? "network" : isConfiguration ? "configuration" : "unknown",
+					},
+				},
+				isTransient ? "warning" : "error",
+			);
 		}
 
 		// If MUX succeeded but hemera transmission failed → 207 Multi-Status
@@ -116,7 +140,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 		);
 	} catch (err) {
 		const message = err instanceof Error ? err.message : String(err);
-		reportError(err instanceof Error ? err : new Error(message), undefined, "error");
-		return createErrorResponse(message, ErrorCodes.INTERNAL_ERROR, undefined, 500);
+		reportError(
+			err instanceof Error ? err : new Error(message),
+			{
+				requestId,
+				route: `/api/recording/upload/${id}`,
+				method: "POST",
+			},
+			"error",
+		);
+		return createErrorResponse(message, ErrorCodes.INTERNAL_ERROR, requestId, 500);
 	}
 }

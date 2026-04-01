@@ -220,9 +220,11 @@ private async writeSlide(dir: string, filename: string, html: string): Promise<v
 
 Add to `tests/unit/slide-builder.spec.ts`:
 - Lesson title centered in `<h1>`
-- Correct filename per sequence number
+- Correct filename pattern: `{NN}_{slugifiedTitleOrFallback}.html` (FR-003) — e.g., `002_grundlagen.html`
+- Slugify fallback: when `slugify(lessonTitle)` yields empty, use `lesson-{lessonIndex}` (1-based, zero-padded two digits)
 - Lessons filtered by `seminarId` (only matching course)
 - Sorted by `sequence` field (not API response order)
+- Global sequence counter `{NN}` (FR-004b) continues from intro slide
 
 ### Step 11: Lesson Fetching & Filtering
 
@@ -259,18 +261,21 @@ Add to `tests/unit/slide-builder.spec.ts`:
 - Text content slide: HTML body centered in `<div>`
 - Image slide: `<img>` with `src` and `alt` text
 - Video slide: `<video>` with `controls` attribute
-- Correct filename pattern (`03_material_{lessonSeq}_{idx}`)
-- Materials ordered by lesson sequence, then by index within each lesson
+- Correct filename pattern: `{NN}_{slugifiedDescriptor}.html` (FR-004a) with global `{NN}` counter (FR-004b)
+- Descriptor patterns: text → `{slug}-text-{idx}`, image → `{slugifiedImageTitle}` or fallback `{slug}-image-{idx}`, video → `{slugifiedVideoTitle}` or fallback `{slug}-video-{idx}`
+- Global sequence counter continues from last curriculum slide
 
 ### Step 14: Text & Media Fetching
 
-Extend `src/lib/slides/generator.ts`:
+Extend `src/lib/slides/generator.ts` (the `slugify` helper is defined as a module-level function in this file — see `src/lib/slides/generator.ts` line ~46):
 
 ```typescript
 const allTexts = await this.client.get("/texts", TextContentsResponseSchema);
 const allMedia = await this.client.get("/media", MediaAssetsResponseSchema);
 
-for (const lesson of courseLessons) {
+for (const [lessonIdx, lesson] of courseLessons.entries()) {
+  const lessonSlug = slugify(lesson.title) || `lesson-${String(lessonIdx + 1).padStart(2, "0")}`;
+
   const lessonTexts = allTexts.filter(
     (t) => t.entityRef.type === "lesson" && t.entityRef.id === lesson.sourceId
   );
@@ -278,21 +283,36 @@ for (const lesson of courseLessons) {
     (m) => m.entityRef.type === "lesson" && m.entityRef.id === lesson.sourceId
   );
 
-  let materialIdx = 1;
+  let textIdx = 1;
   for (const text of lessonTexts) {
     const html = buildTextSlide(text);
-    const filename = `03_material_${lesson.sequence}_${materialIdx}.html`;
+    const descriptor = `${lessonSlug}-text-${textIdx}`;
+    const filename = `${String(globalSeq++).padStart(3, "0")}_${descriptor}.html`;
     await this.writeSlide(courseOutputDir, filename, html);
     slides.push({ filename, type: "material", title: "Text Content" });
-    materialIdx++;
+    textIdx++;
   }
+  // Independent per-type counters (FR-004a: each type resets to 1 per lesson)
+  let imageIdx = 1;
+  let videoIdx = 1;
   for (const media of lessonMedia) {
     const html = media.mediaType === "image" ? buildImageSlide(media) : buildVideoSlide(media);
-    const filename = `03_material_${lesson.sequence}_${materialIdx}.html`;
+    const idx = media.mediaType === "image" ? imageIdx++ : videoIdx++;
+    const descriptor = this.buildMediaDescriptor(media, lessonSlug, idx);
+    const filename = `${String(globalSeq++).padStart(3, "0")}_${descriptor}.html`;
     await this.writeSlide(courseOutputDir, filename, html);
     slides.push({ filename, type: "material", title: media.altText ?? media.mediaType });
-    materialIdx++;
   }
+}
+
+// Helper: build descriptor per FR-004a
+private buildMediaDescriptor(media: MediaAsset, lessonSlug: string, index: number): string {
+  if (media.title) {
+    const slugged = slugify(media.title);
+    if (slugged) return slugged;
+  }
+  const type = media.mediaType === "image" ? "image" : "video";
+  return `${lessonSlug}-${type}-${index}`;
 }
 ```
 
@@ -358,26 +378,65 @@ export class SlideGenerator {
     const courseOutputDir = path.join(this.outputDir, seminar.sourceId);
     await this.clearDir(courseOutputDir);
 
-    // 3. Generate intro slide
-    const introHtml = buildIntroSlide(seminar);
-    await this.writeSlide(courseOutputDir, "01_intro.html", introHtml);
-    slides.push({ filename: "01_intro.html", type: "intro", title: seminar.title });
+    // 3. Global sequence counter (FR-004b) — shared across all slide types
+    let globalSeq = 1;
 
-    // 4. Fetch lessons, filter by seminarId, sort by sequence
+    // 4. Generate intro slide
+    const introFilename = `${String(globalSeq++).padStart(3, "0")}_intro.html`;
+    const introHtml = buildIntroSlide(seminar);
+    await this.writeSlide(courseOutputDir, introFilename, introHtml);
+    slides.push({ filename: introFilename, type: "intro", title: seminar.title });
+
+    // 5. Fetch lessons, filter by seminarId, sort by sequence (Step 11)
     const allLessons = await this.client.get("/lessons", LessonsResponseSchema);
     const courseLessons = allLessons
       .filter((l) => l.seminarId === seminar.sourceId)
       .sort((a, b) => a.sequence - b.sequence);
 
-    // 5. Generate curriculum slides ({NN}_{slugifiedTitle}.html)
-    for (const lesson of courseLessons) {
-      const html = buildCurriculumSlide(lesson);
-      const filename = seqFilename(lesson.title);
-      await this.writeSlide(courseOutputDir, filename, html);
+    // 6. Generate curriculum slides — {NN}_{slugifiedTitleOrFallback}.html (FR-003)
+    for (const [lessonIdx, lesson] of courseLessons.entries()) {
+      const titleSlug = slugify(lesson.title) || `lesson-${String(lessonIdx + 1).padStart(2, "0")}`;
+      const curriculumHtml = buildCurriculumSlide(lesson);
+      const filename = `${String(globalSeq++).padStart(3, "0")}_${titleSlug}.html`;
+      await this.writeSlide(courseOutputDir, filename, curriculumHtml);
       slides.push({ filename, type: "curriculum", title: lesson.title });
     }
 
-    // 6. Fetch texts + media, generate material slides ({NN}_{slugifiedDescriptor}.html)
+    // 7. Fetch texts + media, generate material slides — {NN}_{descriptor}.html (FR-004a)
+    const allTexts = await this.client.get("/texts", TextContentsResponseSchema);
+    const allMedia = await this.client.get("/media", MediaAssetsResponseSchema);
+
+    for (const [lessonIdx, lesson] of courseLessons.entries()) {
+      const lessonSlug = slugify(lesson.title) || `lesson-${String(lessonIdx + 1).padStart(2, "0")}`;
+
+      const lessonTexts = allTexts.filter(
+        (t) => t.entityRef.type === "lesson" && t.entityRef.id === lesson.sourceId
+      );
+      const lessonMedia = allMedia.filter(
+        (m) => m.entityRef.type === "lesson" && m.entityRef.id === lesson.sourceId
+      );
+
+      let textIdx = 1;
+      for (const text of lessonTexts) {
+        const html = buildTextSlide(text);
+        const descriptor = `${lessonSlug}-text-${textIdx}`;
+        const filename = `${String(globalSeq++).padStart(3, "0")}_${descriptor}.html`;
+        await this.writeSlide(courseOutputDir, filename, html);
+        slides.push({ filename, type: "material", title: "Text Content" });
+        textIdx++;
+      }
+      // Independent per-type counters (FR-004a: each type resets to 1 per lesson)
+      let imageIdx = 1;
+      let videoIdx = 1;
+      for (const media of lessonMedia) {
+        const html = media.mediaType === "image" ? buildImageSlide(media) : buildVideoSlide(media);
+        const idx = media.mediaType === "image" ? imageIdx++ : videoIdx++;
+        const descriptor = this.buildMediaDescriptor(media, lessonSlug, idx);
+        const filename = `${String(globalSeq++).padStart(3, "0")}_${descriptor}.html`;
+        await this.writeSlide(courseOutputDir, filename, html);
+        slides.push({ filename, type: "material", title: media.altText ?? media.mediaType });
+      }
+    }
 
     return {
       slidesGenerated: slides.length,
