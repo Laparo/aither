@@ -121,4 +121,42 @@ describe("camera snapshot helpers", () => {
 		expect(onError).not.toHaveBeenCalled();
 		expect(onFinally).not.toHaveBeenCalled();
 	});
+
+	it("getReconnectState produces monotonically increasing attempts for backoff", () => {
+		let state = getReconnectState(0);
+		expect(state.attempt).toBe(1);
+
+		state = getReconnectState(state.attempt);
+		expect(state.attempt).toBe(2);
+
+		state = getReconnectState(state.attempt);
+		expect(state.attempt).toBe(3);
+
+		// Each reconnect resets visual state while incrementing attempt
+		expect(state.src).toBeNull();
+		expect(state.error).toBeNull();
+		expect(state.loading).toBe(true);
+	});
+
+	it("runSnapshotLoadCycle propagates HTTP error without body as status text", async () => {
+		const onSuccess = vi.fn();
+		const onError = vi.fn();
+		const onFinally = vi.fn();
+
+		await runSnapshotLoadCycle(
+			"/api/recording/snapshot?t=1",
+			vi.fn().mockResolvedValue(mockResponse(500, "Internal Server Error")),
+			vi.fn(),
+			vi.fn(),
+			{
+				onSuccess,
+				onError,
+				onFinally,
+				isCancelled: () => false,
+			},
+		);
+
+		expect(onError).toHaveBeenCalledWith("HTTP 500 Internal Server Error");
+		expect(onFinally).toHaveBeenCalledTimes(1);
+	});
 });

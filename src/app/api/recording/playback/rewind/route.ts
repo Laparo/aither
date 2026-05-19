@@ -14,7 +14,6 @@ import { ErrorCodes, createErrorResponse, createSuccessResponse } from "@/lib/ut
 import type { NextRequest } from "next/server";
 
 export async function POST(req: NextRequest) {
-
 	try {
 		const body = await req.json();
 		const { recordingId, seconds = 10 } = body;

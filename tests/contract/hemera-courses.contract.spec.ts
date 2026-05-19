@@ -13,6 +13,7 @@ import { describe, expect, it } from "vitest";
 
 describe("Hemera ServiceCourseDetail Contract", () => {
 	const validParticipant = {
+		bookingId: "bk_xyz789",
 		participationId: "cp_abc123",
 		userId: "user_clerk_001",
 		name: "Maria Schmidt",

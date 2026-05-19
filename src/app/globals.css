@@ -1,0 +1,29 @@
+:root {
+	--hemera-beige: #ebe2d3;
+	--hemera-marsala: #884143;
+	--hemera-bronze: #926a49;
+	--hemera-rosy-brown: #bc8f8f;
+	--hemera-light-black: #2d2d2d;
+}
+
+* {
+	box-sizing: border-box;
+}
+
+html,
+body {
+	margin: 0;
+	padding: 0;
+	background: var(--hemera-beige);
+	color: var(--hemera-light-black);
+	font-family: var(--font-inter), "Helvetica Neue", Arial, sans-serif;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+	font-family: var(--font-playfair), Georgia, serif;
+}

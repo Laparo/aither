@@ -6,10 +6,11 @@
 import { requireAdmin } from "@/lib/auth/role-check";
 import { getRouteAuth } from "@/lib/auth/route-auth";
 import {
-	createHemeraClient,
 	HemeraConfigurationError,
 	HemeraUnreachableError,
+	createHemeraClient,
 } from "@/lib/hemera/factory";
+import { reportError } from "@/lib/monitoring/rollbar-official";
 import { transmitRecording } from "@/lib/sync/recording-transmitter";
 import type { TransmitResult } from "@/lib/sync/recording-transmitter";
 import { RecordingTransmitRequestSchema } from "@/lib/sync/schemas";
@@ -67,20 +68,71 @@ export async function POST(request: Request): Promise<NextResponse> {
 			method: "POST",
 		});
 	} catch (err) {
-		const isTransient = err instanceof HemeraUnreachableError;
-		const isConfiguration = err instanceof HemeraConfigurationError;
+		if (err instanceof HemeraUnreachableError) {
+			reportError(
+				err,
+				{
+					requestId,
+					route: "/api/recordings",
+					method: "POST",
+					additionalData: {
+						component: "recordings.route",
+						phase: "createHemeraClient",
+						failureType: "network",
+					},
+				},
+				"warning",
+			);
+			return NextResponse.json(
+				{
+					error: "Service Unavailable",
+					code: "HEMERA_UNREACHABLE",
+					message: err.message,
+					requestId,
+				},
+				{ status: 503 },
+			);
+		}
+
+		if (err instanceof HemeraConfigurationError) {
+			reportError(err, {
+				requestId,
+				route: "/api/recordings",
+				method: "POST",
+				additionalData: {
+					component: "recordings.route",
+					phase: "createHemeraClient",
+					failureType: "configuration",
+				},
+			});
+			return NextResponse.json(
+				{
+					error: "Internal Server Error",
+					code: "HEMERA_CONFIGURATION_ERROR",
+					requestId,
+				},
+				{ status: 500 },
+			);
+		}
+
+		const unknownError = err instanceof Error ? err : new Error(String(err));
+		reportError(unknownError, {
+			requestId,
+			route: "/api/recordings",
+			method: "POST",
+			additionalData: {
+				component: "recordings.route",
+				phase: "createHemeraClient",
+				failureType: "unknown",
+			},
+		});
 		return NextResponse.json(
 			{
-				error: isTransient ? "Service Unavailable" : "Internal Server Error",
-				code: isTransient
-					? "HEMERA_UNREACHABLE"
-					: isConfiguration
-						? "HEMERA_CONFIGURATION_ERROR"
-						: "HEMERA_CLIENT_INIT_FAILED",
-				message: err instanceof Error ? err.message : "Failed to initialize Hemera API client",
+				error: "Internal Server Error",
+				code: "HEMERA_CLIENT_INIT_FAILED",
 				requestId,
 			},
-			{ status: isTransient ? 503 : 500 },
+			{ status: 500 },
 		);
 	}
 

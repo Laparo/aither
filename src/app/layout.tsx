@@ -1,5 +1,8 @@
-import { AppRouterCacheProvider } from "@mui/material-nextjs/v15-appRouter";
+import { AppHeader } from "@/app/components/header/AppHeader";
+import { ThemeRegistry } from "@/app/components/theme/ThemeRegistry";
+import { inter, playfairDisplay } from "@/app/fonts";
 import type { Metadata } from "next";
+import "./globals.css";
 
 export const metadata: Metadata = {
 	title: "Aither",
@@ -12,9 +15,12 @@ export default function RootLayout({
 	children: React.ReactNode;
 }) {
 	return (
-		<html lang="de">
+		<html lang="de" className={`${inter.variable} ${playfairDisplay.variable}`}>
 			<body>
-				<AppRouterCacheProvider>{children}</AppRouterCacheProvider>
+				<ThemeRegistry>
+					<AppHeader />
+					{children}
+				</ThemeRegistry>
 			</body>
 		</html>
 	);

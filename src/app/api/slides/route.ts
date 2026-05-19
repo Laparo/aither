@@ -7,9 +7,9 @@ import { requireAdmin } from "@/lib/auth/role-check";
 import { getRouteAuth } from "@/lib/auth/route-auth";
 import { loadConfig } from "@/lib/config";
 import {
-	createHemeraClient,
 	HemeraConfigurationError,
 	HemeraUnreachableError,
+	createHemeraClient,
 } from "@/lib/hemera/factory";
 import { reportError } from "@/lib/monitoring/rollbar-official";
 import { SlideGenerator } from "@/lib/slides/generator";
@@ -77,33 +77,79 @@ export async function POST(req: NextRequest) {
 			{ status: 200 },
 		);
 	} catch (err) {
-		const isTransient = err instanceof HemeraUnreachableError;
-		const isConfiguration = err instanceof HemeraConfigurationError;
-		const status = isTransient ? 503 : 500;
-		const code = isTransient
-			? "HEMERA_UNREACHABLE"
-			: isConfiguration
-				? "HEMERA_CONFIGURATION_ERROR"
-				: "SLIDES_GENERATION_FAILED";
+		if (err instanceof HemeraUnreachableError) {
+			reportError(
+				err,
+				{
+					requestId,
+					route: "/api/slides",
+					method: "POST",
+					additionalData: {
+						feature: "slide-generation",
+						code: "HEMERA_UNREACHABLE",
+						component: "slides.route",
+						phase: "createHemeraClient",
+						failureType: "network",
+					},
+				},
+				"warning",
+			);
+			return NextResponse.json(
+				{
+					status: "failed",
+					code: "HEMERA_UNREACHABLE",
+					requestId,
+					error: err.message,
+				},
+				{ status: 503 },
+			);
+		}
 
-		reportError(err instanceof Error ? err : new Error(String(err)), {
+		if (err instanceof HemeraConfigurationError) {
+			reportError(err, {
+				requestId,
+				route: "/api/slides",
+				method: "POST",
+				additionalData: {
+					feature: "slide-generation",
+					code: "HEMERA_CONFIGURATION_ERROR",
+					component: "slides.route",
+					phase: "createHemeraClient",
+					failureType: "configuration",
+				},
+			});
+			return NextResponse.json(
+				{
+					status: "failed",
+					code: "HEMERA_CONFIGURATION_ERROR",
+					requestId,
+					error: err.message,
+				},
+				{ status: 500 },
+			);
+		}
+
+		const unknownError = err instanceof Error ? err : new Error(String(err));
+		reportError(unknownError, {
 			requestId,
 			route: "/api/slides",
 			method: "POST",
 			additionalData: {
 				feature: "slide-generation",
-				code,
-				failureType: isTransient ? "network" : isConfiguration ? "configuration" : "unknown",
+				code: "SLIDES_GENERATION_FAILED",
+				component: "slides.route",
+				phase: "runtime",
+				failureType: "unknown",
 			},
 		});
 		return NextResponse.json(
 			{
 				status: "failed",
-				code,
+				code: "SLIDES_GENERATION_FAILED",
 				requestId,
-				error: err instanceof Error ? err.message : String(err),
+				error: unknownError.message,
 			},
-			{ status },
+			{ status: 500 },
 		);
 	} finally {
 		isGenerating = false;

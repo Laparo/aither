@@ -10,7 +10,6 @@ import { ErrorCodes, createErrorResponse, createSuccessResponse } from "@/lib/ut
 import type { NextRequest } from "next/server";
 
 export async function GET(_req: NextRequest) {
-
 	try {
 		const active = isRecording();
 		const session = getSessionState();

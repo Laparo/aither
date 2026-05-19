@@ -10,7 +10,6 @@ import { ErrorCodes, createErrorResponse, createSuccessResponse } from "@/lib/ut
 import type { NextRequest } from "next/server";
 
 export async function POST(req: NextRequest) {
-
 	try {
 		let body: Record<string, unknown>;
 		try {

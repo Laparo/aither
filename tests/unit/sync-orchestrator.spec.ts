@@ -221,6 +221,7 @@ const courseDetailResponse: ServiceCourseDetailResponse = {
 		endDate: "2026-06-15T17:00:00.000Z",
 		participants: [
 			{
+				bookingId: "bk_001",
 				participationId: "cp_001",
 				userId: "user_001",
 				name: "Maria Schmidt",
@@ -231,6 +232,7 @@ const courseDetailResponse: ServiceCourseDetailResponse = {
 				preparationCompletedAt: "2026-06-10T10:00:00.000Z",
 			},
 			{
+				bookingId: "bk_002",
 				participationId: "cp_002",
 				userId: "user_002",
 				name: "Thomas Müller",

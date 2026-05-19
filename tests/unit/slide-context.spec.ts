@@ -18,6 +18,7 @@ function makeCourseDetail(overrides?: Partial<ServiceCourseDetail>): ServiceCour
 		endDate: "2026-03-16T17:00:00.000Z",
 		participants: [
 			{
+				bookingId: "bk-1",
 				participationId: "part-1",
 				userId: "u1",
 				name: "Anna Müller",
@@ -28,6 +29,7 @@ function makeCourseDetail(overrides?: Partial<ServiceCourseDetail>): ServiceCour
 				preparationCompletedAt: "2026-01-15T10:00:00Z",
 			},
 			{
+				bookingId: "bk-2",
 				participationId: "part-2",
 				userId: "u2",
 				name: "Ben Fischer",
@@ -116,6 +118,7 @@ describe("buildSlideContext", () => {
 		const detail = makeCourseDetail({
 			participants: [
 				{
+					bookingId: "bk-null",
 					participationId: "p1",
 					userId: "u1",
 					name: null,

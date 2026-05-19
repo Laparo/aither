@@ -53,6 +53,35 @@ function slugify(text: string): string {
 		.replace(/^-|-$/g, "");
 }
 
+function lessonSlugOrFallback(lessonTitle: string, lessonIndex: number): string {
+	const slug = slugify(lessonTitle);
+	if (slug) return slug;
+	return `lesson-${String(lessonIndex).padStart(2, "0")}`;
+}
+
+function stableIdDescriptor(sourceId: string): string {
+	const slug = slugify(sourceId);
+	return slug || "item";
+}
+
+function lessonDescriptor(
+	lesson: { title: string; sourceId: string },
+	lessonIndex: number,
+): string {
+	return `${lessonSlugOrFallback(lesson.title, lessonIndex)}-${stableIdDescriptor(lesson.sourceId)}`;
+}
+
+function mediaDescriptor(
+	media: { sourceId: string; mediaType: "image" | "video"; altText: string | null },
+	lessonIdDescriptor: string,
+): string {
+	// Legacy /media endpoint exposes altText instead of title; use it as title-equivalent.
+	const mediaTitleSlug = slugify(media.altText ?? "");
+	const mediaIdDescriptor = stableIdDescriptor(media.sourceId);
+	if (mediaTitleSlug) return `${mediaTitleSlug}-${mediaIdDescriptor}`;
+	return `${lessonIdDescriptor}-${media.mediaType}-${mediaIdDescriptor}`;
+}
+
 /** Extract the first name from a full name and slugify it. */
 function extractFirstName(fullName: string | undefined): string {
 	if (!fullName) return "unbekannt";
@@ -151,9 +180,10 @@ export class SlideGenerator {
 					.filter((l) => l.seminarId === seminar?.sourceId)
 					.sort((a, b) => a.sequence - b.sequence);
 
-				for (const lesson of courseLessons) {
+				for (const [lessonIdx, lesson] of courseLessons.entries()) {
+					const descriptor = lessonDescriptor(lesson, lessonIdx + 1);
 					const html = buildCurriculumSlide(lesson);
-					const filename = seqFilename(lesson.title);
+					const filename = seqFilename(descriptor);
 					await this.writeSlide(courseOutputDir, filename, html);
 					slides.push({ filename, type: "curriculum", title: lesson.title });
 				}
@@ -161,7 +191,7 @@ export class SlideGenerator {
 				const allTexts = await this.client.get("/texts", TextContentsResponseSchema);
 				const allMedia = await this.client.get("/media", MediaAssetsResponseSchema);
 
-				for (const lesson of courseLessons) {
+				for (const [lessonIdx, lesson] of courseLessons.entries()) {
 					const lessonTexts = allTexts.filter(
 						(t) => t.entityRef.type === "lesson" && t.entityRef.id === lesson.sourceId,
 					);
@@ -169,23 +199,24 @@ export class SlideGenerator {
 						(m) => m.entityRef.type === "lesson" && m.entityRef.id === lesson.sourceId,
 					);
 
-					let materialIdx = 1;
+					const lessonIdDescriptor = lessonDescriptor(lesson, lessonIdx + 1);
 
 					for (const text of lessonTexts) {
 						const html = buildTextSlide(text);
-						const filename = seqFilename(`${lesson.title}-text-${materialIdx}`);
+						const filename = seqFilename(
+							`${lessonIdDescriptor}-text-${stableIdDescriptor(text.sourceId)}`,
+						);
 						await this.writeSlide(courseOutputDir, filename, html);
 						slides.push({ filename, type: "material", title: "Text Content" });
-						materialIdx++;
 					}
 
 					for (const media of lessonMedia) {
 						const html =
 							media.mediaType === "image" ? buildImageSlide(media) : buildVideoSlide(media);
-						const filename = seqFilename(media.altText ?? `${lesson.title}-${media.mediaType}`);
+						const descriptor = mediaDescriptor(media, lessonIdDescriptor);
+						const filename = seqFilename(descriptor);
 						await this.writeSlide(courseOutputDir, filename, html);
 						slides.push({ filename, type: "material", title: media.altText ?? media.mediaType });
-						materialIdx++;
 					}
 				}
 			} catch (err) {

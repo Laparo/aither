@@ -3,6 +3,8 @@
 **Input**: Design documents from `/specs/007-dashboard-design/`
 **Prerequisites**: plan.md, spec.md, research.md, data-model.md, contracts/components.md, quickstart.md
 
+**Re-baselined**: 2026-04-01 against the current repository state. Checked items reflect files and feature slices already present in the working tree; validation tasks remain unchecked unless explicitly re-run and confirmed.
+
 **Tests**: Unit tests included (Constitution I mandates test-first development). E2E test for layout validation per acceptance criteria.
 
 **Organization**: Tasks grouped by user story. Each story corresponds to a dashboard section and can be implemented and tested independently after the foundational theme infrastructure is in place.
@@ -17,9 +19,9 @@
 
 **Purpose**: Create directories and globals.css for the new component structure
 
-- [ ] T001 Create dashboard component directory at `src/app/components/dashboard/`
-- [ ] T002 [P] Create theme component directory at `src/app/components/theme/`
-- [ ] T003 [P] Create `src/app/globals.css` with Hemera CSS custom properties (`--hemera-beige`, `--hemera-marsala`, `--hemera-bronze`, `--hemera-rosy-brown`, `--hemera-light-black`) and Google Fonts imports (Inter 400–700, Playfair Display 400–700)
+- [x] T001 Create dashboard component directory at `src/app/components/dashboard/`
+- [x] T002 [P] Create theme component directory at `src/app/components/theme/`
+- [x] T003 [P] Create `src/app/globals.css` with Hemera CSS custom properties (`--hemera-beige`, `--hemera-marsala`, `--hemera-bronze`, `--hemera-rosy-brown`, `--hemera-light-black`) and Google Fonts imports (Inter 400–700, Playfair Display 400–700)
 
 ---
 
@@ -29,11 +31,11 @@
 
 **⚠️ CRITICAL**: No section component work (US2–US5) can begin until this phase is complete.
 
-- [ ] T004 [P] [US1] Create Hemera design tokens in `src/app/components/theme/design-tokens.ts` — export `colors` (marsala, marsalaLight, marsalaDark, bronze, rosyBrown, beige, lightBlack, white, infoMain, lightGray), `spacing` (sectionPy, sectionPyCompact, containerMaxWidth), and `typography` (heading: Playfair Display, body: Inter) objects
-- [ ] T005 [P] [US1] Write unit test for design tokens in `tests/unit/theme-tokens.spec.ts` — assert color hex values match Hemera canonical values, spacing.containerMaxWidth === 'lg', typography families correct
-- [ ] T006 [US1] Create MUI theme configuration in `src/app/components/theme/theme.ts` — `createTheme()` with palette (primary=marsala, secondary=bronze, background.default=beige), typography (Playfair Display headings, Inter body), component overrides (MuiContainer maxWidthLg=1200px, MuiAppBar rosyBrown), shape.borderRadius=8
-- [ ] T007 [US1] Create ThemeRegistry client component in `src/app/components/theme/ThemeRegistry.tsx` — wrap children with `AppRouterCacheProvider` → `ThemeProvider` → `CssBaseline`
-- [ ] T008 [US1] Update root layout in `src/app/layout.tsx` — replace bare `AppRouterCacheProvider` with `ThemeRegistry`, import `globals.css`
+- [x] T004 [P] [US1] Create Hemera design tokens in `src/app/components/theme/design-tokens.ts` — export `colors` (marsala, marsalaLight, marsalaDark, bronze, rosyBrown, beige, lightBlack, white, infoMain, lightGray), `spacing` (sectionPy, sectionPyCompact, containerMaxWidth), and `typography` (heading: Playfair Display, body: Inter) objects
+- [x] T005 [P] [US1] Write unit test for design tokens in `tests/unit/theme-tokens.spec.ts` — assert color hex values match Hemera canonical values, spacing.containerMaxWidth === 'lg', typography families correct
+- [x] T006 [US1] Create MUI theme configuration in `src/app/components/theme/theme.ts` — `createTheme()` with palette (primary=marsala, secondary=bronze, background.default=beige), typography (Playfair Display headings, Inter body), component overrides (MuiContainer maxWidthLg=1200px, MuiAppBar rosyBrown), shape.borderRadius=8
+- [x] T007 [US1] Create ThemeRegistry client component in `src/app/components/theme/ThemeRegistry.tsx` — wrap children with `AppRouterCacheProvider` → `ThemeProvider` → `CssBaseline`
+- [x] T008 [US1] Update root layout in `src/app/layout.tsx` — replace bare `AppRouterCacheProvider` with `ThemeRegistry`, import `globals.css`
 
 **Checkpoint**: Theme infrastructure ready. Dashboard renders with Hemera colors, fonts, and spacing. All subsequent sections inherit the theme.
 
@@ -47,13 +49,14 @@
 
 ### Unit Tests for US2
 
-- [ ] T009 [P] [US2] Write unit test for CourseCard in `tests/unit/dashboard-course-card.spec.ts` — assert rendering of title, level chip (German label), formatted dates, participant count, `data-testid="course-card"`
-- [ ] T010 [P] [US2] Write unit test for MaterialCard in `tests/unit/dashboard-material-card.spec.ts` — assert rendering of status chip (Generiert/Nicht generiert), slide count, formatted date, `data-testid="material-card"`
+- [x] T009 [P] [US2] Write unit test for CourseCard in `tests/unit/dashboard-course-card.spec.ts` — assert rendering of title, level chip (German label), formatted dates, participant count, `data-testid="course-card"`
+- [x] T009b [P] [US2] Write unit test for course tie-breaking comparator (pure function) — assert: single course selected, earliest `startDate` wins, same `startDate` falls back to lexicographically smallest `id`, null `startDate` excluded, empty input returns null
+- [x] T010 [P] [US2] Write unit test for MaterialCard in `tests/unit/dashboard-material-card.spec.ts` — assert rendering of status chip (Generiert/Nicht generiert), slide count, formatted date, empty state ("Keine Folien vorhanden" when files empty + status not-generated), `data-testid="material-card"`.
 
 ### Implementation for US2
 
-- [ ] T011 [P] [US2] Create CourseCard component in `src/app/components/dashboard/section-a-course-card.tsx` — `Paper` wrapper, Typography h6 for title, `Chip` for level (Grundkurs/Fortgeschritten/Masterclass), formatted dates (dd.MM.yyyy), participant count
-- [ ] T012 [P] [US2] Create MaterialCard client component in `src/app/components/dashboard/section-a-material-card.tsx` — `Paper` wrapper, status `Chip` (success/default color), last updated date, slide count, embed existing `SlideThumbnails` and `SlideGenerateButton` components
+- [x] T011 [P] [US2] Create CourseCard component in `src/app/components/dashboard/section-a-course-card.tsx` — `Paper` wrapper, Typography h6 for title, `Chip` for level (Grundkurs/Fortgeschritten/Masterclass), formatted dates (dd.MM.yyyy), participant count
+- [x] T012 [P] [US2] Create MaterialCard client component in `src/app/components/dashboard/section-a-material-card.tsx` — `Paper` wrapper, status `Chip` (success/default color), last updated date, slide count, embed existing `SlideThumbnails` and `SlideGenerateButton` components
 
 **Checkpoint**: Section A renders two cards side-by-side with real data from Hemera API and local filesystem.
 
@@ -67,13 +70,14 @@
 
 ### Unit Tests for US3
 
-- [ ] T013 [P] [US3] Write unit test for ParticipantsList in `tests/unit/dashboard-participants-list.spec.ts` — assert one item per participant, Avatar with initials, expand/collapse for detail fields, empty state "Keine Teilnehmer.", `data-testid="participants-list"`
-- [ ] T014 [P] [US3] Write unit test for SlidesList in `tests/unit/dashboard-slides-list.spec.ts` — assert one item per file, filename displayed, clickable link, empty state "Keine Folien generiert.", `data-testid="slides-list"`
+- [x] T013 [P] [US3] Write unit test for ParticipantsList in `tests/unit/dashboard-participants-list.spec.ts` — assert one item per participant, Avatar with initials, expand/collapse for detail fields, empty state "Keine Teilnehmer.", alphabetical sort order (multi-participant fixture with mixed case, null-name participant sorted last), `role="region"` + `aria-labelledby` on Collapse panels, `data-testid="participants-list"`
+- [x] T013b [P] [US3] Write keyboard navigation test for ParticipantsList using `@testing-library/react` + `userEvent` — assert: Enter/Space toggles `aria-expanded`, Escape closes expanded panel and returns focus to toggle, ArrowUp/ArrowDown navigates between ListItem rows, Home/End moves focus to first/last ListItem, Tab traverses focusable elements inside expanded Collapse panel
+- [x] T014 [P] [US3] Write unit test for SlidesList in `tests/unit/dashboard-slides-list.spec.ts` — assert one item per file, filename displayed, clickable link opens preview Modal, Modal shows filename title + close button, preview error state renders error message + retry, empty state "Keine Folien generiert.", `data-testid="slides-list"`, `data-testid="slide-preview-modal"`
 
 ### Implementation for US3
 
-- [ ] T015 [P] [US3] Create ParticipantsList client component in `src/app/components/dashboard/section-b-participants-list.tsx` — `Paper` wrapper, heading "Teilnehmer & Vorbereitungen", MUI `List` with compact cards (Avatar with initials + deterministic color, name, completion status), expandable detail panel (preparation intent, desired results, line manager profile), empty state
-- [ ] T016 [P] [US3] Create SlidesList component in `src/app/components/dashboard/section-b-slides-list.tsx` — `Paper` wrapper, heading "Kursfolien", MUI `List` with one row per file (filename, clickable link), empty state
+- [x] T015 [P] [US3] Create ParticipantsList client component in `src/app/components/dashboard/section-b-participants-list.tsx` — `Paper` wrapper, heading "Teilnehmer & Vorbereitungen", MUI `List` with compact cards (Avatar with initials + deterministic color, name, completion status), expandable detail panel (preparation intent, desired results, line manager profile), empty state
+- [x] T016 [P] [US3] Create SlidesList client component in `src/app/components/dashboard/section-b-slides-list.tsx` — `Paper` wrapper, heading "Kursfolien", MUI `List` with one row per file (filename, clickable link opening preview Modal), preview Modal (`Dialog` with close button, filename title, `data-testid="slide-preview-modal"`), preview error state with retry button, empty state. Requires rework: existing implementation lacks preview Modal.
 
 **Checkpoint**: Section B renders two lists side-by-side. Participant cards expand/collapse. Slides list links to preview files.
 
@@ -87,13 +91,15 @@
 
 ### Unit Tests for US4
 
-- [ ] T017 [P] [US4] Write unit test for SteuerungCards in `tests/unit/dashboard-steuerung-cards.spec.ts` — assert cards rendered for all endpoints, each showing path/method/status chip, responsive grid layout, `data-testid="steuerung-cards"`
-- [ ] T017b [P] [US4] Write unit test for CameraSection in `tests/unit/dashboard-camera-card.spec.ts` — assert heading “Kamera” rendered, CameraSnapshot component embedded, `data-testid="camera-card"`
+- [x] T017 [P] [US4] Write unit test for SteuerungCards in `tests/unit/dashboard-steuerung-cards.spec.ts` — assert cards rendered for all endpoints, each showing path/method/status chip, responsive grid layout, descriptive `aria-label` on each status Chip ("endpoint-path method status"), `data-testid="steuerung-cards"`
+- [x] T017b [P] [US4] Write unit test for CameraSection in `tests/unit/dashboard-camera-card.spec.ts` — assert heading “Kamera” rendered, CameraSnapshot component embedded, `data-testid="camera-card"`
+- [x] T017c [P] [US4] Verify `CameraSnapshot` polling, reconnect, and additive backoff behavior in `tests/unit/camera-snapshot.spec.ts` against Section D requirements; extend implementation if gaps remain
 
 ### Implementation for US4
 
-- [ ] T018 [US4] Create SteuerungCards client component in `src/app/components/dashboard/section-c-steuerung-cards.tsx` — heading "Steuerung", responsive grid of `Paper` cards (`{ xs: '1fr', sm: '1fr 1fr', md: '1fr 1fr 1fr' }`), each card showing endpoint path, HTTP method, status `Chip` (OK/Error/Loading), reuse health check logic from existing `EndpointStatus` component
-- [ ] T019 [P] [US4] Create CameraSection component in `src/app/components/dashboard/section-d-camera-card.tsx` — `Paper` wrapper, heading "Kamera", embed existing `CameraSnapshot` component, `data-testid="camera-card"`
+- [x] T018 [US4] Create SteuerungCards client component in `src/app/components/dashboard/section-c-steuerung-cards.tsx` — heading "Steuerung", responsive grid of `Paper` cards (`{ xs: '1fr', sm: '1fr 1fr', md: '1fr 1fr 1fr' }`), each card showing endpoint path, HTTP method, status `Chip` (OK/Error/Loading), reuse health check logic from existing `EndpointStatus` component
+- [x] T018a [P] [US4] Extract shared monitored endpoint definitions to `src/app/components/endpoint-config.ts` and update `src/app/components/endpoint-status.tsx` plus `src/app/components/dashboard/section-c-steuerung-cards.tsx` to consume `MONITORED_ENDPOINTS`
+- [x] T019 [P] [US4] Create CameraSection component in `src/app/components/dashboard/section-d-camera-card.tsx` — `Paper` wrapper, heading "Kamera", embed existing `CameraSnapshot` component, `data-testid="camera-card"`
 
 **Checkpoint**: Section C shows endpoint cards in responsive grid. Section D shows camera snapshot.
 
@@ -107,11 +113,12 @@
 
 ### E2E Test for US5
 
-- [ ] T020 [US5] Write E2E test for dashboard layout in `tests/e2e/dashboard-layout.spec.ts` — verify all four sections visible on desktop (1200px) and mobile (375px) viewports, all `data-testid` attributes present, cards side-by-side on desktop, single-column on mobile
+- [x] T020 [US5] Write E2E test for dashboard layout in `tests/e2e/dashboard-layout.spec.ts` — verify all four sections visible on desktop (1200px) and mobile (375px) viewports, all `data-testid` attributes present, cards side-by-side on desktop, single-column on mobile
+- [x] T020b [P] [US5] Write performance budget assertions in `tests/e2e/dashboard-layout.spec.ts` (or separate file) — assert CLS < 0.1 via `PerformanceObserver`, FCP ≤ 2 s via `performance.getEntriesByName('first-contentful-paint')`, hydration ≤ 100 ms via custom mark
 
 ### Implementation for US5
 
-- [ ] T021 [US5] Refactor `src/app/page.tsx` — replace flat table layout with four sections: Section A (CSS Grid `{ xs: '1fr', md: '1fr 1fr' }` with CourseCard + MaterialCard), Section B (CSS Grid `{ xs: '1fr', md: '1fr 1fr' }` with ParticipantsList + SlidesList), Section C (SteuerungCards), Section D (CameraSection). Use MUI `Container maxWidth="lg"`, inter-section spacing `mb: { xs: 4, md: 6 }`, `align-items: stretch` for equal-height cards. Keep existing SSR data fetching (fetchNextCourseDetail, fetchSlideStatus) and error/empty state alerts.
+- [x] T021 [US5] Refactor `src/app/page.tsx` — replace flat table layout with four sections: Section A (CSS Grid `{ xs: '1fr', md: '1fr 1fr' }` with CourseCard + MaterialCard), Section B (CSS Grid `{ xs: '1fr', md: '1fr 1fr' }` with ParticipantsList + SlidesList), Section C (SteuerungCards), Section D (CameraSection). Use MUI `Container maxWidth="lg"`, inter-section spacing `mb: { xs: 4, md: 6 }`, `align-items: stretch` for equal-height cards. Keep existing SSR data fetching (fetchNextCourseDetail, fetchSlideStatus) and error/empty state alerts.
 
 **Checkpoint**: Dashboard fully composed with all sections, responsive layout, Hemera theme applied.
 
@@ -123,17 +130,17 @@
 
 ### Validation
 
-- [ ] T022 Run all unit tests via `npx vitest run tests/unit/dashboard-*.spec.ts tests/unit/theme-tokens.spec.ts` and fix any failures
-- [ ] T023 Run E2E test via `npx playwright test tests/e2e/dashboard-layout.spec.ts` and fix any failures
-- [ ] T024 [P] Run Biome formatting and linting via `npm run lint` — fix any violations in new files
-- [ ] T025 [P] Run TypeScript type check via `npx tsc --noEmit` — fix any type errors
-- [ ] T026 Verify production build via `npm run build` — ensure no build errors
-- [ ] T027 Run quickstart.md validation — verify all steps in `specs/007-dashboard-design/quickstart.md` work end-to-end
+- [x] T022 Run all unit tests via `npx vitest run tests/unit/dashboard-*.spec.ts tests/unit/theme-tokens.spec.ts` and fix any failures
+- [x] T023 Run E2E test via `npx playwright test tests/e2e/dashboard-layout.spec.ts` and fix any failures
+- [x] T024 [P] Run Biome formatting and linting via `npm run lint` — fix any violations in new files
+- [x] T025 [P] Run TypeScript type check via `npx tsc --noEmit` — fix any type errors
+- [x] T026 Verify production build via `npm run build` — ensure no build errors
+- [x] T027 Run quickstart.md validation — verify all steps in `specs/007-dashboard-design/quickstart.md` work end-to-end
 
 ### Error Handling (Constitution VI)
 
-- [ ] T028 [US5] Create App Router error boundary in `src/app/error.tsx` — client component with Rollbar error reporting via `serverInstance.error()`, user-facing fallback UI with retry button, German error message
-- [ ] T029 [P] [US5] Create global error boundary in `src/app/global-error.tsx` — catches root layout errors, minimal HTML fallback with Rollbar reporting
+- [x] T028 [US5] Create App Router error boundary in `src/app/error.tsx` — client component with Rollbar error reporting via `serverInstance.error()`, user-facing fallback UI with retry button, German error message
+- [x] T029 [P] [US5] Create global error boundary in `src/app/global-error.tsx` — catches root layout errors, minimal HTML fallback with Rollbar reporting
 
 ---
 

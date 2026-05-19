@@ -3,7 +3,7 @@
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 export interface ReconnectState {
 	src: string | null;
@@ -81,7 +81,9 @@ export function CameraSnapshot() {
 	const [src, setSrc] = useState<string | null>(null);
 	const [error, setError] = useState<string | null>(null);
 	const [loading, setLoading] = useState(true);
-	const [attempt, setAttempt] = useState(0);
+	const [, setAttempt] = useState(0);
+	const [requestKey, setRequestKey] = useState(0);
+	const requestNonceRef = useRef(0);
 
 	const reconnect = useCallback(() => {
 		setAttempt((a) => {
@@ -91,33 +93,41 @@ export function CameraSnapshot() {
 			setLoading(next.loading);
 			return next.attempt;
 		});
+		setRequestKey((current) => current + 1);
 	}, []);
 
 	useEffect(() => {
 		let objectUrl: string | null = null;
 		let cancelled = false;
+		requestNonceRef.current = Math.max(requestNonceRef.current + 1, requestKey + 1);
 
-		const url = buildSnapshotUrl();
-		void runSnapshotLoadCycle(url, (input) => fetch(input), URL.createObjectURL, URL.revokeObjectURL, {
-			onSuccess: (createdUrl) => {
-				objectUrl = createdUrl;
-				setSrc(createdUrl);
-				setError(null);
+		const url = buildSnapshotUrl(() => requestNonceRef.current);
+		void runSnapshotLoadCycle(
+			url,
+			(input) => fetch(input),
+			URL.createObjectURL,
+			URL.revokeObjectURL,
+			{
+				onSuccess: (createdUrl) => {
+					objectUrl = createdUrl;
+					setSrc(createdUrl);
+					setError(null);
+				},
+				onError: (message) => {
+					setError(message);
+				},
+				onFinally: () => {
+					setLoading(false);
+				},
+				isCancelled: () => cancelled,
 			},
-			onError: (message) => {
-				setError(message);
-			},
-			onFinally: () => {
-				setLoading(false);
-			},
-			isCancelled: () => cancelled,
-		});
+		);
 
 		return () => {
 			cancelled = true;
 			if (objectUrl) URL.revokeObjectURL(objectUrl);
 		};
-	}, [attempt]);
+	}, [requestKey]);
 
 	if (error) {
 		return (

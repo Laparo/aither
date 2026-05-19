@@ -1,6 +1,7 @@
 import {
-	checkEndpoint,
 	type EndpointDef,
+	checkEndpoint,
+	getEndpointResultKey,
 } from "@/app/components/endpoint-status";
 import { describe, expect, it, vi } from "vitest";
 
@@ -19,6 +20,34 @@ function buildEndpoint(overrides?: Partial<EndpointDef>): EndpointDef {
 }
 
 describe("EndpointStatus probe behavior", () => {
+	it("keys endpoint probe results by method and path to avoid collisions", () => {
+		expect(
+			getEndpointResultKey({
+				method: "GET",
+				path: "/api/probe",
+			}),
+		).toBe("GET /api/probe");
+
+		expect(
+			getEndpointResultKey({
+				method: "POST",
+				path: "/api/probe",
+			}),
+		).toBe("POST /api/probe");
+
+		expect(
+			getEndpointResultKey({
+				method: "GET",
+				path: "/api/probe",
+			}),
+		).not.toBe(
+			getEndpointResultKey({
+				method: "POST",
+				path: "/api/probe",
+			}),
+		);
+	});
+
 	it("falls back from HEAD to GET when HEAD is unsupported", async () => {
 		const fetchMock = vi
 			.fn<typeof fetch>()
@@ -55,9 +84,7 @@ describe("EndpointStatus probe behavior", () => {
 		const fetchMock = vi.fn<typeof fetch>().mockResolvedValueOnce(mockResponse(405));
 		vi.stubGlobal("fetch", fetchMock);
 
-		const result = await checkEndpoint(
-			buildEndpoint({ fallbackToGetOnHeadUnsupported: false }),
-		);
+		const result = await checkEndpoint(buildEndpoint({ fallbackToGetOnHeadUnsupported: false }));
 
 		expect(result).toEqual({
 			status: "erreichbar",
