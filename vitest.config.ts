@@ -5,8 +5,9 @@ export default defineConfig({
 	plugins: [tsconfigPaths()],
 	test: {
 		globals: true,
+		// Default to Node; browser-like tests opt in with per-file @vitest-environment jsdom.
 		environment: "node",
-		include: ["tests/**/*.spec.ts"],
+		include: ["tests/**/*.spec.ts", "tests/**/*.spec.tsx"],
 		exclude: ["tests/e2e/**"],
 		coverage: {
 			provider: "v8",

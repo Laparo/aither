@@ -10,7 +10,10 @@ import { HemeraClient } from "./client";
 import { getTokenManager } from "./token-manager";
 
 export class HemeraConfigurationError extends Error {
-	constructor(message: string, readonly details?: Record<string, unknown>) {
+	constructor(
+		message: string,
+		readonly details?: Record<string, unknown>,
+	) {
 		super(message);
 		this.name = "HemeraConfigurationError";
 	}
@@ -101,10 +104,12 @@ async function getBaseUrlWithFallback(): Promise<string> {
 	}
 
 	// Both unreachable — do NOT cache so next request retries
-	bothUnavailableLogged = true;
-	console.warn(
-		`[Hemera] Both primary (${sanitizeUrlForLog(primaryUrl)}) and fallback (${sanitizeUrlForLog(fallbackUrl)}) are unreachable.`,
-	);
+	if (!bothUnavailableLogged) {
+		console.warn(
+			`[Hemera] Both primary (${sanitizeUrlForLog(primaryUrl)}) and fallback (${sanitizeUrlForLog(fallbackUrl)}) are unreachable.`,
+		);
+		bothUnavailableLogged = true;
+	}
 	throw new HemeraUnreachableError(primaryUrl, fallbackUrl);
 }
 
@@ -198,10 +203,9 @@ export async function createHemeraClient(
 	try {
 		config = loadConfig();
 	} catch (err) {
-		const configError = new HemeraConfigurationError(
-			"Hemera client configuration is invalid",
-			{ cause: err instanceof Error ? err.message : String(err) },
-		);
+		const configError = new HemeraConfigurationError("Hemera client configuration is invalid", {
+			cause: err instanceof Error ? err.message : String(err),
+		});
 		reportError(configError, {
 			...errorContext,
 			additionalData: {

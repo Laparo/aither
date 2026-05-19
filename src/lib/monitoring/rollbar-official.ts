@@ -18,6 +18,19 @@ interface RollbarTestInstance {
 	wait: (cb?: () => void) => void;
 }
 
+const noopInstance: RollbarTestInstance = {
+	critical: () => {},
+	error: () => {},
+	warning: () => {},
+	warn: () => {},
+	info: () => {},
+	debug: () => {},
+	log: () => {},
+	wait: (cb?: () => void) => {
+		if (typeof cb === "function") cb();
+	},
+};
+
 // ── Enablement rules ──────────────────────────────────────────────────────
 
 const isE2EMode = process.env.E2E_TEST === "1";
@@ -26,10 +39,158 @@ const isTestMode =
 	// Vitest uses VITEST, VITEST_POOL_ID; Jest uses JEST_WORKER_ID
 	typeof process.env.VITEST !== "undefined" ||
 	typeof process.env.JEST_WORKER_ID !== "undefined";
+const isNodeRuntime = process.env.NEXT_RUNTIME !== "edge" && typeof window === "undefined";
 const isDevelopment = process.env.NODE_ENV === "development";
 const isExplicitlyDisabled =
 	process.env.NEXT_PUBLIC_ROLLBAR_ENABLED === "0" || process.env.ROLLBAR_ENABLED === "0";
+const rollbarServerRoot = process.env.ROLLBAR_SERVER_ROOT;
+const clientRollbarToken = process.env.NEXT_PUBLIC_ROLLBAR_CLIENT_TOKEN;
 
+const COMMON_SCRUB_FIELDS = [
+	"password",
+	"apiKey",
+	"api_key",
+	"secret",
+	"token",
+	"authorization",
+] satisfies string[];
+
+const CLIENT_SCRUB_FIELDS = [
+	...COMMON_SCRUB_FIELDS,
+	"cookie",
+	"cookies",
+	"set-cookie",
+	"email",
+	"user_email",
+	"userEmail",
+	"user_id",
+	"userId",
+	"user_ip",
+	"ip",
+	"ip_address",
+	"person",
+	"clerk",
+	"session",
+	"sessionId",
+	"session_id",
+	"accessToken",
+	"refreshToken",
+] satisfies string[];
+
+export function isExplicitlyEnabled(name: string): boolean {
+	const value = process.env[name];
+	return value === "1" || value === "true";
+}
+
+function redactSensitiveFields(value: unknown): unknown {
+	if (Array.isArray(value)) {
+		return value.map(redactSensitiveFields);
+	}
+
+	if (!value || typeof value !== "object") {
+		return value;
+	}
+
+	const sensitiveKeys = new Set(CLIENT_SCRUB_FIELDS.map((field) => field.toLowerCase()));
+	const input = value as Record<string, unknown>;
+	const output: Record<string, unknown> = {};
+
+	for (const [key, nestedValue] of Object.entries(input)) {
+		output[key] = sensitiveKeys.has(key.toLowerCase())
+			? "[redacted]"
+			: redactSensitiveFields(nestedValue);
+	}
+
+	return output;
+}
+
+export function transformClientPayload(payload: Record<string, unknown>): void {
+	const data = payload.data;
+	if (!data || typeof data !== "object") {
+		return;
+	}
+
+	const dataRecord = data as Record<string, unknown>;
+	const body = dataRecord.body;
+	if (!body || typeof body !== "object") {
+		return;
+	}
+
+	const bodyRecord = body as Record<string, unknown>;
+	const transformedBody = redactSensitiveFields(bodyRecord) as Record<string, unknown>;
+	transformedBody.person = undefined;
+
+	const request = transformedBody.request;
+	if (request && typeof request === "object") {
+		const requestRecord = request as Record<string, unknown>;
+		requestRecord.user_ip = undefined;
+		requestRecord.headers = undefined;
+	}
+
+	dataRecord.body = transformedBody;
+}
+
+interface ClientRollbarEnablementOptions {
+	isNodeRuntime: boolean;
+	isTestMode: boolean;
+	isE2EMode: boolean;
+	isExplicitlyDisabled: boolean;
+	publicEnabled: boolean;
+	clientToken?: string;
+}
+
+interface ServerRootOptions {
+	isNodeRuntime: boolean;
+	configuredRoot?: string;
+	getCwd?: () => string;
+}
+
+export function isClientRollbarEnabled({
+	isNodeRuntime,
+	isTestMode,
+	isE2EMode,
+	isExplicitlyDisabled,
+	publicEnabled,
+	clientToken,
+}: ClientRollbarEnablementOptions): boolean {
+	return (
+		!isNodeRuntime &&
+		!isTestMode &&
+		!isE2EMode &&
+		!isExplicitlyDisabled &&
+		publicEnabled &&
+		Boolean(clientToken)
+	);
+}
+
+const clientRollbarEnabled = isClientRollbarEnabled({
+	isNodeRuntime,
+	isTestMode,
+	isE2EMode,
+	isExplicitlyDisabled,
+	publicEnabled: isExplicitlyEnabled("NEXT_PUBLIC_ROLLBAR_ENABLED"),
+	clientToken: clientRollbarToken,
+});
+
+export function resolveServerRoot({
+	isNodeRuntime,
+	configuredRoot,
+	getCwd = () => process.cwd(),
+}: ServerRootOptions): string | undefined {
+	if (!isNodeRuntime) {
+		return undefined;
+	}
+
+	if (configuredRoot) {
+		return configuredRoot;
+	}
+
+	try {
+		return getCwd();
+	} catch {
+		return undefined;
+	}
+}
 function readNumberEnv(name: string, fallback: number): number {
 	const v = process.env[name];
 	if (!v) return fallback;
@@ -58,45 +219,41 @@ const baseConfig = {
 
 // Client-side configuration (for future React components)
 export const clientConfig = {
-	accessToken: process.env.NEXT_PUBLIC_ROLLBAR_CLIENT_TOKEN,
+	accessToken: clientRollbarToken,
 	...baseConfig,
+	enabled: clientRollbarEnabled,
+	captureUncaught: true,
+	captureUnhandledRejections: true,
+	scrubFields: CLIENT_SCRUB_FIELDS,
+	transform: transformClientPayload,
 };
 
 // Server-side singleton instance
 // In test mode, export a no-op instance to avoid network calls.
-export const serverInstance: Rollbar | RollbarTestInstance = isTestMode
-	? {
-			critical: () => {},
-			error: () => {},
-			warning: () => {},
-			warn: () => {},
-			info: () => {},
-			debug: () => {},
-			log: () => {},
-			wait: (cb?: () => void) => {
-				if (typeof cb === "function") cb();
-			},
-		}
+export const serverInstance: Rollbar | RollbarTestInstance =
+	!isNodeRuntime || isTestMode
+		? noopInstance
+		: new Rollbar({
+				accessToken: isE2EMode ? "dummy-token-for-e2e" : process.env.ROLLBAR_SERVER_TOKEN,
+				...baseConfig,
+				payload: {
+					server: { root: resolveServerRoot({ isNodeRuntime, configuredRoot: rollbarServerRoot }) },
+				},
+				// PII filtering: always scrub secrets; scrub user-identifying fields when consent is not granted
+				scrubFields: [
+					// Always scrub secrets
+					...COMMON_SCRUB_FIELDS,
+					// Scrub PII fields unless consent is explicitly granted
+					...(isTelemetryConsentGranted()
+						? []
+						: ["email", "user_email", "userEmail", "user_ip", "ip_address", "person"]),
+				],
+			});
+
+export const clientInstance: Rollbar | RollbarTestInstance = !clientRollbarEnabled
+	? noopInstance
 	: new Rollbar({
-			accessToken: isE2EMode ? "dummy-token-for-e2e" : process.env.ROLLBAR_SERVER_TOKEN,
-			...baseConfig,
-			payload: {
-				server: { root: typeof process !== "undefined" && typeof process.cwd === "function" ? process.cwd() : "/" },
-			},
-			// PII filtering: always scrub secrets; scrub user-identifying fields when consent is not granted
-			scrubFields: [
-				// Always scrub secrets
-				"password",
-				"apiKey",
-				"api_key",
-				"secret",
-				"token",
-				"authorization",
-				// Scrub PII fields unless consent is explicitly granted
-				...(isTelemetryConsentGranted()
-					? []
-					: ["email", "user_email", "userEmail", "user_ip", "ip_address", "person"]),
-			],
+			...clientConfig,
 		});
 
 // Legacy-compatible exports
@@ -108,8 +265,7 @@ export const rollbarConfig = {
 export const rollbar = serverInstance;
 
 export const clientRollbarConfig = {
-	accessToken: process.env.NEXT_PUBLIC_ROLLBAR_CLIENT_TOKEN,
-	...baseConfig,
+	...clientConfig,
 };
 
 // ── Severity & Error Context ──────────────────────────────────────────────

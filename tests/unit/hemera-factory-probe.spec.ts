@@ -1,9 +1,8 @@
 import {
-	createHemeraClient,
 	HemeraUnreachableError,
+	createHemeraClient,
 	resetHemeraBaseUrl,
 } from "@/lib/hemera/factory";
-import { HemeraTokenManager } from "@/lib/hemera/token-manager";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/config", () => ({
@@ -35,9 +34,9 @@ describe("createHemeraClient reachability probes", () => {
 		} as ReturnType<typeof loadConfig>);
 
 		const { getTokenManager } = await import("@/lib/hemera/token-manager");
-		vi.mocked(getTokenManager).mockReturnValue(
-			new HemeraTokenManager("test-key-minimum-32-characters-long-for-validation"),
-		);
+		vi.mocked(getTokenManager).mockReturnValue({
+			getToken: async () => "test-key-minimum-32-characters-long-for-validation",
+		} as ReturnType<typeof getTokenManager>);
 	});
 
 	it("uses primary when HEAD is unsupported but GET fallback returns 401", async () => {

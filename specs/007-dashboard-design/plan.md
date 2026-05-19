@@ -1,11 +1,11 @@
 # Implementation Plan: 007 — Dashboard Design
 
-**Branch**: `007-dashboard-design` | **Date**: 2026-03-25 | **Spec**: [spec.md](spec.md)
+**Branch**: `007-dashboard-design` | **Date**: 2026-04-01 | **Spec**: [spec.md](spec.md)
 **Input**: Feature specification from `/specs/007-dashboard-design/spec.md`
 
 ## Summary
 
-Redesign the Aither dashboard (`src/app/page.tsx`) from a flat table-based layout into a structured four-section card-based composition (A: Course + Material, B: Participants + Slides, C: Steuerung, D: Kamera). Adopt the Hemera design system (MUI theme, design tokens, ThemeRegistry pattern, CSS variables, Google Fonts) to ensure visual coherence between both applications. All data sources remain unchanged (Hemera API + local filesystem); this is a pure UI/layout restructuring with design system integration.
+Redesign the Aither dashboard (`src/app/page.tsx`) from a flat table-based layout into a structured four-section card-based composition (A: Course + Material, B: Participants + Slides, C: Steuerung, D: Kamera). Adopt the Hemera design system (MUI theme, design tokens, ThemeRegistry pattern, CSS variables, Google Fonts) to ensure visual coherence between both applications. Reuse the existing camera and endpoint probing logic where possible by extracting shared endpoint configuration and by keeping `CameraSnapshot` as the owner of refresh/reconnect behavior.
 
 ## Technical Context
 
@@ -15,9 +15,9 @@ Redesign the Aither dashboard (`src/app/page.tsx`) from a flat table-based layou
 **Testing**: Vitest for unit tests, Playwright for E2E  
 **Target Platform**: Self-hosted Linux service (development on macOS, port 3001)  
 **Project Type**: Single Next.js web application  
-**Performance Goals**: Dashboard SSR render < 500 ms; no CLS from card layout shifts  
+**Performance Goals**: Initial dashboard load (SSR) < 1.8 s (FCP); sections A–B interactive ≤ 100 ms after hydration; CLS < 0.1  
 **Constraints**: No local database (Constitution VII); all data fetched from Hemera API or local filesystem  
-**Scale/Scope**: Single page redesign + 6 new dashboard components + 3 theme infrastructure files
+**Scale/Scope**: Single page redesign + 6 new dashboard components + shared endpoint config extraction + theme/error-boundary infrastructure
 
 ## Constitution Check
 
@@ -25,33 +25,32 @@ Redesign the Aither dashboard (`src/app/page.tsx`) from a flat table-based layou
 
 | Principle | Status | Notes |
 |-----------|--------|-------|
-| I. Test-First Development | ✅ PASS | Unit tests for each new component (Card, List, Section). Contract tests for component rendering before implementation. |
+| I. Test-First Development | ✅ PASS | T014, T017, T017b, and T017c are implemented and validated; test backlog note cleared in this re-check. |
 | II. Code Quality & Formatting | ✅ PASS | Biome formatting enforced. TypeScript strict mode active. |
-| III. Feature Development Workflow | ✅ PASS | Spec written first; contracts defined in this plan before implementation. |
-| IV. Authentication & Security | ✅ PASS | No new auth surfaces. Existing Hemera API auth unchanged. PII filtering maintained. |
-| V. Component Architecture | ✅ PASS | Hemera design system adopted: MUI theme, design tokens, ThemeRegistry, CSS variables, fonts. WCAG 2.1 AA for all interactive elements. |
-| VI. Holistic Error Handling | ⚠️ PARTIAL | App Router error.tsx + global-error.tsx to be added (T028–T029). Rollbar server-side already active. Graceful degradation when Hemera API unavailable (existing error/empty alerts in page.tsx). |
-| VII. Stateless Architecture | ✅ PASS | No local database. Dashboard fetches from Hemera API + reads local slide files. No new persistence. |
-| VIII. HTML Playback | ⬜ N/A | No playback changes. |
-| IX. Aither Control API | ⬜ N/A | No API changes. |
-| X. Language Policy | ✅ PASS | All code and comments in English. UI labels remain German (user-facing). |
+| III. Feature Development Workflow | ✅ PASS | Spec, research, data model, contracts, quickstart, and task list exist for the feature. |
+| IV. Authentication & Security | ✅ PASS | No new auth surface. Existing Hemera API auth and sanitized monitoring stay unchanged. |
+| V. Component Architecture | ✅ PASS | Hemera design system adopted through tokens, theme, ThemeRegistry, CSS variables, and shared component structure. |
+| VI. Holistic Error Handling | ✅ PASS | Feature scope includes route-level fallback UI plus App Router `error.tsx` and `global-error.tsx`. |
+| VII. Stateless Architecture | ✅ PASS | Dashboard remains read-only against Hemera API and local slide files. No persistence added. |
+| VIII. HTML Playback | ⬜ N/A | No playback contract changes introduced. |
+| IX. Aither Control API | ⬜ N/A | No new Aither control endpoints added. |
+| X. Language Policy | ✅ PASS | Code and comments remain English; UI labels remain German. |
 
-**Gate result: PASS** — No violations. Proceeding to Phase 0.
+**Gate result: PASS** — Principle I test coverage items (T014, T017, T017b, T017c) are complete and validated.
 
 ### Post-Design Re-Check (after Phase 1)
 
-All principles re-evaluated after design artifacts produced:
-
 | Principle | Status | Post-Design Notes |
 |-----------|--------|-------------------|
-| I. Test-First | ✅ PASS | Component contracts defined with test assertions. 7 unit test files + 1 E2E test planned. |
-| II. Code Quality | ✅ PASS | All new files will pass Biome. TypeScript strict mode. |
-| III. Feature Workflow | ✅ PASS | research.md, data-model.md, contracts/components.md, quickstart.md all produced. |
-| V. Component Architecture | ✅ PASS | Full Hemera design system replicated: tokens, theme, ThemeRegistry, CSS vars, fonts. |
-| VII. Stateless Architecture | ✅ PASS | No new persistence introduced. Data model confirms read-only consumption. |
-| X. Language Policy | ✅ PASS | All contract/component code in English. German only in UI labels. |
+| I. Test-First | ✅ PASS | Contracts are covered by implemented tests; T014, T017, T017b, and T017c are present and validated in the current repository state. |
+| II. Code Quality | ✅ PASS | TypeScript strict mode and Biome remain the quality baseline. |
+| III. Feature Workflow | ✅ PASS | `research.md`, `data-model.md`, `contracts/components.md`, and `quickstart.md` are present and aligned to the refilled plan. |
+| V. Component Architecture | ✅ PASS | Design tokens, theme wrapper, dashboard sections, and shared endpoint config are part of the planned structure. |
+| VI. Error Handling | ✅ PASS | Error boundary files are included in the source structure and tracked in the task list. |
+| VII. Stateless Architecture | ✅ PASS | The design continues to consume existing APIs and filesystem outputs only. |
+| X. Language Policy | ✅ PASS | No deviation introduced by the design artifacts. |
 
-**Post-design gate result: PASS** — No new violations.
+**Post-design gate result: PASS** — Principle I checks are now aligned with implemented and validated test coverage.
 
 ## Project Structure
 
@@ -65,7 +64,7 @@ specs/007-dashboard-design/
 ├── quickstart.md        # Phase 1 output
 ├── contracts/           # Phase 1 output
 │   └── components.md    # Component interface contracts
-└── tasks.md             # Phase 2 output (NOT created by /speckit.plan)
+└── tasks.md             # Phase 2 output (re-baselined checklist)
 ```
 
 ### Source Code (repository root)
@@ -73,43 +72,49 @@ specs/007-dashboard-design/
 ```text
 src/
 ├── app/
-│   ├── page.tsx                          # Refactored: orchestrates sections A/B/C/D
-│   ├── layout.tsx                        # Updated: ThemeRegistry + global CSS
-│   ├── globals.css                       # NEW: Hemera CSS variables + font imports
+│   ├── error.tsx                           # App Router error boundary
+│   ├── global-error.tsx                    # Global error boundary
+│   ├── globals.css                         # Hemera CSS variables + font imports
+│   ├── layout.tsx                          # ThemeRegistry wiring
+│   ├── page.tsx                            # Refactored dashboard composition
 │   └── components/
 │       ├── dashboard/
-│       │   ├── section-a-course-card.tsx      # NEW: Course info card
-│       │   ├── section-a-material-card.tsx    # NEW: Material status card
-│       │   ├── section-b-participants-list.tsx # NEW: Participant list with avatars
-│       │   ├── section-b-slides-list.tsx      # NEW: Slide file list
-│       │   ├── section-c-steuerung-cards.tsx  # NEW: Endpoint status cards
-│       │   └── section-d-camera-card.tsx      # NEW: Camera snapshot card
+│       │   ├── section-a-course-card.tsx
+│       │   ├── section-a-material-card.tsx
+│       │   ├── section-b-participants-list.tsx
+│       │   ├── section-b-slides-list.tsx
+│       │   ├── section-c-steuerung-cards.tsx
+│       │   ├── section-d-camera-card.tsx
+│       │   └── types.ts
 │       ├── theme/
-│       │   ├── design-tokens.ts              # NEW: Hemera design tokens (UI)
-│       │   ├── theme.ts                      # NEW: MUI theme configuration
-│       │   └── ThemeRegistry.tsx             # NEW: Emotion + ThemeProvider wrapper
-│       ├── camera-snapshot.tsx           # Existing (unchanged)
-│       ├── endpoint-status.tsx           # Existing (data logic reused)
-│       ├── slide-generate-button.tsx     # Existing (unchanged)
-│       └── slide-thumbnails.tsx          # Existing (unchanged)
+│       │   ├── design-tokens.ts
+│       │   ├── theme.ts
+│       │   └── ThemeRegistry.tsx
+│       ├── camera-snapshot.tsx             # Existing; owns reconnect / refresh behavior
+│       ├── endpoint-config.ts              # Shared monitored endpoint definitions
+│       ├── endpoint-status.tsx             # Existing probe logic reused by cards
+│       ├── slide-generate-button.tsx       # Existing
+│       └── slide-thumbnails.tsx            # Existing
 └── lib/
-    └── (no changes — data fetching logic stays in page.tsx as SSR)
+    └── (no new persistence or service layer required)
 
 tests/
-├── unit/
-│   ├── dashboard-course-card.spec.ts         # NEW
-│   ├── dashboard-material-card.spec.ts       # NEW
-│   ├── dashboard-participants-list.spec.ts   # NEW
-│   ├── dashboard-slides-list.spec.ts         # NEW
-│   ├── dashboard-steuerung-cards.spec.ts     # NEW
-│   ├── dashboard-camera-card.spec.ts         # NEW
-│   └── theme-tokens.spec.ts                  # NEW
-└── e2e/
-    └── dashboard-layout.spec.ts              # NEW
+├── e2e/
+│   └── dashboard-layout.spec.ts           # Planned viewport regression coverage
+└── unit/
+    ├── camera-snapshot.spec.ts            # Existing camera loading/reconnect coverage
+    ├── dashboard-course-card.spec.ts
+    ├── dashboard-material-card.spec.ts
+    ├── dashboard-participants-list.spec.ts
+    ├── dashboard-slides-list.spec.ts      # Planned
+    ├── dashboard-steuerung-cards.spec.ts  # Planned
+    ├── dashboard-camera-card.spec.ts      # Planned
+    ├── endpoint-status-probe.spec.ts      # Existing endpoint probe coverage
+    └── theme-tokens.spec.ts
 ```
 
-**Structure Decision**: Single project layout. New components placed under `src/app/components/dashboard/` for feature grouping. Theme infrastructure under `src/app/components/theme/`. All existing components remain untouched; data fetching stays in the Server Component (`page.tsx`).
+**Structure Decision**: Single-project Next.js layout. New dashboard sections live under `src/app/components/dashboard/`, shared theme infrastructure under `src/app/components/theme/`, and reused probe/camera logic stays in the existing component layer for incremental adoption.
 
 ## Complexity Tracking
 
-Partial constitution compliance — Principle VI (Holistic Error Handling) has ⚠️ PARTIAL status: App Router `error.tsx` + `global-error.tsx` are planned (T028–T029) but not yet implemented. This is accepted because error boundaries are explicitly scheduled in Phase 7 and do not block earlier phases.
+No constitution violations require justification. Remaining delivery risk is limited to finishing the unimplemented coverage and aligning `CameraSnapshot` refresh/backoff behavior with the Section D contract.

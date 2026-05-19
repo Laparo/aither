@@ -160,10 +160,10 @@ describe("SlideGenerator", () => {
 		const courseDir = path.join(outputDir, "sem-1");
 		const files = await fs.readdir(courseDir);
 		expect(files).toContain("001_intro.html");
-		expect(files).toContain("002_introduction.html");
-		expect(files).toContain("003_advanced-types.html");
-		expect(files).toContain("004_photo.html");
-		expect(files).toContain("005_advanced-types-text-1.html");
+		expect(files).toContain("002_introduction-les-1.html");
+		expect(files).toContain("003_advanced-types-les-2.html");
+		expect(files).toContain("004_photo-med-1.html");
+		expect(files).toContain("005_advanced-types-les-2-text-txt-1.html");
 	});
 
 	it("clears the course subdirectory before generating", async () => {
@@ -276,6 +276,112 @@ describe("SlideGenerator", () => {
 		const materials = result.slides.filter((s) => s.type === "material");
 		expect(materials.length).toBe(2);
 	});
+
+	it("uses lesson-XX fallback slugs and descriptor fallback patterns per FR-003/FR-004a", async () => {
+		const fallbackLessons: Lesson[] = [
+			{
+				sourceId: "les-empty",
+				seminarId: "sem-1",
+				title: "!!!",
+				sequence: 1,
+				textContentIds: ["txt-fallback"],
+				mediaAssetIds: ["med-image", "med-video"],
+			},
+		];
+
+		const fallbackTexts: TextContent[] = [
+			{
+				sourceId: "txt-fallback",
+				entityRef: { type: "lesson", id: "les-empty" },
+				body: "<p>Fallback text</p>",
+				contentType: "html",
+			},
+		];
+
+		const fallbackMedia: MediaAsset[] = [
+			{
+				sourceId: "med-image",
+				entityRef: { type: "lesson", id: "les-empty" },
+				mediaType: "image",
+				sourceUrl: "https://hemera.academy/img/fallback.jpg",
+				altText: null,
+				fileSize: null,
+			},
+			{
+				sourceId: "med-video",
+				entityRef: { type: "lesson", id: "les-empty" },
+				mediaType: "video",
+				sourceUrl: "https://hemera.academy/video/fallback.mp4",
+				altText: null,
+				fileSize: null,
+			},
+		];
+
+		const fallbackClient = {
+			get: vi.fn().mockImplementation((p: string) => {
+				if (p === "/seminars") return Promise.resolve([mockSeminar]);
+				if (p === "/lessons") return Promise.resolve(fallbackLessons);
+				if (p === "/texts") return Promise.resolve(fallbackTexts);
+				if (p === "/media") return Promise.resolve(fallbackMedia);
+				if (p === "/api/service/courses") {
+					return Promise.resolve({
+						success: true,
+						data: [
+							{
+								id: "sem-1",
+								title: mockSeminar.title,
+								slug: "typescript-masterclass",
+								level: "ADVANCED",
+								startDate: mockSeminar.dates[0].start,
+								endDate: mockSeminar.dates[0].end,
+								participantCount: 0,
+							},
+						],
+						meta: { requestId: "r", timestamp: new Date().toISOString(), version: "1.0" },
+					});
+				}
+				if (p === "/api/service/courses/sem-1") {
+					return Promise.resolve({
+						success: true,
+						data: {
+							id: "sem-1",
+							title: mockSeminar.title,
+							slug: "typescript-masterclass",
+							level: "ADVANCED",
+							startDate: mockSeminar.dates[0].start,
+							endDate: mockSeminar.dates[0].end,
+							participants: [],
+						},
+					});
+				}
+				if (p === "/api/service/courses/sem-1/materials") {
+					return Promise.resolve({ success: true, data: { courseId: "sem-1", topics: [] } });
+				}
+				return Promise.resolve([]);
+			}),
+			put: vi.fn(),
+		} as unknown as HemeraClient;
+
+		const generator = new SlideGenerator({ client: fallbackClient, outputDir });
+		await generator.generate();
+
+		const courseDir = path.join(outputDir, "sem-1");
+		const files = await fs.readdir(courseDir);
+		expect(files).toContain("001_intro.html");
+		expect(files).toContain("002_lesson-01-les-empty.html");
+		expect(files).toContain("003_lesson-01-les-empty-text-txt-fallback.html");
+		expect(files).toContain("004_lesson-01-les-empty-image-med-image.html");
+		expect(files).toContain("005_lesson-01-les-empty-video-med-video.html");
+	});
+
+	it("keeps global sequence monotonic across intro, curriculum, and materials", async () => {
+		const client = createMockClient();
+		const generator = new SlideGenerator({ client, outputDir });
+
+		const result = await generator.generate();
+		const seq = result.slides.map((s) => Number.parseInt(s.filename.split("_")[0] ?? "0", 10));
+		expect(seq).toEqual([1, 2, 3, 4, 5]);
+	});
 });
 
 // ── Material Template Processing Tests (T020) ──────────────────────────────
@@ -290,6 +396,7 @@ const mockCourseDetail: ServiceCourseDetail = {
 	endDate: new Date(Date.now() + 172800000).toISOString(),
 	participants: [
 		{
+			bookingId: "bk-p1",
 			participationId: "p-1",
 			userId: "u-1",
 			name: "Anna Müller",
@@ -300,6 +407,7 @@ const mockCourseDetail: ServiceCourseDetail = {
 			preparationCompletedAt: "2025-01-10T10:00:00Z",
 		},
 		{
+			bookingId: "bk-p2",
 			participationId: "p-2",
 			userId: "u-2",
 			name: "Ben Fischer",
