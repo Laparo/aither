@@ -1,5 +1,6 @@
 "use client";
 
+import { type EndpointDef, MONITORED_ENDPOINTS } from "@/app/components/endpoint-config";
 import Chip from "@mui/material/Chip";
 import Paper from "@mui/material/Paper";
 import Table from "@mui/material/Table";
@@ -11,57 +12,7 @@ import TableRow from "@mui/material/TableRow";
 import Typography from "@mui/material/Typography";
 import { useEffect, useState } from "react";
 
-export interface EndpointDef {
-	label: string;
-	path: string;
-	method: "GET" | "POST";
-	group: string;
-	probeMethod?: "HEAD" | "GET";
-	fallbackToGetOnHeadUnsupported?: boolean;
-}
-
-const endpoints: EndpointDef[] = [
-	// Slides
-	{ label: "Folien generieren", path: "/api/slides", method: "POST", group: "Präsentation" },
-	{
-		label: "Folien-Status",
-		path: "/api/slides/status",
-		method: "GET",
-		group: "Präsentation",
-	},
-
-	// Recording
-	{ label: "Aufnahme starten", path: "/api/recording/start", method: "POST", group: "Aufnahme" },
-	{ label: "Aufnahme stoppen", path: "/api/recording/stop", method: "POST", group: "Aufnahme" },
-	{ label: "Aufnahme-Status", path: "/api/recording/status", method: "GET", group: "Aufnahme" },
-	{ label: "Aufnahmen auflisten", path: "/api/recording/list", method: "GET", group: "Aufnahme" },
-
-	// Playback
-	{
-		label: "Wiedergabe starten",
-		path: "/api/recording/playback/play",
-		method: "POST",
-		group: "Wiedergabe",
-	},
-	{
-		label: "Wiedergabe stoppen",
-		path: "/api/recording/playback/stop",
-		method: "POST",
-		group: "Wiedergabe",
-	},
-	{
-		label: "Zurückspulen",
-		path: "/api/recording/playback/rewind",
-		method: "POST",
-		group: "Wiedergabe",
-	},
-	{
-		label: "Vorspulen",
-		path: "/api/recording/playback/forward",
-		method: "POST",
-		group: "Wiedergabe",
-	},
-];
+export type { EndpointDef };
 
 type Status = "prüfe" | "erreichbar" | "fehler";
 
@@ -69,6 +20,10 @@ export interface EndpointResult {
 	status: Status;
 	code?: number;
 	probeMethod?: "HEAD" | "GET";
+}
+
+export function getEndpointResultKey(endpoint: Pick<EndpointDef, "method" | "path">): string {
+	return `${endpoint.method} ${endpoint.path}`;
 }
 
 function isRedirectStatus(status: number): boolean {
@@ -137,9 +92,9 @@ export function EndpointStatus() {
 
 		async function run() {
 			const entries = await Promise.all(
-				endpoints.map(async (ep) => {
+				MONITORED_ENDPOINTS.map(async (ep) => {
 					const result = await checkEndpoint(ep);
-					return [ep.path, result] as const;
+					return [getEndpointResultKey(ep), result] as const;
 				}),
 			);
 			if (!cancelled) {
@@ -153,7 +108,7 @@ export function EndpointStatus() {
 		};
 	}, []);
 
-	const groups = [...new Set(endpoints.map((ep) => ep.group))];
+	const groups = [...new Set(MONITORED_ENDPOINTS.map((ep) => ep.group))];
 
 	return (
 		<>
@@ -172,37 +127,35 @@ export function EndpointStatus() {
 								</TableRow>
 							</TableHead>
 							<TableBody>
-								{endpoints
-									.filter((ep) => ep.group === group)
-									.map((ep) => {
-										const r = results.get(ep.path);
-										const status: Status = r?.status ?? "prüfe";
-										return (
-											<TableRow key={ep.path}>
-												<TableCell>{ep.label}</TableCell>
-												<TableCell>{ep.method}</TableCell>
-												<TableCell>
-													<Chip
-														label={
-															status === "prüfe"
-																? "Prüfe…"
-																: status === "erreichbar"
-																	? `Erreichbar${r?.code ? ` (${r.code})` : ""}${r?.probeMethod ? ` • ${r.probeMethod}` : ""}`
-																	: `Fehler${r?.code ? ` (${r.code})` : ""}`
-														}
-														color={
-															status === "prüfe"
-																? "default"
-																: status === "erreichbar"
-																	? "success"
-																	: "error"
-														}
-														size="small"
-													/>
-												</TableCell>
-											</TableRow>
-										);
-									})}
+								{MONITORED_ENDPOINTS.filter((ep) => ep.group === group).map((ep) => {
+									const r = results.get(getEndpointResultKey(ep));
+									const status: Status = r?.status ?? "prüfe";
+									return (
+										<TableRow key={getEndpointResultKey(ep)}>
+											<TableCell>{ep.label}</TableCell>
+											<TableCell>{ep.method}</TableCell>
+											<TableCell>
+												<Chip
+													label={
+														status === "prüfe"
+															? "Prüfe…"
+															: status === "erreichbar"
+																? `Erreichbar${r?.code ? ` (${r.code})` : ""}${r?.probeMethod ? ` • ${r.probeMethod}` : ""}`
+																: `Fehler${r?.code ? ` (${r.code})` : ""}`
+													}
+													color={
+														status === "prüfe"
+															? "default"
+															: status === "erreichbar"
+																? "success"
+																: "error"
+													}
+													size="small"
+												/>
+											</TableCell>
+										</TableRow>
+									);
+								})}
 							</TableBody>
 						</Table>
 					</TableContainer>

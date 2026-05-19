@@ -12,7 +12,7 @@ describes the data shapes consumed by the dashboard components.
 
 ### ServiceCourseDetail (from Hemera API)
 
-Existing type — no changes.
+Existing type — no changes. Note: the Hemera API does not expose `createdAt` on this type. Course tie-breaking for the dashboard uses `startDate` → `id` only.
 
 ```typescript
 interface ServiceCourseDetail {
@@ -108,14 +108,32 @@ interface SlidesListProps {
 }
 
 /** Section C — Steuerung Cards (no props — self-contained client component) */
-// EndpointStatus component reused with visual restructuring
+// Shared endpoint config + probe result reused with visual restructuring
+
+interface EndpointDef {
+  label: string
+  path: string
+  method: "GET" | "POST"
+  group: string
+  probeMethod?: "HEAD" | "GET"
+  fallbackToGetOnHeadUnsupported?: boolean
+}
+
+interface EndpointResult {
+  status: "prüfe" | "erreichbar" | "fehler"
+  code?: number
+  probeMethod?: "HEAD" | "GET"
+}
 ```
 
 ## State Transitions
 
-No state transitions — all data is fetched once at SSR time and rendered
-statically. Client components (`EndpointStatus`, `SlideGenerateButton`)
-manage their own internal state as before.
+Primary data (course detail, slide status) is fetched once at SSR time and rendered statically. Client components manage independent polling and interaction state:
+
+- **SteuerungCards**: Polls endpoints every 10 s; per-endpoint state cycles through `prüfe → erreichbar | fehler` with HEAD→GET fallback.
+- **CameraSnapshot**: Polls `/api/recording/snapshot` with additive backoff on failure (10 s → 20 s → 30 s cap); resets on success; pauses when tab hidden.
+- **SlideGenerateButton**: Self-contained generation trigger with internal loading/success/error state.
+- **ParticipantsList**: Client-side expand/collapse toggling of participant detail panels.
 
 ## Validation Rules
 

@@ -28,7 +28,7 @@ npm run dev
 
 ```bash
 # Unit tests (new dashboard component tests)
-npx vitest run tests/unit/dashboard-*.spec.ts
+npx vitest run 'tests/unit/dashboard-*.spec.ts'
 npx vitest run tests/unit/theme-tokens.spec.ts
 
 # All unit tests

@@ -28,7 +28,9 @@ export function selectNextCourse(courses: ServiceCourse[]): ServiceCourse | null
 		// Both startDates are guaranteed non-null after filter
 		const dateA = a.startDate ? new Date(a.startDate).getTime() : 0;
 		const dateB = b.startDate ? new Date(b.startDate).getTime() : 0;
-		return dateA - dateB;
+		if (dateA !== dateB) return dateA - dateB;
+		// Tie-break by lexicographically smallest id
+		return a.id.localeCompare(b.id);
 	});
 
 	return futureCourses[0];

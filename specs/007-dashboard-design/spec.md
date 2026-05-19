@@ -28,9 +28,9 @@ Two cards displayed side-by-side (`gridTemplateColumns: { xs: '1fr', md: '1fr 1f
    - Start date, end date
    - Participant count
    - Data source: `ServiceCourseDetail` from Hemera API (`fetchNextCourseDetail()`)
-   - **Empty state**: When `fetchNextCourseDetail()` returns no course, render the `Paper` card with a centered "Keine anstehenden Kurse" message and an optional CTA to view all courses. ARIA `role="status"` on the empty message.
-   - **Error state**: When `fetchNextCourseDetail()` throws or returns an HTTP error, render an error message ("Kursdaten konnten nicht geladen werden") with a retry button that re-invokes `fetchNextCourseDetail()`. Log the error details (status code, message) for debugging.
-   - **Tie-breaking**: If multiple courses share the same start date, select the one with the earliest `createdAt` timestamp. If `createdAt` is also identical, break the tie by selecting the course with the lexicographically smallest `id` (ascending string comparison). This guarantees a fully deterministic selection. Test example: two courses starting 2026-04-01 with `createdAt` 08:00 — course with `id: "abc"` is selected over `id: "def"`. Another example: two courses starting 2026-04-01 with `createdAt` 08:00 and 09:00 — the 08:00 course is displayed.
+   - **Empty state**: When `fetchNextCourseDetail()` returns no course, render the `Paper` card with a centered "Keine anstehenden Kurse" message. No CTA is included in this iteration (deferred to a future spec). ARIA `role="status"` on the empty message.
+   - **Error state**: When `fetchNextCourseDetail()` throws or returns an HTTP error, `CourseCard` does **not** catch or render the error itself. Instead, errors propagate to the page level (`page.tsx`), which renders an `Alert` with the message "Kursdaten konnten nicht geladen werden". The page-level error boundary (`error.tsx`) provides the retry button via `router.refresh()`. All error events are logged centrally via `reportError` with status code and message for monitoring.
+   - **Tie-breaking**: If multiple courses share the same start date, break the tie by selecting the course with the lexicographically smallest `id` (ascending string comparison). This guarantees a fully deterministic selection without requiring fields beyond what the Hemera API provides. Test example: two courses starting 2026-04-01 — course with `id: "abc"` is selected over `id: "def"`.
 
 2. **Course Material Card** (right) — A `Paper`-based card displaying the slide/material generation status:
    - Generation status chip (Generiert / Nicht generiert)
@@ -40,7 +40,7 @@ Two cards displayed side-by-side (`gridTemplateColumns: { xs: '1fr', md: '1fr 1f
    - Generate button (existing `SlideGenerateButton` component)
    - Data source: `fetchSlideStatus()` from local filesystem
    - **Loading state**: While `fetchSlideStatus()` is pending, display a `Skeleton` placeholder matching the card layout (chip skeleton, text skeleton lines, thumbnail placeholder area).
-   - **Error state**: When filesystem access fails (e.g., `ENOENT`, `EACCES` or other I/O errors), render an error message ("Folienstatus konnte nicht geladen werden") with a retry button. Log the error.
+   - **Error state**: When filesystem access fails (e.g., `ENOENT`, `EACCES` or other I/O errors), render an error message ("Folienstatus konnte nicht geladen werden") with a retry button. **Retry mechanism**: The retry button calls `router.refresh()` (Next.js App Router) to re-run the server component data fetch. Log the error via `reportError`.
    - **Empty state**: When `fetchSlideStatus()` returns zero slides, render a "Keine Folien vorhanden" message with the `SlideGenerateButton` as CTA.
    - `SlideThumbnails` expects `{ files: string[] }` (array of file paths). `SlideGenerateButton` is self-contained and requires no additional props from `fetchSlideStatus()`.
 
@@ -57,16 +57,16 @@ Two lists displayed side-by-side (`gridTemplateColumns: { xs: '1fr', md: '1fr 1f
      - Preparation intent
      - Desired results
      - Line manager profile
-   - **Avatar fallbacks**: When name is null or empty, the `Avatar` displays a generic person icon (MUI `PersonIcon`) with the label "Unbekannt".
+   - **Avatar fallbacks**: When name is null, empty, or contains only whitespace/special characters such that no letter-based initials can be extracted, the `Avatar` displays the glyph `"?"` with `AVATAR_COLORS[0]` as the background color and the label "Unbekannt". `AVATAR_COLORS` is defined in `src/app/components/dashboard/section-b-participants-list.tsx` as an array of hex color strings (e.g. `["#884143", "#926A49", ...]`); `AVATAR_COLORS[0]` (`"#884143"` / marsala) is the fallback background.
    - **Empty state**: When no participants exist, the `Paper` renders "Keine Teilnehmer vorhanden" with explanatory text and no CTA (participants are managed in Hemera).
-   - **Sorting**: `ParticipantsList` sorts participants alphabetically by `lastName` (ascending), with normalization (`trim()` + `toLowerCase()`) applied before comparison. Participants whose `lastName` is null, undefined, or empty string are always sorted **to the end** of the list (after all participants with a non-empty `lastName`). Among those end-sorted participants, relative order is determined by `firstName`. If `lastName` is equal after normalization, sort by `firstName` (same normalization). Participants whose `firstName` is also null, undefined, or empty string are sorted to the end within their `lastName` group. The sorting is stable and deterministic. Applied client-side within the `ParticipantsList` component (prop `participants` is the unsorted server response).
+   - **Sorting**: `ParticipantsList` sorts participants alphabetically by `name` (ascending), with normalization (`trim()` + `toLowerCase()`) applied before comparison. Participants whose `name` is null, undefined, or empty string are always sorted **to the end** of the list (after all participants with a non-empty `name`). If two names are identical after normalization, their relative order is preserved (stable sort). The sorting is deterministic. Applied client-side within the `ParticipantsList` component (prop `participants` is the unsorted server response).
    - Data source: `ServiceCourseDetail.participants` from Hemera API
 
 2. **Course Slides List** (right) — A `Paper`-based list of all generated slide files:
    - Slide filename
    - Clickable link to preview the slide: clicking opens a preview Modal (not a new tab) displaying the slide content. The Modal includes a close button and the slide filename as title.
-   - **Error fallback for files**: If a file from `fetchSlideStatus().files` is missing or corrupted (HTTP 404/500 or read error when accessed), the Modal shows an error state ("Datei konnte nicht geladen werden") with a retry button and logs the faulty file path.
-   - **Empty state**: When `fetchSlideStatus().files` is empty, render the `Paper` with "Keine Folien generiert." message, an illustration placeholder, and a hint to generate slides.
+   - **Error fallback for files**: If a file from `fetchSlideStatus().files` is missing or corrupted (HTTP 404/500 or read error when accessed), the Modal shows an error state ("Datei konnte nicht geladen werden") with a retry button. The retry button calls `router.refresh()` to re-run the server component data fetch (consistent with the page-level retry mechanism). The button shows a loading state while the refresh is pending. The faulty file path is logged via `reportError` on both initial failure and retry failure.
+   - **Empty state**: When `fetchSlideStatus().files` is empty, render the `Paper` with "Keine Folien generiert." message, a centered `DescriptionIcon` (MUI, 48 px, `color='text.disabled'`) as visual placeholder, and a hint to generate slides.
    - **State mapping**: `fetchSlideStatus().files` maps to UI states as follows: pending fetch → loading skeleton, successful response with files → file list (ready), successful response with empty array → empty state, I/O error / exception → error state with retry.
    - Data source: `fetchSlideStatus().files` from local filesystem
 
@@ -74,11 +74,12 @@ Two lists displayed side-by-side (`gridTemplateColumns: { xs: '1fr', md: '1fr 1f
 
 1. **Steuerung (Endpoints & Controls)** — A list of `Paper`-based cards under the heading "Steuerung", each representing a monitored endpoint or control:
    - Existing `EndpointStatus` component content, restructured as individual cards
-   - Each card shows: endpoint path, HTTP method, connectivity status chip
-   - **Endpoint DTO**: Each endpoint is represented as `EndpointStatus { id: string, path: string, method: 'GET' | 'POST' | 'PUT' | 'DELETE', status: 'ok' | 'degraded' | 'down', lastCheck: string (ISO date), latencyMs: number | null, errorMessage?: string }`
-   - **Displayed fields**: `path`, `method`, `status` (as Chip color), `latencyMs` (shown in card when available)
-   - **Status rendering**: `status === 'ok'` → green `Chip` label "OK"; `status === 'degraded'` → orange `Chip` label "Degraded"; `status === 'down'` → red `Chip` label "Fehler" with `errorMessage` as `Tooltip` content and `aria-label`
-   - **Accessibility**: Each status `Chip` has `aria-label` combining endpoint path, method, and status (e.g., "/api/recording/start POST: OK")
+   - Each card shows: endpoint path, configured HTTP method, connectivity status chip
+   - **Shared endpoint config**: Endpoint definitions are sourced from `src/app/components/endpoint-config.ts` as `EndpointDef { label: string, path: string, method: 'GET' | 'POST', group: string, probeMethod?: 'HEAD' | 'GET', fallbackToGetOnHeadUnsupported?: boolean }`
+   - **Runtime probe result**: Health checks resolve to `EndpointResult { status: 'prüfe' | 'erreichbar' | 'fehler', code?: number, probeMethod?: 'HEAD' | 'GET' }`
+   - **Displayed fields**: `path`, `method`, and the connectivity result; HTTP status code and the effective probe method MAY be surfaced as supporting detail when available
+   - **Status rendering**: `status === 'prüfe'` → neutral `Chip` label "Laden…"; `status === 'erreichbar'` → green `Chip` label "OK"; `status === 'fehler'` → red `Chip` label "Error" with HTTP code or network context available via tooltip text
+   - **Shared logic rule**: `SteuerungCards` and the legacy `EndpointStatus` table MUST import the same `MONITORED_ENDPOINTS` source of truth
    - Data source: existing endpoint health check logic from `EndpointStatus` component
 
 #### Section D — Kamera (bottom)
@@ -87,6 +88,7 @@ Two lists displayed side-by-side (`gridTemplateColumns: { xs: '1fr', md: '1fr 1f
    - Existing `CameraSnapshot` component embedded
    - Section heading: "Kamera"
    - Data source: existing camera snapshot API (`/api/recording/snapshot`)
+   - **Ownership rule**: `CameraSection` is a visual wrapper only; loading, retry, reconnect, polling, and backoff behavior remain owned by `CameraSnapshot`
    - **Loading state**: On initial mount, render a `Skeleton` placeholder (matching the `CameraSnapshot` aspect ratio) until the first snapshot response arrives.
    - **Error state**: When `/api/recording/snapshot` returns an error or is unreachable, display a fallback placeholder image with the message "Kamera nicht verfügbar" and a retry button. Log the error.
    - **Auto-refresh**: The `CameraSnapshot` component polls `/api/recording/snapshot` every **10 seconds** (configurable via prop `refreshIntervalMs`, default `10000`). On successful fetch, the interval resets to the base value (`refreshIntervalMs`). On error, the component uses **incremental (additive) backoff**: the interval increases by `refreshIntervalMs` each failure (10s → 20s → 30s), capped at **30 seconds**. Retries continue **indefinitely** at the capped interval until a successful response resets the interval. Polling pauses when the browser tab is not visible (`document.hidden`) and resumes immediately on tab focus (triggering one fetch, then resuming the normal interval).
@@ -116,6 +118,7 @@ Two lists displayed side-by-side (`gridTemplateColumns: { xs: '1fr', md: '1fr 1f
 | C | `endpoint-card-{index}` | Individual endpoint card (0-based) |
 | D | `camera-card` | CameraSection |
 | D | `camera-snapshot` | CameraSnapshot image element |
+| B | `slide-preview-modal` | SlidesList preview Dialog |
 
 ### Performance Goals
 

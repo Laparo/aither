@@ -8,9 +8,9 @@
 import { requireAdmin } from "@/lib/auth/role-check";
 import { getRouteAuth } from "@/lib/auth/route-auth";
 import {
-	createHemeraClient,
 	HemeraConfigurationError,
 	HemeraUnreachableError,
+	createHemeraClient,
 } from "@/lib/hemera/factory";
 import { reportError } from "@/lib/monitoring/rollbar-official";
 import { getRecordingById } from "@/lib/recording/file-manager";
@@ -87,13 +87,16 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 		// Forward to hemera.academy via transmitRecording
 		let transmitted = false;
 		let transmissionError: string | null = null;
+		let currentPhase: "createHemeraClient" | "transmitRecording" = "createHemeraClient";
 
 		try {
+			currentPhase = "createHemeraClient";
 			const client = await createHemeraClient({
 				requestId,
 				route: `/api/recording/upload/${id}`,
 				method: "POST",
 			});
+			currentPhase = "transmitRecording";
 			const transmitResult = await transmitRecording(client, {
 				seminarSourceId,
 				muxAssetId: muxResult.muxAssetId,
@@ -106,22 +109,48 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 				transmissionError = transmitResult.error ?? "Unknown transmission error";
 			}
 		} catch (err) {
-			const isTransient = err instanceof HemeraUnreachableError;
-			const isConfiguration = err instanceof HemeraConfigurationError;
-			const message = err instanceof Error ? err.message : String(err);
-			transmissionError = message;
-			reportError(
-				err instanceof Error ? err : new Error(message),
-				{
+			if (err instanceof HemeraUnreachableError) {
+				transmissionError = err.message;
+				reportError(
+					err,
+					{
+						requestId,
+						route: `/api/recording/upload/${id}`,
+						method: "POST",
+						additionalData: {
+							component: "recording.upload.route",
+							phase: currentPhase,
+							failureType: "network",
+						},
+					},
+					"warning",
+				);
+			} else if (err instanceof HemeraConfigurationError) {
+				transmissionError = err.message;
+				reportError(err, {
 					requestId,
 					route: `/api/recording/upload/${id}`,
 					method: "POST",
 					additionalData: {
-						failureType: isTransient ? "network" : isConfiguration ? "configuration" : "unknown",
+						component: "recording.upload.route",
+						phase: currentPhase,
+						failureType: "configuration",
 					},
-				},
-				isTransient ? "warning" : "error",
-			);
+				});
+			} else {
+				const message = err instanceof Error ? err.message : String(err);
+				transmissionError = message;
+				reportError(err instanceof Error ? err : new Error(message), {
+					requestId,
+					route: `/api/recording/upload/${id}`,
+					method: "POST",
+					additionalData: {
+						component: "recording.upload.route",
+						phase: currentPhase,
+						failureType: "unknown",
+					},
+				});
+			}
 		}
 
 		// If MUX succeeded but hemera transmission failed → 207 Multi-Status

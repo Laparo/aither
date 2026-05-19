@@ -1,5 +1,12 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import { ConnectionStatus } from "@/app/components/dashboard/connection-status";
+import { CourseCard } from "@/app/components/dashboard/section-a-course-card";
+import { MaterialCard } from "@/app/components/dashboard/section-a-material-card";
+import { ParticipantsList } from "@/app/components/dashboard/section-b-participants-list";
+import { SteuerungCards } from "@/app/components/dashboard/section-c-steuerung-cards";
+import { CameraSection } from "@/app/components/dashboard/section-d-camera-card";
+import type { SlideStatus } from "@/app/components/dashboard/types";
 import { HemeraClient } from "@/lib/hemera/client";
 import {
 	type ServiceCourseDetail,
@@ -10,40 +17,9 @@ import { getTokenManager } from "@/lib/hemera/token-manager";
 import { selectNextCourse } from "@/lib/sync/course-selector";
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
-import Chip from "@mui/material/Chip";
-import Paper from "@mui/material/Paper";
-import Table from "@mui/material/Table";
-import TableBody from "@mui/material/TableBody";
-import TableCell from "@mui/material/TableCell";
-import TableContainer from "@mui/material/TableContainer";
-import TableHead from "@mui/material/TableHead";
-import TableRow from "@mui/material/TableRow";
+import Breadcrumbs from "@mui/material/Breadcrumbs";
+import Container from "@mui/material/Container";
 import Typography from "@mui/material/Typography";
-import { CameraSnapshot } from "./components/camera-snapshot";
-import { EndpointStatus } from "./components/endpoint-status";
-import { SlideGenerateButton } from "./components/slide-generate-button";
-import { SlideThumbnails } from "./components/slide-thumbnails";
-
-const levelLabels: Record<string, string> = {
-	BEGINNER: "Grundkurs",
-	INTERMEDIATE: "Fortgeschritten",
-	ADVANCED: "Masterclass",
-};
-
-function formatDate(iso: string | null): string {
-	if (!iso) return "–";
-	const d = new Date(iso);
-	if (Number.isNaN(d.getTime())) return "–";
-	return d.toLocaleDateString("de-DE", {
-		day: "2-digit",
-		month: "2-digit",
-		year: "numeric",
-	});
-}
-
-function dash(value: string | null | undefined): string {
-	return value ?? "–";
-}
 
 /** Create an authenticated HemeraClient for SSR data fetching. */
 function createClient(): HemeraClient | null {
@@ -61,14 +37,6 @@ function createClient(): HemeraClient | null {
 		fetchFn: (input, init) =>
 			fetch(input, { ...init, signal: AbortSignal.timeout(5_000), cache: "no-store" }),
 	});
-}
-
-interface SlideStatus {
-	status: "generated" | "not-generated";
-	slideCount: number;
-	lastUpdated: string | null;
-	files: string[];
-	courseId: string | null;
 }
 
 async function fetchSlideStatus(courseId: string | null): Promise<SlideStatus> {
@@ -163,166 +131,73 @@ export default async function Home() {
 	const slideStatus = await fetchSlideStatus(slideCourseId);
 
 	return (
-		<Box component="main" sx={{ maxWidth: 960, mx: "auto", p: 3 }}>
-			<Typography variant="h3" component="h1" gutterBottom>
-				Aither
-			</Typography>
-			<Typography variant="subtitle1" color="text.secondary" gutterBottom>
-				Hemera Academy Integration
-			</Typography>
+		<Container component="main" maxWidth="lg" sx={{ py: { xs: 4, md: 6 } }}>
+			<Breadcrumbs separator="›" sx={{ mb: 2 }}>
+				<Typography
+					color="text.primary"
+					variant="body2"
+					sx={{ display: "flex", alignItems: "center", gap: 0.5 }}
+				>
+					<svg
+						xmlns="http://www.w3.org/2000/svg"
+						width="18"
+						height="18"
+						viewBox="0 0 24 24"
+						fill="currentColor"
+						aria-hidden="true"
+					>
+						<path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z" />
+					</svg>
+					Admin Dashboard
+				</Typography>
+			</Breadcrumbs>
 
-			{/* --- Error Fallback (T024) --- */}
-			{fetchError && (
-				<Alert severity="warning" data-testid="homepage-error-fallback" sx={{ mt: 3 }}>
-					Kursdaten konnten nicht geladen werden.
-				</Alert>
-			)}
+			<Box sx={{ mb: 4 }}>
+				<Typography variant="h4" component="h1" gutterBottom>
+					Berichte &amp; Analysen
+				</Typography>
+				<Typography variant="body1" color="text.secondary">
+					Statistiken, Auslastung und Systemstatus auf einen Blick.
+				</Typography>
+			</Box>
 
-			{/* --- No Upcoming Course --- */}
+			{fetchError && <ConnectionStatus probeUrl="/api/hemera-health" />}
+
 			{!fetchError && !courseDetail && (
-				<Alert severity="info" data-testid="no-upcoming-course" sx={{ mt: 3 }}>
+				<Alert severity="info" data-testid="no-upcoming-course" sx={{ mt: 3, mb: 3 }}>
 					Kein kommender Kurs verfügbar.
 				</Alert>
 			)}
 
-			{/* --- Course Details Table (T022) --- */}
 			{courseDetail && (
-				<>
-					<Typography variant="h5" sx={{ mt: 4, mb: 1 }}>
-						Nächster Kurs
-					</Typography>
-					<TableContainer component={Paper} data-testid="course-details-table">
-						<Table size="small">
-							<TableBody>
-								<TableRow>
-									<TableCell component="th" sx={{ fontWeight: 600, width: "30%" }}>
-										Kurs
-									</TableCell>
-									<TableCell>{courseDetail.title}</TableCell>
-								</TableRow>
-								<TableRow>
-									<TableCell component="th" sx={{ fontWeight: 600 }}>
-										Level
-									</TableCell>
-									<TableCell>{levelLabels[courseDetail.level] ?? courseDetail.level}</TableCell>
-								</TableRow>
-								<TableRow>
-									<TableCell component="th" sx={{ fontWeight: 600 }}>
-										Startdatum
-									</TableCell>
-									<TableCell>{formatDate(courseDetail.startDate)}</TableCell>
-								</TableRow>
-								<TableRow>
-									<TableCell component="th" sx={{ fontWeight: 600 }}>
-										Enddatum
-									</TableCell>
-									<TableCell>{formatDate(courseDetail.endDate)}</TableCell>
-								</TableRow>
-								<TableRow>
-									<TableCell component="th" sx={{ fontWeight: 600 }}>
-										Teilnehmerzahl
-									</TableCell>
-									<TableCell>{courseDetail.participants.length}</TableCell>
-								</TableRow>
-							</TableBody>
-						</Table>
-					</TableContainer>
-				</>
+				<Box
+					sx={{
+						display: "grid",
+						gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" },
+						gap: 2,
+						alignItems: "stretch",
+						mb: { xs: 4, md: 6 },
+					}}
+				>
+					<CourseCard course={courseDetail} />
+					<MaterialCard slideStatus={slideStatus} />
+				</Box>
 			)}
 
-			{/* --- Slide Status --- */}
-			<Typography variant="h5" sx={{ mt: 4, mb: 1 }}>
-				Seminarmaterial
-			</Typography>
-			<TableContainer component={Paper} data-testid="slide-status-table">
-				<Table size="small">
-					<TableBody>
-						<TableRow>
-							<TableCell component="th" sx={{ fontWeight: 600, width: "30%" }}>
-								Status
-							</TableCell>
-							<TableCell>
-								<Chip
-									label={slideStatus.status === "generated" ? "Generiert" : "Nicht generiert"}
-									color={slideStatus.status === "generated" ? "success" : "default"}
-									size="small"
-								/>
-							</TableCell>
-						</TableRow>
-						<TableRow>
-							<TableCell component="th" sx={{ fontWeight: 600 }}>
-								Letzte Aktualisierung
-							</TableCell>
-							<TableCell>{formatDate(slideStatus.lastUpdated)}</TableCell>
-						</TableRow>
-						<TableRow>
-							<TableCell component="th" sx={{ fontWeight: 600 }}>
-								Anzahl Seiten
-							</TableCell>
-							<TableCell>{slideStatus.slideCount}</TableCell>
-						</TableRow>
-					</TableBody>
-				</Table>
-			</TableContainer>
-			{slideStatus.files.length > 0 && slideStatus.courseId && (
-				<SlideThumbnails courseId={slideStatus.courseId} files={slideStatus.files} />
-			)}
-			<SlideGenerateButton />
-
-			{/* --- Participants Table (T023) --- */}
 			{courseDetail && (
-				<>
-					<Typography variant="h5" sx={{ mt: 4, mb: 1 }}>
-						Teilnehmer &amp; Vorbereitungen
-					</Typography>
-					{courseDetail.participants.length === 0 ? (
-						<Typography color="text.secondary">Keine Teilnehmer.</Typography>
-					) : (
-						<TableContainer component={Paper} data-testid="participants-table">
-							<Table size="small">
-								<TableHead>
-									<TableRow>
-										<TableCell sx={{ fontWeight: 600 }}>Name</TableCell>
-										<TableCell sx={{ fontWeight: 600 }}>Vorbereitungsabsicht</TableCell>
-										<TableCell sx={{ fontWeight: 600 }}>Gewünschte Ergebnisse</TableCell>
-										<TableCell sx={{ fontWeight: 600 }}>Vorgesetzten-Profil</TableCell>
-										<TableCell sx={{ fontWeight: 600 }}>Vorbereitung abgeschlossen</TableCell>
-									</TableRow>
-								</TableHead>
-								<TableBody>
-									{courseDetail.participants.map((p) => (
-										<TableRow key={p.participationId}>
-											<TableCell>{dash(p.name)}</TableCell>
-											<TableCell sx={{ wordBreak: "break-word" }}>
-												{dash(p.preparationIntent)}
-											</TableCell>
-											<TableCell sx={{ wordBreak: "break-word" }}>
-												{dash(p.desiredResults)}
-											</TableCell>
-											<TableCell sx={{ wordBreak: "break-word" }}>
-												{dash(p.lineManagerProfile)}
-											</TableCell>
-											<TableCell>{p.preparationCompletedAt !== null ? "Ja" : "–"}</TableCell>
-										</TableRow>
-									))}
-								</TableBody>
-							</Table>
-						</TableContainer>
-					)}
-				</>
+				<Box sx={{ mb: { xs: 4, md: 6 } }}>
+					<ParticipantsList
+						participants={courseDetail.participants}
+						hemeraBaseUrl={process.env.HEMERA_API_BASE_URL}
+					/>
+				</Box>
 			)}
 
-			{/* --- Camera Status --- */}
-			<Typography variant="h5" sx={{ mt: 4, mb: 1 }}>
-				Kamera
-			</Typography>
-			<CameraSnapshot />
+			<Box sx={{ mb: { xs: 4, md: 6 } }}>
+				<SteuerungCards />
+			</Box>
 
-			{/* --- Steuerung (endpoint health) --- */}
-			<Typography variant="h5" sx={{ mt: 4, mb: 1 }}>
-				Steuerung
-			</Typography>
-			<EndpointStatus />
-		</Box>
+			<CameraSection />
+		</Container>
 	);
 }

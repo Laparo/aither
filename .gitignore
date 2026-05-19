@@ -12,6 +12,8 @@ out/
 .env
 .env.local
 .env.*.local
+.env.*
+!.env.example
 .env.backup
 .env.local.backup
 
