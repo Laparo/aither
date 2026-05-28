@@ -29,7 +29,6 @@ export function selectNextCourse(courses: ServiceCourse[]): ServiceCourse | null
 		const dateA = a.startDate ? new Date(a.startDate).getTime() : 0;
 		const dateB = b.startDate ? new Date(b.startDate).getTime() : 0;
 		if (dateA !== dateB) return dateA - dateB;
-		// Tie-break by lexicographically smallest id
 		return a.id.localeCompare(b.id);
 	});
 

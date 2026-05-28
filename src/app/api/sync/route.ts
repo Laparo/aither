@@ -7,12 +7,8 @@
 import { requireAdmin } from "@/lib/auth/role-check";
 import { getRouteAuth } from "@/lib/auth/route-auth";
 import { loadConfig } from "@/lib/config";
-import {
-	HemeraConfigurationError,
-	HemeraUnreachableError,
-	createHemeraClient,
-} from "@/lib/hemera/factory";
-import { reportError, rollbar } from "@/lib/monitoring/rollbar-official";
+import { createHemeraClient } from "@/lib/hemera/factory";
+import { rollbar } from "@/lib/monitoring/rollbar-official";
 import { SyncOrchestrator } from "@/lib/sync/orchestrator";
 import type { DataSyncJob } from "@/lib/sync/types";
 import { type NextRequest, NextResponse } from "next/server";
@@ -168,94 +164,7 @@ export async function POST(_req: NextRequest) {
 		const cfg = loadConfig();
 		const outputDir = cfg.HTML_OUTPUT_DIR;
 
-		let client: Awaited<ReturnType<typeof createHemeraClient>>;
-		try {
-			client = await createHemeraClient({
-				requestId,
-				route: "/api/sync",
-				method: "POST",
-			});
-		} catch (err) {
-			isSyncRunning = false;
-			syncStartedAt = null;
-			currentJob = null;
-
-			if (err instanceof HemeraUnreachableError) {
-				reportError(
-					err,
-					{
-						requestId,
-						route: "/api/sync",
-						method: "POST",
-						additionalData: {
-							component: "sync.route",
-							phase: "createHemeraClient",
-							failureType: "network",
-						},
-					},
-					"warning",
-				);
-				return NextResponse.json(
-					{
-						success: false,
-						error: {
-							code: "HEMERA_UNREACHABLE",
-							message: err.message,
-						},
-						meta: buildMeta(requestId),
-					},
-					{ status: 503 },
-				);
-			}
-
-			if (err instanceof HemeraConfigurationError) {
-				reportError(err, {
-					requestId,
-					route: "/api/sync",
-					method: "POST",
-					additionalData: {
-						component: "sync.route",
-						phase: "createHemeraClient",
-						failureType: "configuration",
-					},
-				});
-				return NextResponse.json(
-					{
-						success: false,
-						error: {
-							code: "HEMERA_CONFIGURATION_ERROR",
-							message: err.message,
-						},
-						meta: buildMeta(requestId),
-					},
-					{ status: 500 },
-				);
-			}
-
-			const unknownError = err instanceof Error ? err : new Error(String(err));
-			reportError(unknownError, {
-				requestId,
-				route: "/api/sync",
-				method: "POST",
-				additionalData: {
-					component: "sync.route",
-					phase: "init_failed",
-					failureType: "init_failed",
-				},
-			});
-			return NextResponse.json(
-				{
-					success: false,
-					error: {
-						code: "HEMERA_CLIENT_INIT_FAILED",
-						message: unknownError.message,
-					},
-					meta: buildMeta(requestId),
-				},
-				{ status: 500 },
-			);
-		}
-
+		const client = await createHemeraClient();
 		const orchestrator = new SyncOrchestrator({
 			client,
 			outputDir,

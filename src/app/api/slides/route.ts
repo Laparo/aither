@@ -6,14 +6,9 @@
 import { requireAdmin } from "@/lib/auth/role-check";
 import { getRouteAuth } from "@/lib/auth/route-auth";
 import { loadConfig } from "@/lib/config";
-import {
-	HemeraConfigurationError,
-	HemeraUnreachableError,
-	createHemeraClient,
-} from "@/lib/hemera/factory";
+import { createHemeraClient } from "@/lib/hemera/factory";
 import { reportError } from "@/lib/monitoring/rollbar-official";
 import { SlideGenerator } from "@/lib/slides/generator";
-import { getOrCreateRequestIdFromHeaders } from "@/lib/utils/request-id";
 import { type NextRequest, NextResponse } from "next/server";
 
 // ── In-memory state (transient, Constitution VII) ─────────────────────────
@@ -27,9 +22,7 @@ export function _resetState() {
 
 // ── POST /api/slides — Trigger slide generation ──────────────────────────
 
-export async function POST(req: NextRequest) {
-	const requestId = getOrCreateRequestIdFromHeaders(req.headers);
-
+export async function POST(_req: NextRequest) {
 	// Skip auth only when explicitly opted in for local dev usage
 	const skipAuth =
 		process.env.NODE_ENV === "development" && process.env.SKIP_AUTH_IN_DEV === "true";
@@ -58,11 +51,7 @@ export async function POST(req: NextRequest) {
 		const cfg = loadConfig();
 		const outputDir = cfg.SLIDES_OUTPUT_DIR;
 
-		const client = await createHemeraClient({
-			requestId,
-			route: "/api/slides",
-			method: "POST",
-		});
+		const client = await createHemeraClient();
 		const generator = new SlideGenerator({ client, outputDir });
 
 		const result = await generator.generate();
@@ -77,77 +66,15 @@ export async function POST(req: NextRequest) {
 			{ status: 200 },
 		);
 	} catch (err) {
-		if (err instanceof HemeraUnreachableError) {
-			reportError(
-				err,
-				{
-					requestId,
-					route: "/api/slides",
-					method: "POST",
-					additionalData: {
-						feature: "slide-generation",
-						code: "HEMERA_UNREACHABLE",
-						component: "slides.route",
-						phase: "createHemeraClient",
-						failureType: "network",
-					},
-				},
-				"warning",
-			);
-			return NextResponse.json(
-				{
-					status: "failed",
-					code: "HEMERA_UNREACHABLE",
-					requestId,
-					error: err.message,
-				},
-				{ status: 503 },
-			);
-		}
-
-		if (err instanceof HemeraConfigurationError) {
-			reportError(err, {
-				requestId,
-				route: "/api/slides",
-				method: "POST",
-				additionalData: {
-					feature: "slide-generation",
-					code: "HEMERA_CONFIGURATION_ERROR",
-					component: "slides.route",
-					phase: "createHemeraClient",
-					failureType: "configuration",
-				},
-			});
-			return NextResponse.json(
-				{
-					status: "failed",
-					code: "HEMERA_CONFIGURATION_ERROR",
-					requestId,
-					error: err.message,
-				},
-				{ status: 500 },
-			);
-		}
-
-		const unknownError = err instanceof Error ? err : new Error(String(err));
-		reportError(unknownError, {
-			requestId,
+		reportError(err instanceof Error ? err : new Error(String(err)), {
 			route: "/api/slides",
 			method: "POST",
-			additionalData: {
-				feature: "slide-generation",
-				code: "SLIDES_GENERATION_FAILED",
-				component: "slides.route",
-				phase: "runtime",
-				failureType: "unknown",
-			},
+			additionalData: { feature: "slide-generation" },
 		});
 		return NextResponse.json(
 			{
 				status: "failed",
-				code: "SLIDES_GENERATION_FAILED",
-				requestId,
-				error: unknownError.message,
+				error: err instanceof Error ? err.message : String(err),
 			},
 			{ status: 500 },
 		);

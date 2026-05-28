@@ -86,8 +86,8 @@ export function CameraSnapshot() {
 	const requestNonceRef = useRef(0);
 
 	const reconnect = useCallback(() => {
-		setAttempt((a) => {
-			const next = getReconnectState(a);
+		setAttempt((attempt) => {
+			const next = getReconnectState(attempt);
 			setSrc(next.src);
 			setError(next.error);
 			setLoading(next.loading);

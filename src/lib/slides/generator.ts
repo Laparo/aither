@@ -75,7 +75,6 @@ function mediaDescriptor(
 	media: { sourceId: string; mediaType: "image" | "video"; altText: string | null },
 	lessonIdDescriptor: string,
 ): string {
-	// Legacy /media endpoint exposes altText instead of title; use it as title-equivalent.
 	const mediaTitleSlug = slugify(media.altText ?? "");
 	const mediaIdDescriptor = stableIdDescriptor(media.sourceId);
 	if (mediaTitleSlug) return `${mediaTitleSlug}-${mediaIdDescriptor}`;

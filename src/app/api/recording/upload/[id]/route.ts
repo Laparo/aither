@@ -7,11 +7,7 @@
 
 import { requireAdmin } from "@/lib/auth/role-check";
 import { getRouteAuth } from "@/lib/auth/route-auth";
-import {
-	HemeraConfigurationError,
-	HemeraUnreachableError,
-	createHemeraClient,
-} from "@/lib/hemera/factory";
+import { createHemeraClient } from "@/lib/hemera/factory";
 import { reportError } from "@/lib/monitoring/rollbar-official";
 import { getRecordingById } from "@/lib/recording/file-manager";
 import { uploadToMux } from "@/lib/recording/mux-uploader";
@@ -19,13 +15,10 @@ import { MuxUploadRequestSchema } from "@/lib/recording/schemas";
 import { isRecording } from "@/lib/recording/session-manager";
 import { transmitRecording } from "@/lib/sync/recording-transmitter";
 import { ErrorCodes, createErrorResponse, createSuccessResponse } from "@/lib/utils/api-response";
-import { getOrCreateRequestIdFromHeaders } from "@/lib/utils/request-id";
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-	const requestId = getOrCreateRequestIdFromHeaders(req.headers);
-
 	const authData = await getRouteAuth();
 	const authResult = requireAdmin(authData);
 	if (authResult.status !== 200) {
@@ -87,16 +80,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 		// Forward to hemera.academy via transmitRecording
 		let transmitted = false;
 		let transmissionError: string | null = null;
-		let currentPhase: "createHemeraClient" | "transmitRecording" = "createHemeraClient";
 
 		try {
-			currentPhase = "createHemeraClient";
-			const client = await createHemeraClient({
-				requestId,
-				route: `/api/recording/upload/${id}`,
-				method: "POST",
-			});
-			currentPhase = "transmitRecording";
+			const client = await createHemeraClient();
 			const transmitResult = await transmitRecording(client, {
 				seminarSourceId,
 				muxAssetId: muxResult.muxAssetId,
@@ -109,48 +95,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 				transmissionError = transmitResult.error ?? "Unknown transmission error";
 			}
 		} catch (err) {
-			if (err instanceof HemeraUnreachableError) {
-				transmissionError = err.message;
-				reportError(
-					err,
-					{
-						requestId,
-						route: `/api/recording/upload/${id}`,
-						method: "POST",
-						additionalData: {
-							component: "recording.upload.route",
-							phase: currentPhase,
-							failureType: "network",
-						},
-					},
-					"warning",
-				);
-			} else if (err instanceof HemeraConfigurationError) {
-				transmissionError = err.message;
-				reportError(err, {
-					requestId,
-					route: `/api/recording/upload/${id}`,
-					method: "POST",
-					additionalData: {
-						component: "recording.upload.route",
-						phase: currentPhase,
-						failureType: "configuration",
-					},
-				});
-			} else {
-				const message = err instanceof Error ? err.message : String(err);
-				transmissionError = message;
-				reportError(err instanceof Error ? err : new Error(message), {
-					requestId,
-					route: `/api/recording/upload/${id}`,
-					method: "POST",
-					additionalData: {
-						component: "recording.upload.route",
-						phase: currentPhase,
-						failureType: "unknown",
-					},
-				});
-			}
+			const message = err instanceof Error ? err.message : String(err);
+			transmissionError = message;
+			reportError(err instanceof Error ? err : new Error(message), undefined, "error");
 		}
 
 		// If MUX succeeded but hemera transmission failed → 207 Multi-Status
@@ -169,15 +116,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 		);
 	} catch (err) {
 		const message = err instanceof Error ? err.message : String(err);
-		reportError(
-			err instanceof Error ? err : new Error(message),
-			{
-				requestId,
-				route: `/api/recording/upload/${id}`,
-				method: "POST",
-			},
-			"error",
-		);
-		return createErrorResponse(message, ErrorCodes.INTERNAL_ERROR, requestId, 500);
+		reportError(err instanceof Error ? err : new Error(message), undefined, "error");
+		return createErrorResponse(message, ErrorCodes.INTERNAL_ERROR, undefined, 500);
 	}
 }

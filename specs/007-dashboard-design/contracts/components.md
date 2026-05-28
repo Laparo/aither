@@ -74,7 +74,7 @@ interface ThemeRegistryProps {
 ### Section A — CourseCard
 
 **File**: `src/app/components/dashboard/section-a-course-card.tsx`  
-**Type**: Server Component (no interactivity — error/empty/retry states are handled at the page level in `page.tsx`, not inside this component)
+**Type**: Server Component (no interactivity)
 
 ```typescript
 interface CourseCardProps {
@@ -88,8 +88,6 @@ interface CourseCardProps {
 - Level badge as `Chip` (Grundkurs / Fortgeschritten / Masterclass)
 - Start date, end date formatted as `dd.MM.yyyy`
 - Participant count
-
-**Note**: CourseCard only receives successfully fetched data. Error, empty, and loading states are rendered by `page.tsx` before CourseCard is mounted.
 
 **Test assertions**:
 - Renders course title text
@@ -108,8 +106,6 @@ interface MaterialCardProps {
   slideStatus: SlideStatus
 }
 ```
-
-**Note**: MaterialCard only receives a resolved `SlideStatus` object. Loading (Skeleton), error (Alert), and empty states at the *section level* are handled by `page.tsx` before MaterialCard is mounted — identical to the CourseCard pattern. MaterialCard itself renders the "Keine Folien vorhanden" empty state when `slideStatus.files` is empty and `slideStatus.status === 'not-generated'`.
 
 **Renders**:
 - `Paper` wrapper with consistent padding
@@ -141,14 +137,13 @@ interface ParticipantsListProps {
 - MUI `List` with `ListItem` rows
 - Each row: `Avatar` (initials from name) → name → completion status
 - Each `ListItem` is expandable (click/tap toggles detail panel): expanded state reveals preparation intent, desired results, and line manager profile via a collapsible section (`Collapse` or inline expand). `aria-expanded` MUST reflect the current state.
-- **Keyboard interaction**: `Enter` and `Space` on a focused `ListItem` MUST toggle the expanded state (updating `aria-expanded`). When expanding, focus MUST move to the first focusable element inside the `Collapse` panel (or remain on the `ListItem` if no focusable children exist). When collapsing, focus MUST return to the `ListItem` toggle. `Escape` on a focused element inside an expanded `Collapse` panel MUST close the panel and return focus to the `ListItem` toggle. Arrow keys (`ArrowUp` / `ArrowDown`) SHOULD navigate between `ListItem` rows within the `List`. `Home` / `End` MUST move focus to the first / last `ListItem` in the `List`. `Tab` / `Shift+Tab` MUST traverse focusable elements inside the expanded `Collapse` panel before moving out to the next focusable component in the page.
-- **Collapse panel semantics**: Each `Collapse` panel MUST render a semantic container (`role="region"`) with `aria-labelledby` referencing the `id` of its parent `ListItem` toggle. When a `Collapse` opens or closes, the state change MUST be announced to assistive technology (e.g., via `aria-live="polite"` on a status element or programmatic focus movement that triggers announcement).
+- **Keyboard interaction**: `Enter` and `Space` on a focused `ListItem` MUST toggle the expanded state (updating `aria-expanded`). When expanding, focus MUST move to the first focusable element inside the `Collapse` panel (or remain on the `ListItem` if no focusable children exist). When collapsing, focus MUST return to the `ListItem` toggle. Arrow keys (`ArrowUp` / `ArrowDown`) SHOULD navigate between `ListItem` rows within the `List`.
 - Empty state: "Keine Teilnehmer." message
 
 **Avatar logic**:
-- Extract initials from the `name` field: split `name` by whitespace, take the first character of the first token and the first character of the last token. If `name` contains only one token, use its first character only.
+- Extract first letter of first name + first letter of last name
 - **Deterministic background color algorithm**: Given the full name string, compute `sum = name.split('').reduce((acc, ch) => acc + ch.charCodeAt(0), 0)`. The palette is a fixed array `AVATAR_COLORS = ['#884143', '#926A49', '#bc8f8f', '#5B9A8B', '#2D2D2D', '#6B4C3B', '#7A8B6F', '#8B6F7A']`. The background color index is `sum % AVATAR_COLORS.length`. All implementations MUST use this exact algorithm to produce identical colors.
-- Fallback: when `name` is null or empty, display the glyph `"?"` with `AVATAR_COLORS[0]` as background color and the label "Unbekannt"
+- Fallback: when name is null or empty, display the glyph `"?"` and use palette index `0` (`AVATAR_COLORS[0]`) as the background color
 
 **Test assertions**:
 - Renders one list item per participant
@@ -159,7 +154,7 @@ interface ParticipantsListProps {
 ### Section B — SlidesList
 
 **File**: `src/app/components/dashboard/section-b-slides-list.tsx`  
-**Type**: Client Component (`'use client'`) — preview Modal requires local state
+**Type**: Server Component
 
 ```typescript
 interface SlidesListProps {
@@ -170,17 +165,12 @@ interface SlidesListProps {
 **Renders**:
 - `Paper` wrapper with section heading "Kursfolien"
 - MUI `List` with one row per slide file
-- Each row: slide filename, clickable link that opens a preview Modal
-- **Preview Modal**: MUI `Dialog` displaying the slide content (`<iframe>` or `<img>` depending on file type). The Modal includes: a close button (`IconButton` with `CloseIcon`), the slide filename as `DialogTitle`, and `data-testid="slide-preview-modal"`. Content is loaded from the local slide file path via a relative URL.
-- **Preview error state**: When the slide file cannot be loaded (HTTP 404/500, network error, or read failure), the Modal body shows "Datei konnte nicht geladen werden" with a retry button that re-attempts the load. The faulty file path is logged via `reportError`.
+- Each row: slide filename, clickable link
 - Empty state: "Keine Folien generiert." message
 
 **Test assertions**:
 - Renders one list item per file in `slideStatus.files`
 - Each item shows the filename
-- Clicking a filename opens the preview Modal with the correct filename as title
-- Preview Modal has a close button that closes the Modal
-- Preview error state renders error message and retry button when file load fails
 - Empty state rendered when files is empty
 - Has `data-testid="slides-list"`
 
@@ -200,8 +190,6 @@ export interface EndpointDef {
   path: string;
   method: 'GET' | 'POST';
   group: string;
-  probeMethod?: 'HEAD' | 'GET';
-  fallbackToGetOnHeadUnsupported?: boolean;
 }
 
 export const MONITORED_ENDPOINTS: EndpointDef[] = [
@@ -216,26 +204,13 @@ import { MONITORED_ENDPOINTS } from '@/app/components/endpoint-config';
 
 This ensures a single source of truth for the endpoint list. No hard-coded endpoint list in either component.
 
-**Runtime probe result**:
-
-```typescript
-export interface EndpointResult {
-  status: 'prüfe' | 'erreichbar' | 'fehler';
-  code?: number;
-  probeMethod?: 'HEAD' | 'GET';
-}
-```
-
 **Polling & data fetching**:
 - Uses `fetch` + `useEffect` (no external library) for health checks
 - Initial fetch on mount; polls every **10 seconds** thereafter
 - Each endpoint is fetched independently; a single endpoint failure does not block others
-- Default probe method is `HEAD`; if the endpoint returns `405` or `501` and `fallbackToGetOnHeadUnsupported !== false`, the probe retries with `GET`
-- Requests MUST use `redirect: 'manual'` so auth redirects are treated as failures instead of reachable endpoints
 - **Loading state**: On mount, each `Chip` shows label `"Laden…"` with `color="default"` until the first response
-- **Reachable rule**: Non-redirect HTTP responses below `500` resolve to `status: 'erreichbar'`; redirect responses and network failures resolve to `status: 'fehler'`
-- **Error handling**: Error chips show `color="error"`; tooltip text MAY include the HTTP status code and the effective probe method. Retries happen on the next poll interval.
-- **Success**: `status: 'erreichbar'` renders a success chip labelled `"OK"`
+- **Error handling**: HTTP 4xx/5xx responses and network errors (`TypeError`) set status to `"Error"`. The `Chip` shows `color="error"` with a `Tooltip` displaying the HTTP status code or error message. Retries happen on the next poll interval (no exponential backoff).
+- **Success**: HTTP 2xx sets status to `"OK"` with `Chip color="success"`
 
 **Renders**:
 - Section heading "Steuerung"
@@ -247,8 +222,8 @@ export interface EndpointResult {
 - Renders cards for all monitored endpoints
 - Each card shows endpoint path and method
 - Status chips show `"Laden…"` before first response
-- Status chips reflect probe results (OK / Error) using the shared `EndpointResult` mapping
-- Error chips have a `Tooltip` with error details when a code is available
+- Status chips reflect health check results (OK / Error)
+- Error chips have a `Tooltip` with error details
 - Has `data-testid="steuerung-cards"`
 
 ### Section D — CameraSection
@@ -262,11 +237,6 @@ No external props — self-contained (embeds existing `CameraSnapshot` component
 - `Paper` wrapper with section heading “Kamera”
 - Embedded `CameraSnapshot` component (existing)
 - `data-testid="camera-card"`
-
-**Delegated refresh contract**:
-- `CameraSection` MUST NOT re-implement snapshot fetching logic; it wraps the existing `CameraSnapshot`
-- `CameraSnapshot` owns loading state, retry / reconnect behavior, and any polling / backoff semantics required by Section D in [spec.md](../spec.md)
-- Verification of polling and additive backoff belongs in dedicated `CameraSnapshot` tests rather than wrapper-component tests
 
 **Test assertions**:
 - Renders heading “Kamera”

@@ -5,16 +5,10 @@
 
 import { requireAdmin } from "@/lib/auth/role-check";
 import { getRouteAuth } from "@/lib/auth/route-auth";
-import {
-	HemeraConfigurationError,
-	HemeraUnreachableError,
-	createHemeraClient,
-} from "@/lib/hemera/factory";
-import { reportError } from "@/lib/monitoring/rollbar-official";
+import { createHemeraClient } from "@/lib/hemera/factory";
 import { transmitRecording } from "@/lib/sync/recording-transmitter";
 import type { TransmitResult } from "@/lib/sync/recording-transmitter";
 import { RecordingTransmitRequestSchema } from "@/lib/sync/schemas";
-import { getOrCreateRequestIdFromHeaders } from "@/lib/utils/request-id";
 import { NextResponse } from "next/server";
 
 /**
@@ -25,8 +19,6 @@ import { NextResponse } from "next/server";
  * Response: 200 on success, 400 on validation error, 502 on Hemera API failure
  */
 export async function POST(request: Request): Promise<NextResponse> {
-	const requestId = getOrCreateRequestIdFromHeaders(request.headers);
-
 	const authData = await getRouteAuth();
 	const authResult = requireAdmin(authData);
 	if (authResult.status !== 200) {
@@ -62,75 +54,13 @@ export async function POST(request: Request): Promise<NextResponse> {
 	// Create Hemera client
 	let client: Awaited<ReturnType<typeof createHemeraClient>>;
 	try {
-		client = await createHemeraClient({
-			requestId,
-			route: "/api/recordings",
-			method: "POST",
-		});
+		client = await createHemeraClient();
 	} catch (err) {
-		if (err instanceof HemeraUnreachableError) {
-			reportError(
-				err,
-				{
-					requestId,
-					route: "/api/recordings",
-					method: "POST",
-					additionalData: {
-						component: "recordings.route",
-						phase: "createHemeraClient",
-						failureType: "network",
-					},
-				},
-				"warning",
-			);
-			return NextResponse.json(
-				{
-					error: "Service Unavailable",
-					code: "HEMERA_UNREACHABLE",
-					message: err.message,
-					requestId,
-				},
-				{ status: 503 },
-			);
-		}
-
-		if (err instanceof HemeraConfigurationError) {
-			reportError(err, {
-				requestId,
-				route: "/api/recordings",
-				method: "POST",
-				additionalData: {
-					component: "recordings.route",
-					phase: "createHemeraClient",
-					failureType: "configuration",
-				},
-			});
-			return NextResponse.json(
-				{
-					error: "Internal Server Error",
-					code: "HEMERA_CONFIGURATION_ERROR",
-					requestId,
-				},
-				{ status: 500 },
-			);
-		}
-
-		const unknownError = err instanceof Error ? err : new Error(String(err));
-		reportError(unknownError, {
-			requestId,
-			route: "/api/recordings",
-			method: "POST",
-			additionalData: {
-				component: "recordings.route",
-				phase: "createHemeraClient",
-				failureType: "unknown",
-			},
-		});
+		console.error("createHemeraClient failed", { err });
 		return NextResponse.json(
 			{
 				error: "Internal Server Error",
-				code: "HEMERA_CLIENT_INIT_FAILED",
-				requestId,
+				message: "Failed to initialize Hemera API client",
 			},
 			{ status: 500 },
 		);
