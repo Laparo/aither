@@ -60,6 +60,12 @@ As platform owner, I need these endpoints to keep server-to-server auth server-s
 - What happens when two navigation requests for the same presentation arrive concurrently?
 - How does the API behave when optional notes data is absent (must still return valid payload shape)?
 
+### Adjacent API Boundaries
+
+- `GET /api/slides/status` and `GET /api/slides/view` are considered adjacent endpoints and remain out of functional scope for this feature.
+- The controller endpoints MUST NOT require changes to adjacent endpoint request/response shapes.
+- If adjacent endpoint artifact state drifts from controller state, controller endpoints still enforce their own contract semantics and return explicit controller error codes.
+
 ## Requirements *(mandatory)*
 
 ### Functional Requirements
@@ -73,8 +79,22 @@ As platform owner, I need these endpoints to keep server-to-server auth server-s
 - **FR-007**: Manifest and navigation endpoints MAY include supplemental notes fields when available, but MUST remain valid when notes are absent.
 - **FR-008**: Slide ordering returned by `GET /api/slides/controller` MUST be deterministic for a given presentation snapshot.
 - **FR-009**: Both endpoints MUST enforce existing service-level authentication and MUST reject unauthorized access.
-- **FR-010**: Error responses MUST be explicit for invalid input, out-of-sync state, and data-unavailable conditions.
-- **FR-011**: Endpoint handling MUST NOT expose bearer tokens, internal secret values, or sensitive path details in responses.
+- **FR-010**: Error responses MUST be explicit for invalid input, out-of-sync state, and data-unavailable conditions, and MUST follow the canonical status/code matrix defined below.
+- **FR-011**: Endpoint handling MUST NOT expose bearer tokens, internal secret values, or sensitive path details in responses. This includes (non-exhaustive) `Authorization` header values, token fragments, and absolute internal filesystem paths.
+- **FR-012**: On `POST /api/slides/controller/navigation`, `command=previous` at index `0` MUST return `200` with unchanged `activeSlideIndex=0`.
+- **FR-013**: On `POST /api/slides/controller/navigation`, `command=next` at the last slide index MUST return `200` with unchanged `activeSlideIndex`.
+- **FR-014**: If referenced slide artifacts are missing or unreadable, controller endpoints MUST return `503 SLIDE_STATE_UNAVAILABLE` with a structured retryable error payload. FR-014 is a mandatory specialization of FR-010 and takes precedence for this condition.
+- **FR-015**: Adjacent slide endpoints (`/api/slides/status`, `/api/slides/view`) are integration dependencies only and MUST remain backward-compatible and out of scope for controller feature changes.
+
+### Controller Error Code Matrix
+
+| Condition | HTTP Status | Error Code |
+|-----------|-------------|------------|
+| Invalid input (query/body/schema) | `400` | `INVALID_REQUEST` |
+| Unauthorized request | `401` | `UNAUTHORIZED` |
+| Presentation not found | `404` | `PRESENTATION_NOT_FOUND` |
+| Out-of-sync navigation state (`fromIndex` mismatch) | `409` | `INDEX_CONFLICT` |
+| Slide artifacts missing or unreadable | `503` | `SLIDE_STATE_UNAVAILABLE` |
 
 ### Key Entities *(include if feature involves data)*
 

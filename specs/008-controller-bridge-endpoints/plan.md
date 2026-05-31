@@ -22,6 +22,30 @@ Implement two server endpoints in Aither to unblock Gaia controller integration:
 
 Performance targets are treated as acceptance gates and must be validated with a dedicated measurement task in `tasks.md` before implementation sign-off.
 
+### Operational Definitions
+
+- **Actionable error context**: error payload contains `code`, `message`, optional `requestId`, and machine-readable `details` when applicable.
+- **Deterministic ordering**: identical presentation snapshot inputs return identical `slides[]` order and `activeSlideIndex` values.
+- **Representative fixture load**: at least 1 course with 50 slides and mixed notes-present/notes-absent entries.
+
+### Performance Validation Protocol
+
+- Run 30 request samples per endpoint (`GET /api/slides/controller`, `POST /api/slides/controller/navigation`) against the representative fixture load.
+- Compute p95 latency from captured durations (discard warm-up sample 1).
+- Pass criteria: manifest p95 < 300 ms and navigation p95 < 250 ms.
+- Persist validation evidence to `specs/008-controller-bridge-endpoints/performance-validation.md`.
+- Include raw durations, p95 calculation method, fixture identity (fixture name plus timestamp/hash), and explicit pass/fail results for each endpoint.
+
+### Dependencies & Bounded Scope Assumptions
+
+| Dependency | Assumption | Failure Impact | Scope Rule |
+|-----------|------------|----------------|------------|
+| Generated slide artifacts | Artifacts exist under configured output directory | Controller endpoints may return `503 SLIDE_STATE_UNAVAILABLE` | No changes to artifact producer in this feature |
+| Route auth (`getRouteAuth`/guard) | Existing auth behavior remains stable | Unauthorized requests fail with `401` | No auth architecture redesign in this feature |
+| Adjacent endpoints (`/api/slides/status`, `/api/slides/view`) | Existing contracts remain unchanged | Any drift is handled as controller-side explicit error conditions | Adjacent endpoint behavior is explicitly out of scope |
+
+No hidden coupling is introduced: controller endpoints consume shared slide state but do not alter adjacent endpoint contracts.
+
 ## Constitution Check
 
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
@@ -45,6 +69,7 @@ specs/008-controller-bridge-endpoints/
 ├── research.md
 ├── data-model.md
 ├── quickstart.md
+├── performance-validation.md
 ├── contracts/
 │   ├── controller-endpoints.openapi.yaml
 │   └── controller-endpoints.contract.md
@@ -64,8 +89,8 @@ src/
     └── controller-types.ts
 
 tests/
-├── contracts/
-│   └── controller-endpoints.spec.ts
+├── contract/
+│   └── controller-endpoints.contract.spec.ts
 └── unit/
     ├── controller-manifest.spec.ts
     └── controller-navigation.spec.ts
