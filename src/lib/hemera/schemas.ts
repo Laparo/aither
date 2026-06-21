@@ -160,6 +160,7 @@ export const ServiceParticipantSchema = z.object({
 	participationId: z.string().nullable(),
 	userId: z.string(),
 	name: z.string().nullable(),
+	imageUrl: z.string().url().nullable().optional(),
 	status: z.string(),
 	preparationIntent: z.string().nullable(),
 	desiredResults: z.string().nullable(),
