@@ -157,7 +157,7 @@ export type ServiceCoursesResponse = z.infer<typeof ServiceCoursesResponseSchema
 /** Participant within a course detail response (from Hemera GET /api/service/courses/[id]) */
 export const ServiceParticipantSchema = z.object({
 	bookingId: z.string().nullable().optional(),
-	participationId: z.string(),
+	participationId: z.string().nullable(),
 	userId: z.string(),
 	name: z.string().nullable(),
 	status: z.string(),
