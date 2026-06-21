@@ -15,7 +15,6 @@ export function AppHeader() {
 			elevation={0}
 			sx={{
 				bgcolor: colors.rosyBrown,
-				borderBottom: `1px solid ${colors.marsalaDark}`,
 			}}
 		>
 			<Container maxWidth="lg">
