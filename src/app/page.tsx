@@ -7,13 +7,12 @@ import { ParticipantsList } from "@/app/components/dashboard/section-b-participa
 import { SteuerungCards } from "@/app/components/dashboard/section-c-steuerung-cards";
 import { CameraSection } from "@/app/components/dashboard/section-d-camera-card";
 import type { SlideStatus } from "@/app/components/dashboard/types";
-import { HemeraClient } from "@/lib/hemera/client";
+import { createHemeraClient } from "@/lib/hemera/factory";
 import {
 	type ServiceCourseDetail,
 	ServiceCourseDetailResponseSchema,
 	ServiceCoursesResponseSchema,
 } from "@/lib/hemera/schemas";
-import { getTokenManager } from "@/lib/hemera/token-manager";
 import { selectNextCourse } from "@/lib/sync/course-selector";
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
@@ -22,21 +21,12 @@ import Container from "@mui/material/Container";
 import Typography from "@mui/material/Typography";
 
 /** Create an authenticated HemeraClient for SSR data fetching. */
-function createClient(): HemeraClient | null {
-	const baseUrl = process.env.HEMERA_API_BASE_URL;
-	if (!baseUrl) {
-		console.warn("HEMERA_API_BASE_URL nicht gesetzt");
+async function createClient() {
+	try {
+		return await createHemeraClient({ route: "/", method: "GET" });
+	} catch {
 		return null;
 	}
-	const tokenManager = getTokenManager();
-	return new HemeraClient({
-		baseUrl,
-		getToken: () => tokenManager.getToken(),
-		rateLimit: 2,
-		maxRetries: 0,
-		fetchFn: (input, init) =>
-			fetch(input, { ...init, signal: AbortSignal.timeout(5_000), cache: "no-store" }),
-	});
 }
 
 async function fetchSlideStatus(courseId: string | null): Promise<SlideStatus> {
@@ -102,7 +92,7 @@ async function detectSlideCourseId(): Promise<string | null> {
 
 /** Fetch next course with participants, or null on failure. */
 async function fetchNextCourseDetail(): Promise<ServiceCourseDetail | null> {
-	const client = createClient();
+	const client = await createClient();
 	if (!client) return null;
 
 	const coursesResponse = await client.get("/api/service/courses", ServiceCoursesResponseSchema);
