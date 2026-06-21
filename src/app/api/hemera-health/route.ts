@@ -11,12 +11,24 @@ export const dynamic = "force-dynamic";
  * an API-style status code. This avoids falsely reporting "reachable" when
  * something else (e.g. another Next.js instance) is listening on the same URL.
  *
- * Returns 200 if Hemera responds with JSON, 502 otherwise.
+ * - HEAD: returns 200 if Hemera responds, 502 otherwise (no body)
+ * - GET: returns JSON with `{ reachable, baseUrl, hemeraStatus, error? }`
  */
-export async function HEAD() {
+
+interface ProbeResult {
+	reachable: boolean;
+	baseUrl?: string;
+	hemeraStatus?: number;
+	error?: string;
+}
+
+async function probeHemera(): Promise<{ result: ProbeResult; status: number }> {
 	const baseUrl = process.env.HEMERA_API_BASE_URL;
 	if (!baseUrl) {
-		return new NextResponse(null, { status: 502 });
+		return {
+			result: { reachable: false, error: "HEMERA_API_BASE_URL not configured" },
+			status: 502,
+		};
 	}
 
 	try {
@@ -37,10 +49,38 @@ export async function HEAD() {
 		// 404/5xx with HTML = something other than Hemera answered.
 		const looksLikeApi = res.ok || res.status === 401;
 		if (looksLikeApi && looksLikeJson) {
-			return new NextResponse(null, { status: 200 });
+			return {
+				result: { reachable: true, baseUrl, hemeraStatus: res.status },
+				status: 200,
+			};
 		}
-		return new NextResponse(null, { status: 502 });
-	} catch {
-		return new NextResponse(null, { status: 502 });
+		return {
+			result: {
+				reachable: false,
+				baseUrl,
+				hemeraStatus: res.status,
+				error: `Unexpected response (status=${res.status}, contentType=${contentType || "none"})`,
+			},
+			status: 502,
+		};
+	} catch (err) {
+		return {
+			result: {
+				reachable: false,
+				baseUrl,
+				error: err instanceof Error ? err.message : String(err),
+			},
+			status: 502,
+		};
 	}
+}
+
+export async function HEAD() {
+	const { status } = await probeHemera();
+	return new NextResponse(null, { status });
+}
+
+export async function GET() {
+	const { result, status } = await probeHemera();
+	return NextResponse.json(result, { status });
 }
