@@ -26,6 +26,7 @@ services:
       - WATCHPACK_POLLING=true   # File-Watching in Docker
       - HEMERA_API_BASE_URL=http://host.docker.internal:3000
       - HEMERA_API_FALLBACK_URL=http://host.docker.internal:3000
+      - NEXT_PUBLIC_GIT_COMMIT=${GIT_COMMIT:-dev}
     restart: unless-stopped
 
   # ── Prod: Standalone Next.js ───────────────────────────────
