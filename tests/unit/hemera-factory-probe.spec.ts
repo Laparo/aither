@@ -2,8 +2,9 @@ import {
 	HemeraUnreachableError,
 	createHemeraClient,
 	resetHemeraBaseUrl,
+	setDockerDetectionOverride,
 } from "@/lib/hemera/factory";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/config", () => ({
 	loadConfig: vi.fn(),
@@ -25,6 +26,7 @@ describe("createHemeraClient reachability probes", () => {
 	beforeEach(async () => {
 		vi.clearAllMocks();
 		resetHemeraBaseUrl();
+		setDockerDetectionOverride(false);
 
 		const { loadConfig } = await import("@/lib/config");
 		vi.mocked(loadConfig).mockReturnValue({
@@ -37,6 +39,10 @@ describe("createHemeraClient reachability probes", () => {
 		vi.mocked(getTokenManager).mockReturnValue({
 			getToken: async () => "test-key-minimum-32-characters-long-for-validation",
 		} as ReturnType<typeof getTokenManager>);
+	});
+
+	afterEach(() => {
+		setDockerDetectionOverride(null);
 	});
 
 	it("uses primary when HEAD is unsupported but GET fallback returns 401", async () => {
@@ -82,6 +88,29 @@ describe("createHemeraClient reachability probes", () => {
 		expect((client as unknown as { baseUrl: string }).baseUrl).toBe("http://localhost:3000");
 		expect(fetchMock).toHaveBeenCalledTimes(1);
 		expect(fetchMock.mock.calls[0]?.[0]).toBe("http://localhost:3000/api/service/courses");
+	});
+
+	it("prefers host.docker.internal over localhost when running inside Docker", async () => {
+		const { loadConfig } = await import("@/lib/config");
+		vi.mocked(loadConfig).mockReturnValue({
+			HEMERA_API_BASE_URL: "http://localhost:3000",
+			HEMERA_API_FALLBACK_URL: "http://host.docker.internal:3000",
+			HEMERA_API_KEY: "test-key-minimum-32-characters-long-for-validation",
+		} as ReturnType<typeof loadConfig>);
+
+		// Simulate Docker environment via test override
+		setDockerDetectionOverride(true);
+
+		const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(mockResponse(401));
+		vi.stubGlobal("fetch", fetchMock);
+
+		const client = await createHemeraClient();
+		expect((client as unknown as { baseUrl: string }).baseUrl).toBe(
+			"http://host.docker.internal:3000",
+		);
+		expect(fetchMock.mock.calls[0]?.[0]).toBe(
+			"http://host.docker.internal:3000/api/service/courses",
+		);
 	});
 
 	it("treats redirect responses as unreachable and throws when both are redirects", async () => {

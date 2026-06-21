@@ -65,11 +65,62 @@ function isLoopbackHostname(hostname: string): boolean {
 	return normalized === "localhost" || normalized === "127.0.0.1" || normalized === "::1";
 }
 
+/**
+ * Detect if we're running inside a Docker container.
+ * In Docker, `localhost` refers to the container itself, not the host.
+ * We must use `host.docker.internal` to reach services on the host machine.
+ *
+ * Exported for testing — tests can override via `setDockerDetectionOverride`.
+ */
+export function isRunningInDocker(): boolean {
+	try {
+		// Classic Docker detection: /.dockerenv file exists
+		const fs = require("node:fs") as typeof import("node:fs");
+		if (fs.existsSync("/.dockerenv")) return true;
+	} catch {
+		// ignore
+	}
+	try {
+		// cgroup-based detection (works for Docker, Podman, containerd)
+		const fs = require("node:fs") as typeof import("node:fs");
+		const cgroup = fs.readFileSync("/proc/1/cgroup", "utf8");
+		if (/docker|containerd|kubepods/.test(cgroup)) return true;
+	} catch {
+		// ignore
+	}
+	return false;
+}
+
+/**
+ * Test-only override for `isRunningInDocker`. When set to a boolean, that value
+ * is returned instead of performing filesystem detection. Pass `null` to clear.
+ */
+let dockerDetectionOverride: boolean | null = null;
+export function setDockerDetectionOverride(value: boolean | null): void {
+	dockerDetectionOverride = value;
+}
+
+function detectDocker(): boolean {
+	if (dockerDetectionOverride !== null) return dockerDetectionOverride;
+	return isRunningInDocker();
+}
+
 function candidatePriority(url: string): number {
 	try {
-		const hostname = new URL(url).hostname;
+		const hostname = new URL(url).hostname.toLowerCase();
+		const inDocker = detectDocker();
+
+		if (inDocker) {
+			// In Docker: host.docker.internal reaches the host machine.
+			// localhost/127.0.0.1 would point to the container itself.
+			if (hostname === "host.docker.internal") return 0;
+			if (isLoopbackHostname(hostname)) return 1;
+			return 2;
+		}
+
+		// On host: localhost reaches the local machine.
 		if (isLoopbackHostname(hostname)) return 0;
-		if (hostname.toLowerCase() === "host.docker.internal") return 1;
+		if (hostname === "host.docker.internal") return 1;
 		return 2;
 	} catch {
 		return 3;
