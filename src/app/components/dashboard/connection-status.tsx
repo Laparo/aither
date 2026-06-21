@@ -21,6 +21,8 @@ interface ConnectionStatusProps {
 	retryInterval?: number;
 }
 
+const CONNECTION_PROBE_TIMEOUT_MS = 30_000;
+
 export function ConnectionStatus({
 	probeUrl,
 	maxRetries = 10,
@@ -34,17 +36,39 @@ export function ConnectionStatus({
 	const cancelledRef = useRef(false);
 
 	const probe = useCallback(async () => {
+		const controller = new AbortController();
+		const timeoutHandle = setTimeout(() => controller.abort(), CONNECTION_PROBE_TIMEOUT_MS);
 		try {
 			const res = await fetch(probeUrl, {
-				method: "HEAD",
+				method: "GET",
 				cache: "no-store",
-				signal: AbortSignal.timeout(4_000),
+				signal: controller.signal,
 			});
+			clearTimeout(timeoutHandle);
 			if (cancelledRef.current) return;
-			const ok = res.ok || res.status === 401;
+
+			let ok = res.ok || res.status === 401;
+			let error: string | undefined;
+
+			if (ok && res.headers.get("content-type")?.includes("application/json")) {
+				try {
+					const payload = (await res.json()) as { reachable?: boolean; error?: string };
+					if (payload.reachable === false) {
+						ok = false;
+						error = payload.error ?? "Hemera nicht erreichbar";
+					}
+				} catch {
+					// Ignore JSON parse issues and fall back to status-based check
+				}
+			}
+
+			if (!ok && !error) {
+				error = `HTTP ${res.status}`;
+			}
+
 			setAttempts((prev) => [
 				...prev,
-				{ timestamp: new Date(), success: ok, error: ok ? undefined : `HTTP ${res.status}` },
+				{ timestamp: new Date(), success: ok, error: ok ? undefined : error },
 			]);
 			if (ok) {
 				if (cancelledRef.current) return;
@@ -52,6 +76,7 @@ export function ConnectionStatus({
 				return;
 			}
 		} catch (err) {
+			clearTimeout(timeoutHandle);
 			if (cancelledRef.current) return;
 			const message = err instanceof Error ? err.message : "Netzwerkfehler";
 			setAttempts((prev) => [...prev, { timestamp: new Date(), success: false, error: message }]);
