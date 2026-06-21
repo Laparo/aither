@@ -60,6 +60,33 @@ function sanitizeUrlForLog(url: string): string {
 	}
 }
 
+function isLoopbackHostname(hostname: string): boolean {
+	const normalized = hostname.toLowerCase();
+	return normalized === "localhost" || normalized === "127.0.0.1" || normalized === "::1";
+}
+
+function candidatePriority(url: string): number {
+	try {
+		const hostname = new URL(url).hostname;
+		if (isLoopbackHostname(hostname)) return 0;
+		if (hostname.toLowerCase() === "host.docker.internal") return 1;
+		return 2;
+	} catch {
+		return 3;
+	}
+}
+
+function orderedUniqueCandidates(primaryUrl: string, fallbackUrl?: string): string[] {
+	const allCandidates = fallbackUrl ? [primaryUrl, fallbackUrl] : [primaryUrl];
+	const uniqueCandidates = Array.from(new Set(allCandidates));
+
+	return uniqueCandidates.sort((a, b) => candidatePriority(a) - candidatePriority(b));
+}
+
+function getAlternateCandidate(baseUrl: string, candidates: string[]): string | null {
+	return candidates.find((candidate) => candidate !== baseUrl) ?? null;
+}
+
 /**
  * Get the base URL for Hemera API, with automatic fallback support.
  *
@@ -70,47 +97,46 @@ function sanitizeUrlForLog(url: string): string {
  * 4. Cache the working URL permanently for subsequent requests
  * 5. If BOTH are unreachable, do NOT cache — next request retries both
  */
-async function getBaseUrlWithFallback(): Promise<string> {
-	if (cachedBaseUrl) {
-		return cachedBaseUrl;
-	}
-
+async function getBaseUrlWithFallback(): Promise<{ baseUrl: string; alternateUrl: string | null }> {
 	const config = loadConfig();
 	const primaryUrl = config.HEMERA_API_BASE_URL;
 	const fallbackUrl = config.HEMERA_API_FALLBACK_URL;
+	const candidates = orderedUniqueCandidates(primaryUrl, fallbackUrl);
 
-	// If no fallback is configured, return primary URL
-	if (!fallbackUrl) {
-		cachedBaseUrl = primaryUrl;
-		return primaryUrl;
+	if (cachedBaseUrl) {
+		return {
+			baseUrl: cachedBaseUrl,
+			alternateUrl: getAlternateCandidate(cachedBaseUrl, candidates),
+		};
 	}
 
-	// Health check: try a HEAD request against the primary URL with a short timeout
-	console.log(`[Hemera] Testing primary URL: ${sanitizeUrlForLog(primaryUrl)}`);
-	if (await isReachable(primaryUrl)) {
-		console.log(`[Hemera] Primary URL reachable: ${sanitizeUrlForLog(primaryUrl)}`);
-		cachedBaseUrl = primaryUrl;
-		bothUnavailableLogged = false;
-		return primaryUrl;
+	if (candidates.length === 1) {
+		cachedBaseUrl = candidates[0] ?? primaryUrl;
+		return { baseUrl: cachedBaseUrl, alternateUrl: null };
 	}
 
-	// Primary failed — try fallback
-	console.log(`[Hemera] Primary unavailable, testing fallback: ${sanitizeUrlForLog(fallbackUrl)}`);
-	if (await isReachable(fallbackUrl)) {
-		console.log(`[Hemera] Fallback URL reachable: ${sanitizeUrlForLog(fallbackUrl)}`);
-		cachedBaseUrl = fallbackUrl;
-		bothUnavailableLogged = false;
-		return fallbackUrl;
+	for (const candidate of candidates) {
+		console.log(`[Hemera] Testing URL: ${sanitizeUrlForLog(candidate)}`);
+		if (await isReachable(candidate)) {
+			console.log(`[Hemera] URL reachable: ${sanitizeUrlForLog(candidate)}`);
+			cachedBaseUrl = candidate;
+			bothUnavailableLogged = false;
+			return {
+				baseUrl: candidate,
+				alternateUrl: getAlternateCandidate(candidate, candidates),
+			};
+		}
 	}
 
 	// Both unreachable — do NOT cache so next request retries
 	if (!bothUnavailableLogged) {
+		const fallbackLabel = fallbackUrl ? sanitizeUrlForLog(fallbackUrl) : "(not configured)";
 		console.warn(
-			`[Hemera] Both primary (${sanitizeUrlForLog(primaryUrl)}) and fallback (${sanitizeUrlForLog(fallbackUrl)}) are unreachable.`,
+			`[Hemera] Both primary (${sanitizeUrlForLog(primaryUrl)}) and fallback (${fallbackLabel}) are unreachable.`,
 		);
 		bothUnavailableLogged = true;
 	}
-	throw new HemeraUnreachableError(primaryUrl, fallbackUrl);
+	throw new HemeraUnreachableError(primaryUrl, fallbackUrl ?? primaryUrl);
 }
 
 function buildHealthCheckUrl(baseUrl: string): string {
@@ -199,9 +225,8 @@ export async function createHemeraClient(
 		method: options.method,
 	};
 
-	let config: ReturnType<typeof loadConfig>;
 	try {
-		config = loadConfig();
+		loadConfig();
 	} catch (err) {
 		const configError = new HemeraConfigurationError("Hemera client configuration is invalid", {
 			cause: err instanceof Error ? err.message : String(err),
@@ -218,7 +243,6 @@ export async function createHemeraClient(
 	}
 
 	const tokenManager = getTokenManager();
-	const fallbackUrl = config.HEMERA_API_FALLBACK_URL;
 
 	// Defensive validation: ensure tokenManager exposes a getToken() function
 	if (
@@ -243,8 +267,11 @@ export async function createHemeraClient(
 	}
 
 	let baseUrl: string;
+	let alternateUrl: string | null = null;
 	try {
-		baseUrl = await getBaseUrlWithFallback();
+		const selectedUrls = await getBaseUrlWithFallback();
+		baseUrl = selectedUrls.baseUrl;
+		alternateUrl = selectedUrls.alternateUrl;
 	} catch (err) {
 		if (err instanceof HemeraUnreachableError) {
 			reportError(
@@ -275,12 +302,12 @@ export async function createHemeraClient(
 	}
 
 	// If fallback is configured, create a client that can fall back
-	if (fallbackUrl) {
+	if (alternateUrl) {
 		// Create a wrapping fetch function that tries fallback on network errors
 		const originalFetch = globalThis.fetch;
 
 		let primaryOrigin: string;
-		let fallbackOrigin: string;
+		let alternateOrigin: string;
 		try {
 			primaryOrigin = new URL(baseUrl).origin;
 		} catch {
@@ -299,11 +326,11 @@ export async function createHemeraClient(
 			throw configError;
 		}
 		try {
-			fallbackOrigin = new URL(fallbackUrl).origin;
+			alternateOrigin = new URL(alternateUrl).origin;
 		} catch {
 			const configError = new HemeraConfigurationError(
-				`[Hemera] Invalid fallbackUrl — cannot parse origin from "${sanitizeUrlForLog(fallbackUrl)}".`,
-				{ hint: "Check HEMERA_API_FALLBACK_URL configuration." },
+				`[Hemera] Invalid alternateUrl — cannot parse origin from "${sanitizeUrlForLog(alternateUrl)}".`,
+				{ hint: "Check HEMERA_API_BASE_URL / HEMERA_API_FALLBACK_URL configuration." },
 			);
 			reportError(configError, {
 				...errorContext,
@@ -341,10 +368,10 @@ export async function createHemeraClient(
 			} catch {
 				console.warn(`[Hemera] Primary URL failed, trying fallback: ${sanitizeUrlForLog(url)}`);
 
-				const fallbackRequestUrl = `${fallbackOrigin}${parsed.pathname}${parsed.search}${parsed.hash}`;
+				const fallbackRequestUrl = `${alternateOrigin}${parsed.pathname}${parsed.search}${parsed.hash}`;
 				const fallbackResponse = await originalFetch(fallbackRequestUrl, init);
 				if (fallbackResponse.ok) {
-					cachedBaseUrl = fallbackUrl; // Cache only on successful fallback
+					cachedBaseUrl = alternateUrl; // Cache only on successful fallback
 				}
 				return fallbackResponse;
 			}

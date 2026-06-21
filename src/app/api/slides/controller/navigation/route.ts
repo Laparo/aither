@@ -1,12 +1,13 @@
 import { randomUUID } from "node:crypto";
-import { requireAdmin } from "@/lib/auth/role-check";
 import { getRouteAuth } from "@/lib/auth/route-auth";
+import { requireSyncAccess } from "@/lib/auth/sync-service-auth";
 import { ErrorSeverity, reportError } from "@/lib/monitoring/rollbar-official";
 import {
 	navigatePresentation,
 	toControllerErrorResponse,
 } from "@/lib/slides/controller-navigation";
 import { parseControllerNavigationRequest } from "@/lib/slides/controller-types";
+import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 
 function toInvalidRequestResponse(message: string, requestId: string) {
@@ -23,10 +24,10 @@ function toInvalidRequestResponse(message: string, requestId: string) {
 	);
 }
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
 	const requestId = req.headers.get("x-request-id") ?? randomUUID();
 	const authData = await getRouteAuth();
-	const authResult = requireAdmin(authData);
+	const authResult = requireSyncAccess(req, authData);
 	if (authResult.status !== 200) {
 		return NextResponse.json(authResult.body, { status: authResult.status });
 	}

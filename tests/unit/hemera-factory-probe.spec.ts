@@ -67,6 +67,23 @@ describe("createHemeraClient reachability probes", () => {
 		expect(fetchMock).toHaveBeenCalledTimes(4);
 	});
 
+	it("prefers localhost when both localhost and network URL are reachable", async () => {
+		const { loadConfig } = await import("@/lib/config");
+		vi.mocked(loadConfig).mockReturnValue({
+			HEMERA_API_BASE_URL: "http://192.168.8.121:3000",
+			HEMERA_API_FALLBACK_URL: "http://localhost:3000",
+			HEMERA_API_KEY: "test-key-minimum-32-characters-long-for-validation",
+		} as ReturnType<typeof loadConfig>);
+
+		const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(mockResponse(401));
+		vi.stubGlobal("fetch", fetchMock);
+
+		const client = await createHemeraClient();
+		expect((client as unknown as { baseUrl: string }).baseUrl).toBe("http://localhost:3000");
+		expect(fetchMock).toHaveBeenCalledTimes(1);
+		expect(fetchMock.mock.calls[0]?.[0]).toBe("http://localhost:3000/api/service/courses");
+	});
+
 	it("treats redirect responses as unreachable and throws when both are redirects", async () => {
 		const fetchMock = vi
 			.fn<typeof fetch>()

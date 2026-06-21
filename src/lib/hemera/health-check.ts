@@ -23,6 +23,28 @@ function isReachableStatus(status: number): boolean {
 	return (status >= 200 && status < 300) || status === 401 || status === 403;
 }
 
+function isLoopbackHostname(hostname: string): boolean {
+	const normalized = hostname.toLowerCase();
+	return normalized === "localhost" || normalized === "127.0.0.1" || normalized === "::1";
+}
+
+function candidatePriority(url: string): number {
+	try {
+		const hostname = new URL(url).hostname;
+		if (isLoopbackHostname(hostname)) return 0;
+		if (hostname.toLowerCase() === "host.docker.internal") return 1;
+		return 2;
+	} catch {
+		return 3;
+	}
+}
+
+function orderedCandidates(primaryUrl: string, fallbackUrl?: string): string[] {
+	const allCandidates = fallbackUrl ? [primaryUrl, fallbackUrl] : [primaryUrl];
+	const uniqueCandidates = Array.from(new Set(allCandidates));
+	return uniqueCandidates.sort((a, b) => candidatePriority(a) - candidatePriority(b));
+}
+
 async function probe(url: string, method: ProbeMethod, signal: AbortSignal): Promise<Response> {
 	return fetch(url, {
 		method,
@@ -38,48 +60,42 @@ async function probe(url: string, method: ProbeMethod, signal: AbortSignal): Pro
  * Logs a warning in dev mode; reports to Rollbar in production.
  */
 export async function checkHemeraHealth(): Promise<boolean> {
-	let baseUrl: string;
+	let candidates: string[];
 	try {
 		const config = loadConfig();
-		baseUrl = config.HEMERA_API_BASE_URL;
+		candidates = orderedCandidates(config.HEMERA_API_BASE_URL, config.HEMERA_API_FALLBACK_URL);
 	} catch {
 		const msg = "Hemera health check skipped: configuration not available";
 		console.warn(`⚠ ${msg}`);
 		return false;
 	}
 
-	const url = `${baseUrl.replace(/\/+$/, "")}${HEMERA_HEALTH_PATH}`;
+	for (const baseUrl of candidates) {
+		const url = `${baseUrl.replace(/\/+$/, "")}${HEMERA_HEALTH_PATH}`;
 
-	try {
-		const signal = AbortSignal.timeout(5000);
-		const headRes = await probe(url, "HEAD", signal);
+		try {
+			const signal = AbortSignal.timeout(5000);
+			const headRes = await probe(url, "HEAD", signal);
 
-		if (isReachableStatus(headRes.status)) {
-			console.log(`✓ Hemera API reachable at ${baseUrl}`);
-			return true;
-		}
-
-		if (isMethodNotSupported(headRes.status)) {
-			const getRes = await probe(url, "GET", signal);
-			if (isReachableStatus(getRes.status)) {
-				console.log(`✓ Hemera API reachable at ${baseUrl} (GET fallback)`);
+			if (isReachableStatus(headRes.status)) {
+				console.log(`✓ Hemera API reachable at ${baseUrl}`);
 				return true;
 			}
 
-			const msg = `Hemera API responded with ${getRes.status} (${getRes.statusText}) at ${url} (GET fallback)`;
-			handleFailure(msg);
-			return false;
+			if (isMethodNotSupported(headRes.status)) {
+				const getRes = await probe(url, "GET", signal);
+				if (isReachableStatus(getRes.status)) {
+					console.log(`✓ Hemera API reachable at ${baseUrl} (GET fallback)`);
+					return true;
+				}
+			}
+		} catch {
+			// Try next candidate URL
 		}
-
-		const msg = `Hemera API responded with ${headRes.status} (${headRes.statusText}) at ${url}`;
-		handleFailure(msg);
-		return false;
-	} catch (error) {
-		const reason = error instanceof Error ? error.message : String(error);
-		const msg = `Hemera API unreachable at ${baseUrl}: ${reason}`;
-		handleFailure(msg);
-		return false;
 	}
+
+	handleFailure("Hemera API is unreachable for all configured URLs");
+	return false;
 }
 
 function handleFailure(message: string): void {
