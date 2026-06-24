@@ -9,7 +9,7 @@
 # ─────────────────────────────────────────────────────────────
 
 # ── Stage 1: Dependencies ────────────────────────────────────
-FROM node:22-alpine AS deps
+FROM node:24-alpine AS deps
 WORKDIR /app
 
 # Install libc6-compat for Alpine + native modules
@@ -19,7 +19,7 @@ COPY package.json package-lock.json ./
 RUN npm ci
 
 # ── Stage 2: Dev (hot-reload via bind mount) ─────────────────
-FROM node:22-alpine AS dev
+FROM node:24-alpine AS dev
 WORKDIR /app
 
 RUN apk add --no-cache libc6-compat
@@ -35,7 +35,7 @@ EXPOSE 3000
 CMD ["npm", "run", "dev", "--", "-p", "3000"]
 
 # ── Stage 3: Build ───────────────────────────────────────────
-FROM node:22-alpine AS builder
+FROM node:24-alpine AS builder
 WORKDIR /app
 
 RUN apk add --no-cache libc6-compat
@@ -48,7 +48,7 @@ ENV NEXT_TELEMETRY_DISABLED=1
 RUN npm run build
 
 # ── Stage 4: Production runner ───────────────────────────────
-FROM node:22-alpine AS runner
+FROM node:24-alpine AS runner
 WORKDIR /app
 
 RUN apk add --no-cache libc6-compat
