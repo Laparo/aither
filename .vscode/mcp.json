@@ -20,6 +20,11 @@
       "env": {
         "CODACY_ACCOUNT_TOKEN": "${input:codacy_token}"
       }
+    },
+    "playwright": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["@playwright/mcp@latest"]
     }
   },
   "inputs": [
