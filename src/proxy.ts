@@ -51,6 +51,8 @@ const publicPaths = new Set([
 
 const protectedRegexes = protectedPatterns.map((p) => new RegExp(`^${p}$`));
 
+const serviceAuthorizedPaths = new Set(["/api/sync", "/api/slides/view", "/api/slides/controller"]);
+
 function isProtectedPath(pathname: string): boolean {
 	if (publicPaths.has(pathname)) return false;
 	return protectedRegexes.some((re) => re.test(pathname));
@@ -71,7 +73,7 @@ function extractBearerToken(req: NextRequest): string | null {
 }
 
 export function isAuthorizedSyncServiceRequest(req: NextRequest): boolean {
-	if (req.nextUrl.pathname !== "/api/sync") {
+	if (!serviceAuthorizedPaths.has(req.nextUrl.pathname)) {
 		return false;
 	}
 
@@ -121,6 +123,23 @@ async function getClerkHandler(): Promise<
 }
 
 export default async function middleware(req: NextRequest, ev: NextFetchEvent) {
+	// Service routes are authenticated in the route handlers (sync-service-auth).
+	// Clerk middleware must not run here, otherwise Bearer service tokens can be
+	// misinterpreted as Clerk JWTs.
+	const pathname = req.nextUrl.pathname;
+	const authorizationHeader = req.headers.get("authorization") ?? "";
+	const hasBearerAuthorization = authorizationHeader.toLowerCase().startsWith("bearer ");
+
+	if (
+		hasBearerAuthorization &&
+		(pathname === "/api/sync" ||
+			pathname === "/api/slides/view" ||
+			pathname === "/api/slides/controller" ||
+			pathname.startsWith("/api/slides/controller/"))
+	) {
+		return NextResponse.next();
+	}
+
 	if (!hasClerkKey) {
 		if (isProtectedPath(req.nextUrl.pathname)) {
 			console.error(
