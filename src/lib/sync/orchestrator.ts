@@ -369,6 +369,13 @@ export class SyncOrchestrator {
 				};
 				const html = populateTemplate(templateHtml, templateDataWithTimestamp);
 				await writeHtmlFile(this.outputDir, "courses", courseDetail.slug, html);
+
+				// Also write to slides/<courseId>/ for controller manifest compatibility
+				const slidesDir = path.join(this.outputDir, "slides", courseDetail.id);
+				await fs.mkdir(slidesDir, { recursive: true });
+				const slideFileName = `001_${courseDetail.slug}.html`;
+				await fs.writeFile(path.join(slidesDir, slideFileName), html, "utf-8");
+
 				job.filesGenerated = 1;
 			}
 
